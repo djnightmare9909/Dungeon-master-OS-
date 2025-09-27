@@ -190,7 +190,7 @@ header {
   z-index: 10;
 }
 
-#menu-btn {
+#menu-btn, #help-btn {
   background: none;
   border: none;
   color: var(--text-secondary-color);
@@ -199,10 +199,10 @@ header {
   border-radius: 50%;
   display: flex;
 }
-#menu-btn:hover {
+#menu-btn:hover, #help-btn:hover {
     background-color: rgba(255,255,255,0.1);
 }
-#menu-btn svg {
+#menu-btn svg, #help-btn svg {
   width: 24px;
   height: 24px;
 }
@@ -212,6 +212,7 @@ header h1 {
   font-size: 1.75rem;
   color: var(--accent-color);
   text-shadow: 1px 1px 2px #000;
+  margin-right: auto; /* Pushes help button to the right */
 }
 
 main {
@@ -537,6 +538,113 @@ footer {
 .context-item button svg {
     width: 16px;
     height: 16px;
+}
+
+/* --- Help Modal --- */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.7);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background-color: var(--sidebar-color);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h2 {
+    font-family: var(--title-font);
+    color: var(--accent-color);
+    font-size: 1.5rem;
+}
+
+#close-help-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary-color);
+    cursor: pointer;
+    padding: 0.5rem;
+}
+#close-help-btn:hover {
+    color: var(--text-color);
+}
+#close-help-btn svg {
+    width: 24px;
+    height: 24px;
+}
+
+.modal-body {
+    padding: 0 1.5rem 1.5rem;
+    overflow-y: auto;
+    line-height: 1.7;
+}
+
+.modal-body section {
+    margin-top: 1.5rem;
+}
+
+.modal-body h3 {
+    font-family: var(--primary-font);
+    font-weight: 700;
+    font-size: 1.2rem;
+    color: var(--accent-color);
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+
+.modal-body p {
+    margin-bottom: 1rem;
+    color: var(--text-color);
+}
+
+.modal-body ul {
+    list-style-position: inside;
+    padding-left: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.modal-body li {
+    margin-bottom: 0.5rem;
+}
+
+.modal-body code {
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0.2em 0.4em;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9em;
+    color: var(--accent-hover-color);
+}
+
+.modal-body .help-clue {
+    font-style: italic;
+    color: var(--text-secondary-color);
+    margin-top: 1rem;
+    text-align: center;
 }
 
 

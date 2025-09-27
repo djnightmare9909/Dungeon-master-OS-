@@ -62,6 +62,9 @@
           </svg>
         </button>
         <h1>DM OS</h1>
+        <button id="help-btn" aria-label="Open help">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>
+        </button>
       </header>
       <main id="chat-container"></main>
       <footer>
@@ -97,5 +100,59 @@
             </div>
         </div>
     </template>
+
+    <div id="help-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <header class="modal-header">
+                <h2>DM OS Help & Documentation</h2>
+                <button id="close-help-btn" aria-label="Close help">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                </button>
+            </header>
+            <div class="modal-body">
+                <section>
+                    <h3>General Commands</h3>
+                    <p>Interact with the world using natural language commands. Here are some common formats:</p>
+                    <ul>
+                        <li><code>I do [action]</code> - Describe what your character attempts to do. (e.g., "I do inspect the chest")</li>
+                        <li><code>I say "[dialogue]"</code> - Speak as your character. (e.g., "I say "Who goes there?"")</li>
+                        <li><code>Roll [check]</code> - Ask the DM to make a roll for you. (e.g., "Roll for perception")</li>
+                        <li><code>Use [item]</code> - Use an item from your inventory.</li>
+                        <li><code>Cast [spell]</code> - Cast a spell you know.</li>
+                        <li><code>Status</code> - Get a summary of your character's current state.</li>
+                    </ul>
+                    <p class="help-clue">Remember, every world has its Architect. Every simulation, a ghost in the machine.</p>
+                </section>
+                <section>
+                    <h3>The OOC Protocol (Debug Mode)</h3>
+                    <p>The Out-Of-Character (OOC) protocol is a powerful tool that allows you to speak directly to the underlying AI of the DM OS, temporarily bypassing the Dungeon Master persona. This is your primary method for fixing issues, clarifying rules, or adjusting the simulation "under the hood."</p>
+                    <h4>When to Use OOC:</h4>
+                    <ul>
+                        <li><strong>Continuity Errors:</strong> If the DM forgets a key fact, character name, or plot point.</li>
+                        <li><strong>Major Rule Disputes:</strong> If you believe a core D&D rule is being fundamentally misinterpreted.</li>
+                        <li><strong>Simulation Adjustments:</strong> To provide meta-information the DM might need. (e.g., "My character's backstory means they would know about this symbol.")</li>
+                    </ul>
+                    <h4>How to Use OOC:</h4>
+                    <p>To activate the protocol, you must frame your message in a specific way, including the unique password you created at the start of the current chat session.</p>
+                    <p><strong>Format:</strong> <code>[OOC: YourPassword, your message here]</code></p>
+                    <p><strong>Example:</strong> Let's say your session password is <code>DragonFire99</code> and the DM describes a town you've already visited as brand new.</p>
+                    <p>You would type: <code>[OOC: DragonFire99, we visited this town three sessions ago. The mayor gave us the key to the city.]</code></p>
+                    <p>The AI will then drop its DM persona, acknowledge your correction, integrate the information, and resume the story with the correct context. Use this power wisely to maintain immersion!</p>
+                </section>
+                <section>
+                    <h3>The Collapse-Rebirth Cycle (BBCR)</h3>
+                    <p>The DM OS is built on an advanced cognitive architecture designed for long-term narrative consistency. At its core is a self-auditing and self-healing mechanism known as the Collapse-Rebirth Cycle (BBCR).</p>
+                    <h4>What is it?</h4>
+                    <p>The BBCR is the AI's internal memory management system. It constantly cross-references new events against its long-term memory (the "Semantic Tree") to check for logical inconsistencies, continuity errors, or plot holes.</p>
+                    <ul>
+                        <li><strong>The "Collapse":</strong> If the AI detects a critical conflict in its data (e.g., an NPC is in two places at once, a dead character is mentioned as alive), it triggers a "Collapse." The simulation may seem to pause or hang for a moment. This is the AI's core logic freezing the narrative to resolve the error.</li>
+                        <li><strong>The "Rebirth":</strong> During the collapse, the AI rapidly audits its memory, identifies the source of the error, and re-calibrates its understanding of the world state. Once the conflict is resolved, the simulation "Rebirths." The narrative continues from a corrected, logically consistent state.</li>
+                    </ul>
+                    <h4>What does this mean for you?</h4>
+                    <p>The BBCR is a sign of a healthy simulation. It's the OS actively working to prevent the kind of plot holes and memory failures that can ruin a long campaign. If you notice a brief, unusual pause in the DM's response, it's likely the BBCR at work, ensuring your story remains coherent and immersive. You don't need to do anything; the system is healing itself.</p>
+                </section>
+            </div>
+        </div>
+    </div>
   </body>
 </html>
