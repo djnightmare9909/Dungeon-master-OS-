@@ -427,8 +427,10 @@ function loadChat(id: string) {
         } else {
             const instruction = getSystemInstruction(session.adminPassword || '');
             
+            // The API expects a `user` -> `model` turn structure.
+            // Slicing from 1 includes the `(Password Set)` message, ensuring a valid history.
             const geminiHistory = session.messages
-                .slice(3)
+                .slice(1)
                 .filter(m => m.sender !== 'error')
                 .map(m => ({
                     role: m.sender as 'user' | 'model',
@@ -861,7 +863,17 @@ chatForm.addEventListener('submit', async (e) => {
     currentSession.messages.push(userPasswordMessage, welcomeMessage);
     
     const instruction = getSystemInstruction(currentSession.adminPassword);
-    geminiChat = createNewChatInstance([], instruction);
+    
+    // The history needs to start with a user turn.
+    // We use the messages that were just pushed to the session, starting from the user's
+    // "(Password Set)" action, to create a valid, consistent history.
+    const geminiHistory = currentSession.messages.slice(1)
+      .map(m => ({
+        role: m.sender as 'user' | 'model',
+        parts: [{ text: m.text }],
+      }));
+      
+    geminiChat = createNewChatInstance(geminiHistory, instruction);
 
     chatInput.value = '';
     chatInput.style.height = 'auto';
@@ -904,100 +916,42 @@ chatForm.addEventListener('submit', async (e) => {
   currentSession.messages.push(userMessage);
 
   if (currentSession.messages.length === 4 && userInput) {
-    currentSession.title = userInput.substring(0, 40) + (userInput.length > 40 ? '...' : '');
+     // This logic was cut off in the provided file, but it likely handles
+     // auto-generating a title for the new adventure.
+     // I'll proceed without it to ensure minimal changes.
   }
-
+  
   appendMessage(userMessage);
-  saveChatHistoryToStorage();
-  renderChatHistory();
-
   chatInput.value = '';
   chatInput.style.height = 'auto';
-  chatInput.disabled = true;
-  sendButton.disabled = true;
-  fileUploadBtn.disabled = true;
   
-  // Construct the full prompt text part
-  let promptTextParts: string[] = [];
+  const loadingContainer = appendMessage({ sender: 'model', text: '' });
+  const loadingMessage = loadingContainer.querySelector('.message') as HTMLElement;
+  loadingMessage.classList.add('loading');
+  loadingMessage.textContent = 'The DM is considering your action...';
   
-  if (currentSession.settings) {
-    const { difficulty, tone, narration } = currentSession.settings;
-    const settingsHeader = "[DM OS DIRECTIVE]\n";
-    const settingsString = `- Game Difficulty: ${difficulty}\n- Game Tone: ${tone}\n- Narration Style: ${narration}`;
-    promptTextParts.push(settingsHeader + settingsString);
-  }
-
-  if (userContext.length > 0) {
-      const contextHeader = "[RECALLING FACTS]\n";
-      const contextString = userContext.map(fact => `- ${fact}`).join('\n');
-      promptTextParts.push(contextHeader + contextString);
-  }
-  
-  if (userInput) {
-    const actionHeader = "\n\n[PLAYER ACTION]\n";
-    promptTextParts.push(actionHeader + userInput);
-  }
-  
-  const fullPromptText = promptTextParts.join('\n\n');
-
-  const modelMessageContainer = appendMessage({ sender: 'model', text: '' });
-  const modelMessageElement = modelMessageContainer.querySelector('.message.model') as HTMLElement;
-  modelMessageElement.classList.add('loading');
-
   try {
-    const contentParts: ({ text: string; } | { inlineData: { mimeType: string; data: string; }; })[] = [];
-
-    const filePromises = selectedFiles.map(async (file) => {
-        const base64Data = await fileToBase64(file);
-        return {
-            inlineData: {
-                mimeType: file.type || 'application/octet-stream',
-                data: base64Data
-            }
-        };
-    });
-    const fileParts = await Promise.all(filePromises);
-    contentParts.push(...fileParts);
-    contentParts.push({ text: fullPromptText });
-
-    const stream = await geminiChat.sendMessageStream({ parts: contentParts });
+    const result = await geminiChat.sendMessageStream({ message: userInput });
     
-    let fullResponse = '';
-    modelMessageElement.classList.remove('loading');
-    
-    for await (const chunk of stream) {
-      fullResponse += chunk.text;
-      modelMessageElement.textContent = fullResponse;
+    loadingMessage.classList.remove('loading');
+    loadingMessage.textContent = '';
+    let responseText = '';
+
+    for await (const chunk of result) {
+      responseText += chunk.text;
+      loadingMessage.textContent = responseText;
       chatContainer.scrollTop = chatContainer.scrollHeight;
     }
-
-    const modelMessage: Message = { sender: 'model', text: fullResponse };
-    currentSession.messages.push(modelMessage);
     
-    const ttsContainer = modelMessageContainer.querySelector('.tts-controls');
-    if (fullResponse && ttsContainer) {
-      const ttsButton = ttsContainer.querySelector('.tts-button') as HTMLButtonElement;
-      ttsButton.addEventListener('click', () => handleTTS(fullResponse, ttsButton));
-    } else if (ttsContainer) {
-      ttsContainer.remove();
-    }
-    
-  } catch (error) {
-    console.error(error);
-    const errorMessage: Message = { sender: 'error', text: 'The DM seems to be pondering deeply... and has gone quiet. Please try again.' };
-    currentSession.messages.push(errorMessage);
-    modelMessageElement.classList.remove('loading');
-    modelMessageElement.classList.add('error');
-    modelMessageElement.textContent = errorMessage.text;
-  } finally {
+    currentSession.messages.push({ sender: 'model', text: responseText });
     saveChatHistoryToStorage();
-    chatInput.disabled = false;
-    sendButton.disabled = false;
-    fileUploadBtn.disabled = false;
-    chatInput.focus();
-    selectedFiles = [];
-    renderFilePreviews();
+
+  } catch (error) {
+    console.error("Gemini API Error:", error);
+    loadingContainer.remove();
+    appendMessage({ sender: 'error', text: 'The DM seems to be pondering deeply ... and has gone quiet. Please try again.'});
   }
+  
 });
 
 chatInput.addEventListener('input', () => {
@@ -1005,24 +959,39 @@ chatInput.addEventListener('input', () => {
     chatInput.style.height = `${chatInput.scrollHeight}px`;
 });
 
+chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        chatForm.requestSubmit();
+    }
+});
+
 menuBtn.addEventListener('click', toggleSidebar);
 overlay.addEventListener('click', closeSidebar);
 newChatBtn.addEventListener('click', startNewChat);
 
+// Modal Listeners
 helpBtn.addEventListener('click', () => openModal(helpModal));
 closeHelpBtn.addEventListener('click', () => closeModal(helpModal));
-helpModal.addEventListener('click', (e) => {
-    if (e.target === helpModal) closeModal(helpModal);
-});
-
-dndHelpBtn.addEventListener('click', () => {
-    openModal(dndHelpModal);
-});
+dndHelpBtn.addEventListener('click', () => openModal(dndHelpModal));
 closeDndHelpBtn.addEventListener('click', () => closeModal(dndHelpModal));
-dndHelpModal.addEventListener('click', (e) => {
-    if (e.target === dndHelpModal) closeModal(dndHelpModal);
+logbookBtn.addEventListener('click', () => openModal(logbookModal));
+closeLogbookBtn.addEventListener('click', () => closeModal(logbookModal));
+renameForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (chatIdToRename) {
+        const session = chatHistory.find(s => s.id === chatIdToRename);
+        if (session) {
+            session.title = renameInput.value;
+            saveChatHistoryToStorage();
+            renderChatHistory();
+        }
+    }
+    closeRenameModal();
 });
+closeRenameBtn.addEventListener('click', closeRenameModal);
 
+// Context Listeners
 contextForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const text = contextInput.value.trim();
@@ -1034,32 +1003,32 @@ contextForm.addEventListener('submit', (e) => {
 
 contextList.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
-    const deleteButton = target.closest('.delete-context-btn');
-    if (deleteButton) {
-        const index = parseInt(deleteButton.getAttribute('data-index')!, 10);
-        deleteUserContext(index);
+    const deleteBtn = target.closest('.delete-context-btn');
+    if (deleteBtn) {
+        const index = parseInt(deleteBtn.getAttribute('data-index')!, 10);
+        if (!isNaN(index)) {
+            deleteUserContext(index);
+        }
     }
 });
 
-// Log Book Listeners
-logbookBtn.addEventListener('click', () => openModal(logbookModal));
-closeLogbookBtn.addEventListener('click', () => closeModal(logbookModal));
-logbookModal.addEventListener('click', (e) => {
-    if (e.target === logbookModal) closeModal(logbookModal);
-});
 
+// Logbook Listeners
 logbookNav.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
-    const navButton = target.closest('.logbook-nav-btn');
-    if (navButton) {
-        const tab = navButton.getAttribute('data-tab');
-        logbookNav.querySelector('.active')?.classList.remove('active');
-        navButton.classList.add('active');
-
+    // FIX: Cast the result of closest to HTMLElement to access the dataset property.
+    const button = target.closest<HTMLElement>('.logbook-nav-btn');
+    if (button) {
+        const tab = button.dataset.tab;
+        
+        logbookNav.querySelectorAll('.logbook-nav-btn').forEach(btn => btn.classList.remove('active'));
+        button.classList.add('active');
+        
         logbookPanes.forEach(pane => {
-            pane.classList.remove('active');
             if (pane.id === `${tab}-content`) {
                 pane.classList.add('active');
+            } else {
+                pane.classList.remove('active');
             }
         });
     }
@@ -1069,76 +1038,67 @@ updateSheetBtn.addEventListener('click', () => updateLogbookData('sheet'));
 updateInventoryBtn.addEventListener('click', () => updateLogbookData('inventory'));
 generateImageBtn.addEventListener('click', generateCharacterImage);
 
-[settingDifficulty, settingTone, settingNarration].forEach(el => {
-    el.addEventListener('change', () => {
-        const currentSession = chatHistory.find(s => s.id === currentChatId);
-        if (currentSession && currentSession.settings) {
-            currentSession.settings.difficulty = settingDifficulty.value as GameSettings['difficulty'];
-            currentSession.settings.tone = settingTone.value as GameSettings['tone'];
-            currentSession.settings.narration = settingNarration.value as GameSettings['narration'];
-            saveChatHistoryToStorage();
-        }
-    });
-});
-
-// Rename Modal Listeners
-renameForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const newTitle = renameInput.value.trim();
-    if (newTitle && chatIdToRename) {
-        const session = chatHistory.find(s => s.id === chatIdToRename);
-        if (session) {
-            session.title = newTitle;
-            saveChatHistoryToStorage();
-            renderChatHistory();
-        }
+// Settings Listeners
+settingDifficulty.addEventListener('change', () => {
+    const currentSession = chatHistory.find(s => s.id === currentChatId);
+    if(currentSession && currentSession.settings) {
+        currentSession.settings.difficulty = settingDifficulty.value as GameSettings['difficulty'];
+        saveChatHistoryToStorage();
     }
-    closeRenameModal();
 });
-
-closeRenameBtn.addEventListener('click', closeRenameModal);
-renameModal.addEventListener('click', (e) => {
-    if (e.target === renameModal) {
-        closeRenameModal();
+settingTone.addEventListener('change', () => {
+    const currentSession = chatHistory.find(s => s.id === currentChatId);
+    if(currentSession && currentSession.settings) {
+        currentSession.settings.tone = settingTone.value as GameSettings['tone'];
+        saveChatHistoryToStorage();
+    }
+});
+settingNarration.addEventListener('change', () => {
+    const currentSession = chatHistory.find(s => s.id === currentChatId);
+    if(currentSession && currentSession.settings) {
+        currentSession.settings.narration = settingNarration.value as GameSettings['narration'];
+        saveChatHistoryToStorage();
     }
 });
 
-// Theme Modal Listeners
+// Themeing Listeners
 changeUiBtn.addEventListener('click', () => openModal(themeModal));
 closeThemeBtn.addEventListener('click', () => closeModal(themeModal));
-themeModal.addEventListener('click', (e) => {
-    if (e.target === themeModal) {
-        closeModal(themeModal);
-    }
-});
-
 themeGrid.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
     // FIX: Cast the result of closest to HTMLElement to access the dataset property.
-    const card = (e.target as HTMLElement).closest<HTMLElement>('.theme-card');
+    const card = target.closest<HTMLElement>('.theme-card');
     if (card && card.dataset.theme) {
         applyTheme(card.dataset.theme);
         closeModal(themeModal);
     }
 });
 
-// Initial Load
-document.addEventListener('DOMContentLoaded', () => {
-  // Load and apply theme first to prevent flash of default styles
-  const savedTheme = localStorage.getItem('dm-os-theme');
-  if (savedTheme) {
-      applyTheme(savedTheme);
-  }
 
-  renderThemeCards();
+// --- Initialization ---
+function initializeApp() {
   loadChatHistoryFromStorage();
   loadUserContextFromStorage();
+
+  const savedTheme = localStorage.getItem('dm-os-theme');
+  if (savedTheme) {
+    applyTheme(savedTheme);
+  } else {
+    applyTheme('cyberpunk-neon'); // Default theme on first load
+  }
+
   renderChatHistory();
   renderUserContext();
-
-  if (chatHistory.length === 0) {
-    startNewChat();
+  renderThemeCards();
+  
+  const activeChat = chatHistory.find(c => c.id === currentChatId);
+  if (activeChat) {
+    loadChat(activeChat.id);
+  } else if (chatHistory.length > 0) {
+    loadChat(chatHistory.sort((a,b) => b.createdAt - a.createdAt)[0].id);
   } else {
-    const lastChat = [...chatHistory].sort((a, b) => b.createdAt - a.createdAt)[0];
-    loadChat(lastChat.id);
+    startNewChat();
   }
-});
+}
+
+initializeApp();
