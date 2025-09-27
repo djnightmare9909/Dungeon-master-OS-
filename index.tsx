@@ -260,6 +260,12 @@ const renameForm = document.getElementById('rename-form') as HTMLFormElement;
 const renameInput = document.getElementById('rename-input') as HTMLInputElement;
 const closeRenameBtn = document.getElementById('close-rename-btn') as HTMLButtonElement;
 
+// Theme Modal
+const changeUiBtn = document.getElementById('change-ui-btn') as HTMLButtonElement;
+const themeModal = document.getElementById('theme-modal') as HTMLElement;
+const closeThemeBtn = document.getElementById('close-theme-btn') as HTMLButtonElement;
+const themeGrid = document.getElementById('theme-grid') as HTMLElement;
+
 
 // --- State Management ---
 let chatHistory: ChatSession[] = [];
@@ -286,11 +292,11 @@ function closeSidebar() {
   document.body.classList.remove('sidebar-open');
 }
 
-function openHelpModal(modal: HTMLElement) {
+function openModal(modal: HTMLElement) {
     modal.style.display = 'flex';
 }
 
-function closeHelpModal(modal: HTMLElement) {
+function closeModal(modal: HTMLElement) {
     modal.style.display = 'none';
 }
 
@@ -718,17 +724,59 @@ function openRenameModal(id: string) {
     const session = chatHistory.find(s => s.id === id);
     if (session) {
         renameInput.value = session.title;
-        renameModal.style.display = 'flex';
+        openModal(renameModal);
         renameInput.focus();
         renameInput.select();
     }
 }
 
 function closeRenameModal() {
-    renameModal.style.display = 'none';
+    closeModal(renameModal);
     chatIdToRename = null;
 }
 
+// --- Themeing Logic ---
+const themes = [
+    { id: 'high-fantasy-dark', name: 'High Fantasy (Dark)', colors: ['#131314', '#1e1f20', '#2a3a4a', '#c5b358'] },
+    { id: 'high-fantasy-light', name: 'High Fantasy (Light)', colors: ['#fdf6e3', '#f4ecd9', '#eee8d5', '#b58900'] },
+    { id: 'high-fantasy-elven', name: 'High Fantasy (Elven)', colors: ['#1a1829', '#24223b', '#3a365e', '#a489d4'] },
+    { id: 'cyberpunk-neon', name: 'Cyberpunk (Neon)', colors: ['#0d0221', '#140c2b', '#2a004f', '#00f0ff'] },
+    { id: 'cyberpunk-corporate', name: 'Cyberpunk (Corporate)', colors: ['#1a2228', '#242f38', '#354654', '#ff4d4d'] },
+    { id: 'cyberpunk-dystopian', name: 'Cyberpunk (Dystopian)', colors: ['#212121', '#2a2a2a', '#4d443a', '#ff9900'] },
+    { id: 'hellscape-fire', name: 'Hellscape (Fire)', colors: ['#100808', '#1a0c0c', '#4d1818', '#ff4500'] },
+    { id: 'hellscape-soul', name: 'Hellscape (Soul)', colors: ['#130f1a', '#1b1524', '#382d4a', '#7fff00'] },
+    { id: 'hellscape-ash', name: 'Hellscape (Ash)', colors: ['#202020', '#282828', '#404040', '#b22222'] },
+    { id: 'medieval-stone', name: 'Medieval (Stone)', colors: ['#3e3e3e', '#4a4a4a', '#5a5a5a', '#8b4513'] },
+    { id: 'medieval-royal', name: 'Medieval (Royal)', colors: ['#001f3f', '#002b54', '#003f7f', '#ffd700'] },
+    { id: 'medieval-parchment', name: 'Medieval (Parchment)', colors: ['#c2b59b', '#d1c6af', '#b5a88c', '#800000'] },
+    { id: 'outer-space-starship', name: 'Outer Space (Starship)', colors: ['#eef2f5', '#ffffff', '#d7dfe5', '#007bff'] },
+    { id: 'outer-space-deep', name: 'Outer Space (Deep)', colors: ['#0c0d21', '#141633', '#292d5c', '#9d00ff'] },
+    { id: 'outer-space-alien', name: 'Outer Space (Alien)', colors: ['#23092d', '#331042', '#531c69', '#00ff7f'] },
+    { id: 'pirate-sea', name: 'Pirates (High Seas)', colors: ['#f0e5d1', '#faeedb', '#e6d9c1', '#008b8b'] },
+    { id: 'pirate-treasure', name: 'Pirates (Treasure)', colors: ['#3d2c1c', '#4d3824', '#63482d', '#e5c100'] },
+    { id: 'pirate-grog', name: 'Pirates (Grog Tavern)', colors: ['#5c4b3f', '#6c5a4f', '#826e60', '#daa520'] },
+];
+
+function renderThemeCards() {
+    themeGrid.innerHTML = '';
+    themes.forEach(theme => {
+        const card = document.createElement('div');
+        card.className = 'theme-card';
+        card.dataset.theme = theme.id;
+        card.innerHTML = `
+            <div class="theme-preview">
+                ${theme.colors.map(color => `<span style="background-color: ${color};"></span>`).join('')}
+            </div>
+            <div class="theme-name">${theme.name}</div>
+        `;
+        themeGrid.appendChild(card);
+    });
+}
+
+function applyTheme(themeId: string) {
+    document.body.dataset.theme = themeId;
+    localStorage.setItem('dm-os-theme', themeId);
+}
 
 // --- File Handling Logic ---
 
@@ -842,7 +890,7 @@ chatForm.addEventListener('submit', async (e) => {
   }
 
   if (lowerCaseInput === 'help') {
-    openHelpModal(helpModal);
+    openModal(helpModal);
     chatInput.value = '';
     chatInput.style.height = 'auto';
     return;
@@ -961,18 +1009,18 @@ menuBtn.addEventListener('click', toggleSidebar);
 overlay.addEventListener('click', closeSidebar);
 newChatBtn.addEventListener('click', startNewChat);
 
-helpBtn.addEventListener('click', () => openHelpModal(helpModal));
-closeHelpBtn.addEventListener('click', () => closeHelpModal(helpModal));
+helpBtn.addEventListener('click', () => openModal(helpModal));
+closeHelpBtn.addEventListener('click', () => closeModal(helpModal));
 helpModal.addEventListener('click', (e) => {
-    if (e.target === helpModal) closeHelpModal(helpModal);
+    if (e.target === helpModal) closeModal(helpModal);
 });
 
 dndHelpBtn.addEventListener('click', () => {
-    openHelpModal(dndHelpModal);
+    openModal(dndHelpModal);
 });
-closeDndHelpBtn.addEventListener('click', () => closeHelpModal(dndHelpModal));
+closeDndHelpBtn.addEventListener('click', () => closeModal(dndHelpModal));
 dndHelpModal.addEventListener('click', (e) => {
-    if (e.target === dndHelpModal) closeHelpModal(dndHelpModal);
+    if (e.target === dndHelpModal) closeModal(dndHelpModal);
 });
 
 contextForm.addEventListener('submit', (e) => {
@@ -994,10 +1042,10 @@ contextList.addEventListener('click', (e) => {
 });
 
 // Log Book Listeners
-logbookBtn.addEventListener('click', () => openHelpModal(logbookModal));
-closeLogbookBtn.addEventListener('click', () => closeHelpModal(logbookModal));
+logbookBtn.addEventListener('click', () => openModal(logbookModal));
+closeLogbookBtn.addEventListener('click', () => closeModal(logbookModal));
 logbookModal.addEventListener('click', (e) => {
-    if (e.target === logbookModal) closeHelpModal(logbookModal);
+    if (e.target === logbookModal) closeModal(logbookModal);
 });
 
 logbookNav.addEventListener('click', (e) => {
@@ -1049,15 +1097,39 @@ renameForm.addEventListener('submit', (e) => {
 });
 
 closeRenameBtn.addEventListener('click', closeRenameModal);
-
 renameModal.addEventListener('click', (e) => {
     if (e.target === renameModal) {
         closeRenameModal();
     }
 });
 
+// Theme Modal Listeners
+changeUiBtn.addEventListener('click', () => openModal(themeModal));
+closeThemeBtn.addEventListener('click', () => closeModal(themeModal));
+themeModal.addEventListener('click', (e) => {
+    if (e.target === themeModal) {
+        closeModal(themeModal);
+    }
+});
+
+themeGrid.addEventListener('click', (e) => {
+    // FIX: Cast the result of closest to HTMLElement to access the dataset property.
+    const card = (e.target as HTMLElement).closest<HTMLElement>('.theme-card');
+    if (card && card.dataset.theme) {
+        applyTheme(card.dataset.theme);
+        closeModal(themeModal);
+    }
+});
+
 // Initial Load
 document.addEventListener('DOMContentLoaded', () => {
+  // Load and apply theme first to prevent flash of default styles
+  const savedTheme = localStorage.getItem('dm-os-theme');
+  if (savedTheme) {
+      applyTheme(savedTheme);
+  }
+
+  renderThemeCards();
   loadChatHistoryFromStorage();
   loadUserContextFromStorage();
   renderChatHistory();

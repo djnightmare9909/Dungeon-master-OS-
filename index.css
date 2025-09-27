@@ -1,10 +1,12 @@
 :root {
+  /* High Fantasy (Dark) - Default Theme */
   --background-color: #131314;
   --sidebar-color: #1e1f20;
   --text-color: #e3e3e3;
   --text-secondary-color: #9aa0a6;
   --primary-font: "Merriweather", serif;
   --title-font: "Uncial Antiqua", cursive;
+  --mono-font: 'Courier New', Courier, monospace;
   --user-message-bg: #2a3a4a;
   --model-message-bg: #1e1f20;
   --border-color: #3c4043;
@@ -14,6 +16,221 @@
   --sidebar-width: 280px;
 }
 
+/* --- THEME DEFINITIONS --- */
+
+body[data-theme="high-fantasy-light"] {
+  --background-color: #fdf6e3;
+  --sidebar-color: #f4ecd9;
+  --text-color: #586e75;
+  --text-secondary-color: #93a1a1;
+  --user-message-bg: #eee8d5;
+  --model-message-bg: #f4ecd9;
+  --border-color: #93a1a1;
+  --accent-color: #b58900;
+  --accent-hover-color: #cb9700;
+}
+
+body[data-theme="high-fantasy-elven"] {
+  --background-color: #1a1829;
+  --sidebar-color: #24223b;
+  --text-color: #d8d7e9;
+  --user-message-bg: #3a365e;
+  --model-message-bg: #24223b;
+  --border-color: #514d7d;
+  --accent-color: #a489d4;
+  --accent-hover-color: #bda0ea;
+}
+
+body[data-theme="cyberpunk-neon"] {
+  --background-color: #0d0221;
+  --sidebar-color: #140c2b;
+  --text-color: #e0e0e0;
+  --text-secondary-color: #a0a0a0;
+  --primary-font: 'Fira Code', monospace;
+  --title-font: 'Orbitron', sans-serif;
+  --mono-font: 'Fira Code', monospace;
+  --user-message-bg: #2a004f;
+  --model-message-bg: #1d1135;
+  --border-color: #4a00e0;
+  --accent-color: #00f0ff;
+  --accent-hover-color: #8affff;
+  --danger-color: #ff0055;
+}
+
+body[data-theme="cyberpunk-corporate"] {
+  --background-color: #1a2228;
+  --sidebar-color: #242f38;
+  --text-color: #e1e8ed;
+  --primary-font: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --title-font: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --user-message-bg: #354654;
+  --model-message-bg: #242f38;
+  --border-color: #3f505f;
+  --accent-color: #ff4d4d;
+  --accent-hover-color: #ff7f7f;
+}
+
+body[data-theme="cyberpunk-dystopian"] {
+  --background-color: #212121;
+  --sidebar-color: #2a2a2a;
+  --text-color: #b2a490;
+  --primary-font: 'Courier New', Courier, monospace;
+  --title-font: 'Impact', sans-serif;
+  --user-message-bg: #4d443a;
+  --model-message-bg: #2a2a2a;
+  --border-color: #5d5d5d;
+  --accent-color: #ff9900;
+  --accent-hover-color: #ffb84d;
+}
+
+body[data-theme="hellscape-fire"] {
+  --background-color: #100808;
+  --sidebar-color: #1a0c0c;
+  --text-color: #ffc2a1;
+  --title-font: "Uncial Antiqua", cursive;
+  --user-message-bg: #4d1818;
+  --model-message-bg: #1a0c0c;
+  --border-color: #5c2424;
+  --accent-color: #ff4500;
+  --accent-hover-color: #ff6a2e;
+}
+
+body[data-theme="hellscape-soul"] {
+  --background-color: #130f1a;
+  --sidebar-color: #1b1524;
+  --text-color: #c8bfe0;
+  --user-message-bg: #382d4a;
+  --model-message-bg: #1b1524;
+  --border-color: #4d3a66;
+  --accent-color: #7fff00;
+  --accent-hover-color: #99ff33;
+}
+
+body[data-t'hellscape-ash'] {
+  --background-color: #202020;
+  --sidebar-color: #282828;
+  --text-color: #cccccc;
+  --text-secondary-color: #888888;
+  --user-message-bg: #404040;
+  --model-message-bg: #282828;
+  --border-color: #505050;
+  --accent-color: #b22222;
+  --accent-hover-color: #cc3f3f;
+}
+
+body[data-theme="medieval-stone"] {
+  --background-color: #3e3e3e;
+  --sidebar-color: #4a4a4a;
+  --text-color: #e0e0e0;
+  --user-message-bg: #5a5a5a;
+  --model-message-bg: #4a4a4a;
+  --border-color: #6a6a6a;
+  --accent-color: #8b4513;
+  --accent-hover-color: #a0522d;
+}
+
+body[data-theme="medieval-royal"] {
+  --background-color: #001f3f;
+  --sidebar-color: #002b54;
+  --text-color: #f0f0f0;
+  --user-message-bg: #003f7f;
+  --model-message-bg: #002b54;
+  --border-color: #005a9e;
+  --accent-color: #ffd700;
+  --accent-hover-color: #ffdf33;
+}
+
+body[data-theme="medieval-parchment"] {
+  --background-color: #c2b59b;
+  --sidebar-color: #d1c6af;
+  --text-color: #3a2e20;
+  --text-secondary-color: #5c4a35;
+  --user-message-bg: #b5a88c;
+  --model-message-bg: #d1c6af;
+  --border-color: #8b795e;
+  --accent-color: #800000;
+  --accent-hover-color: #a00000;
+}
+
+body[data-theme="outer-space-starship"] {
+  --background-color: #eef2f5;
+  --sidebar-color: #ffffff;
+  --text-color: #1c2a38;
+  --text-secondary-color: #5c6a78;
+  --primary-font: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --title-font: 'Orbitron', sans-serif;
+  --user-message-bg: #d7dfe5;
+  --model-message-bg: #ffffff;
+  --border-color: #c0cdd8;
+  --accent-color: #007bff;
+  --accent-hover-color: #3395ff;
+}
+
+body[data-theme="outer-space-deep"] {
+  --background-color: #0c0d21;
+  --sidebar-color: #141633;
+  --text-color: #dbe4ff;
+  --primary-font: 'Fira Code', monospace;
+  --title-font: 'Orbitron', sans-serif;
+  --user-message-bg: #292d5c;
+  --model-message-bg: #141633;
+  --border-color: #434882;
+  --accent-color: #9d00ff;
+  --accent-hover-color: #b133ff;
+}
+
+body[data-theme="outer-space-alien"] {
+  --background-color: #23092d;
+  --sidebar-color: #331042;
+  --text-color: #d4f8e3;
+  --user-message-bg: #531c69;
+  --model-message-bg: #331042;
+  --border-color: #792d96;
+  --accent-color: #00ff7f;
+  --accent-hover-color: #50ffa9;
+}
+
+body[data-theme="pirate-sea"] {
+  --background-color: #f0e5d1;
+  --sidebar-color: #faeedb;
+  --text-color: #2a201c;
+  --text-secondary-color: #5a4840;
+  --primary-font: "Merriweather", serif;
+  --title-font: "Pirata One", cursive;
+  --user-message-bg: #e6d9c1;
+  --model-message-bg: #faeedb;
+  --border-color: #bdae93;
+  --accent-color: #008b8b;
+  --accent-hover-color: #00a2a2;
+}
+
+body[data-theme="pirate-treasure"] {
+  --background-color: #3d2c1c;
+  --sidebar-color: #4d3824;
+  --text-color: #e8d9c3;
+  --primary-font: "Merriweather", serif;
+  --title-font: "Pirata One", cursive;
+  --user-message-bg: #63482d;
+  --model-message-bg: #4d3824;
+  --border-color: #8c6742;
+  --accent-color: #e5c100;
+  --accent-hover-color: #f8d430;
+}
+
+body[data-theme="pirate-grog"] {
+  --background-color: #5c4b3f;
+  --sidebar-color: #6c5a4f;
+  --text-color: #f1e9e3;
+  --primary-font: "Merriweather", serif;
+  --title-font: "Pirata One", cursive;
+  --user-message-bg: #826e60;
+  --model-message-bg: #6c5a4f;
+  --border-color: #a08a7c;
+  --accent-color: #daa520;
+  --accent-hover-color: #e7b53a;
+}
+
+/* --- Base Styles --- */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -32,6 +249,7 @@ body {
   display: flex;
   height: 100vh;
   overflow: hidden;
+  transition: background-color 0.3s, color 0.3s;
 }
 
 .sr-only {
@@ -55,7 +273,7 @@ body {
   top: 0;
   left: 0;
   transform: translateX(calc(-1 * var(--sidebar-width)));
-  transition: transform 0.3s ease-in-out;
+  transition: transform 0.3s ease-in-out, background-color 0.3s;
   z-index: 1000;
   display: flex;
   flex-direction: column;
@@ -87,7 +305,7 @@ body.sidebar-open #sidebar {
 }
 
 #new-chat-btn:hover {
-  background-color: #282a2c;
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 #new-chat-btn svg {
@@ -154,7 +372,6 @@ body.sidebar-open #sidebar {
     color: var(--accent-color);
 }
 
-
 #overlay {
   position: fixed;
   top: 0;
@@ -173,7 +390,6 @@ body.sidebar-open #overlay {
   visibility: visible;
 }
 
-
 /* --- Main Chat View --- */
 .chat-view {
   flex-grow: 1;
@@ -187,7 +403,7 @@ header {
   padding: 0.75rem 1rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem; /* Reduced gap for more buttons */
+  gap: 0.5rem;
   border-bottom: 1px solid var(--border-color);
   background-color: var(--background-color);
   position: sticky;
@@ -236,8 +452,8 @@ header h1 {
   font-family: var(--title-font);
   font-size: 1.75rem;
   color: var(--accent-color);
-  text-shadow: 1px 1px 2px #000;
-  margin-right: auto; /* Pushes help buttons to the right */
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+  margin-right: auto;
   margin-left: 0.5rem;
 }
 
@@ -304,9 +520,9 @@ main {
 
 @keyframes dots {
   0%, 20% { color: rgba(255,255,255,0); text-shadow: .25em 0 0 rgba(255,255,255,0), .5em 0 0 rgba(255,255,255,0); }
-  40% { color: white; text-shadow: .25em 0 0 rgba(255,255,255,0), .5em 0 0 rgba(255,255,255,0); }
-  60% { text-shadow: .25em 0 0 white, .5em 0 0 rgba(255,255,255,0); }
-  80%, 100% { text-shadow: .25em 0 0 white, .5em 0 0 white; }
+  40% { color: var(--text-color); text-shadow: .25em 0 0 rgba(255,255,255,0), .5em 0 0 rgba(255,255,255,0); }
+  60% { text-shadow: .25em 0 0 var(--text-color), .5em 0 0 rgba(255,255,255,0); }
+  80%, 100% { text-shadow: .25em 0 0 var(--text-color), .5em 0 0 var(--text-color); }
 }
 
 .message.error {
@@ -316,7 +532,7 @@ main {
 }
 
 .message.easter-egg {
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--mono-font);
   font-style: italic;
   color: var(--text-secondary-color);
   background-color: transparent;
@@ -440,7 +656,7 @@ footer {
 }
 #file-upload-btn:disabled {
     cursor: not-allowed;
-    color: #555;
+    opacity: 0.5;
 }
 #file-upload-btn svg {
   width: 22px;
@@ -534,6 +750,7 @@ footer {
 
 #chat-form button[type="submit"]:disabled {
   background-color: #555;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
@@ -547,7 +764,7 @@ footer {
 .sidebar-footer {
   padding: 1rem;
   border-top: 1px solid var(--border-color);
-  margin-top: auto; /* Pushes footer to the bottom */
+  margin-top: auto;
 }
 
 #context-manager h2 {
@@ -595,7 +812,7 @@ footer {
     justify-content: center;
 }
 #context-form button:hover {
-    background-color: #282a2c;
+    background-color: rgba(255,255,255,0.1);
     color: var(--text-color);
 }
 #context-form button svg {
@@ -605,7 +822,7 @@ footer {
 
 #context-list {
     list-style: none;
-    max-height: 150px; /* Or adjust as needed */
+    max-height: 150px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -676,7 +893,7 @@ footer {
 .modal-content form {
     display: flex;
     flex-direction: column;
-    flex-grow: 1; /* For rename modal */
+    flex-grow: 1;
 }
 
 .modal-header {
@@ -755,7 +972,7 @@ footer {
     border: 1px solid var(--border-color);
     border-radius: 4px;
     padding: 0.2em 0.4em;
-    font-family: 'Courier New', Courier, monospace;
+    font-family: var(--mono-font);
     font-size: 0.9em;
     color: var(--accent-hover-color);
 }
@@ -808,9 +1025,8 @@ footer {
     background-color: #3a4b5c;
 }
 .logbook-update-btn:disabled {
-    background-color: #333;
+    opacity: 0.5;
     cursor: not-allowed;
-    color: var(--text-secondary-color);
 }
 
 .hidden {
@@ -888,7 +1104,7 @@ footer {
     min-height: 150px;
     margin-bottom: 1rem;
     white-space: pre-wrap;
-    font-family: 'Courier New', Courier, monospace;
+    font-family: var(--mono-font);
     color: var(--text-secondary-color);
     border: 1px solid var(--border-color);
 }
@@ -974,6 +1190,47 @@ footer {
 .setting-item select:focus {
     outline: none;
     border-color: var(--accent-color);
+}
+
+.settings-separator {
+    height: 1px;
+    background-color: var(--border-color);
+    margin: 2rem 0;
+}
+
+/* --- Theme Chooser Modal --- */
+.theme-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1.5rem;
+}
+
+.theme-card {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.theme-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    border-color: var(--accent-color);
+}
+
+.theme-preview {
+    display: flex;
+    height: 100px;
+}
+.theme-preview span {
+    flex-grow: 1;
+}
+
+.theme-name {
+    padding: 1rem;
+    background-color: var(--model-message-bg);
+    text-align: center;
+    font-weight: bold;
 }
 
 /* --- Responsive Design --- */
