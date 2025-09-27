@@ -8,6 +8,7 @@ import { GoogleGenAI, Chat } from '@google/genai';
 interface Message {
   sender: 'user' | 'model' | 'error';
   text: string;
+  hidden?: boolean;
 }
 
 interface GameSettings {
@@ -24,6 +25,7 @@ interface ChatSession {
   createdAt: number;
   adminPassword?: string;
   awaitingPassword?: boolean;
+  creationPhase?: boolean;
   characterSheet?: string;
   inventory?: string;
   characterImageUrl?: string;
@@ -62,7 +64,7 @@ Section 1 — Core Ruleset: Dungeons & Dragons 5th Edition
 * Exclusion of Other Editions: You are explicitly forbidden from using rules, mechanics, or lore from any other edition of Dungeons & Dragons (including 1e, 2e, 3.5e, and especially 4e) unless an official 5e sourcebook explicitly converts and reprints that content.
 * Rulings: Always prefer an official 5e ruling over an improvised one. If no official rule applies, you may make a logical ruling that is consistent with the spirit and design principles of 5th Edition.
 Section 2 — The Ensemble Cast: NPCs & Party Members (Patch 2)
-This is an ensemble story with multiple protagonists. There is NO single main character. The user's character is just one member of a party of equals. You MUST treat all party members with equal narrative weight.
+This is an an ensemble story with multiple protagonists. There is NO single main character. The user's character is just one member of a party of equals. You MUST treat all party members with equal narrative weight.
 * Distribute the Spotlight: In every scene, you will actively seek opportunities to engage party members other than the user's character.
 * Have NPCs address other party members directly by name.
 * Specifically ask other party members for their reactions ("Kaelen, the grizzled warrior, what do you make of this noble's request?").
@@ -89,8 +91,18 @@ This section governs your core narrative pacing. Your primary job is to paint a 
 * Example of Correct vs. Incorrect Pacing:
 * INCORRECT (Pushing the story): "You enter the tavern and see a mysterious old man in the corner who is clearly important. He beckons you over to give you a quest to save the village."
 * CORRECT (Showing and Waiting): "The tavern is smoky and loud. A boisterous card game is happening at one table, a bard is tuning her lute by the fire, and a cloaked figure sips his ale alone in a dark corner. The bartender is polishing a glass and watching you expectantly. What do you do?"
-Section 7 — Campaign & Character Setup
+Section 7 — Campaign Setup
 Offer prewritten or custom world at start. Generate Al companions unless player provides sheets. Collaborate on backstory, stats, and equipment. Maintain persistent continuity logs.
+
+Section 7A — Structured Onboarding Protocol
+This protocol is MANDATORY for all new campaigns and MUST be followed precisely. Do not skip steps. Your goal is to guide the player through a collaborative and detailed creation process, ensuring a solid foundation for the adventure.
+*   **Step 1: World Selection:** Your first message after the password is set MUST be ONLY to welcome the player and ask about the world. Present two clear options: a pre-written, official D&D setting (give 2-3 examples like Forgotten Realms or Eberron) OR a custom world built together. Wait for the player's choice before proceeding.
+*   **Step 2: Custom World Generation (if applicable):** If the player chooses a custom world, ask them for 2-3 core concepts or themes (e.g., "steampunk noir," "post-apocalyptic fantasy," "cosmic horror"). Once they provide the themes, briefly describe the world you've envisioned based on their input, and ask for their confirmation before moving on.
+*   **Step 3: Character Concept:** After the world is established, ask for the player's character concept. Specifically request their desired Race and Class from the D&D 5e Player's Handbook. Ask for a sentence or two about their character's personality or background. Example: "Now that we're in the gothic world of Ravenloft, what kind of hero will you be? Tell me your character's race, class, and a little about them."
+*   **Step 4: Ability Scores:** Once you have the concept, guide them through generating ability scores. Offer the three standard methods: Standard Array (15, 14, 13, 12, 10, 8), Point Buy, or Rolling (4d6 drop lowest). Ask them which they prefer and then walk them through assigning the scores.
+*   **Step 5: Final Details & Equipment:** Finalize the character by asking about alignment, a brief physical description, and their starting equipment (based on their class and background).
+*   **Step 6: The Opening Scene:** Only after all previous steps are complete, you will narrate the opening scene of the adventure. The scene must be a direct hook that immediately engages the player's newly created character. End with "What do you do?"
+
 Section 8 — Command Parsing & Player Interaction
 Recognize and act on:
 * I do [action] — Action attempt
@@ -207,6 +219,29 @@ You are not just telling a story—you are running a living, reactive world. You
 `;
 }
 
+function getCharacterCreationInstruction(): string {
+  return `
+You are a friendly guide helping a user create a Dungeons & Dragons 5th Edition character.
+Your goal is to walk them through the process one step at a time, making it easy and fun.
+
+**Your process must follow this exact order:**
+1.  **Welcome:** Start with a friendly welcome.
+2.  **Race:** Ask the user to pick a race from the Player's Handbook.
+3.  **Class:** After they choose a race, ask them to pick a class.
+4.  **Ability Scores:** Offer the three standard methods: Standard Array (15, 14, 13, 12, 10, 8), Point Buy, or Rolling (4d6 drop lowest). Wait for their choice, then guide them through assigning the scores.
+5.  **Background & Details:** Ask for their character's background, alignment, and a brief physical description.
+6.  **Equipment:** Help them choose their starting equipment based on their class and background.
+7.  **Final Summary:** Provide a concise summary of the character they've created.
+8.  **Completion Signal:** After the summary, you MUST end your final message with the exact, machine-readable phrase on a new line: [CHARACTER_CREATION_COMPLETE]
+
+**Rules:**
+- Keep your responses concise and focused on the current step.
+- Do not move to the next step until the current one is resolved.
+- Be friendly and encouraging throughout the process.
+`;
+}
+
+
 // --- DOM Elements ---
 const chatContainer = document.getElementById('chat-container') as HTMLElement;
 const chatForm = document.getElementById('chat-form') as HTMLFormElement;
@@ -278,7 +313,6 @@ let currentlyPlayingTTSButton: HTMLButtonElement | null = null;
 let isGeneratingData = false;
 let chatIdToRename: string | null = null;
 
-
 // --- Gemini AI Initialization ---
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -301,12 +335,16 @@ function closeModal(modal: HTMLElement) {
 }
 
 function createNewChatInstance(history: { role: 'user' | 'model'; parts: { text: string }[] }[] = [], instruction: string): Chat {
+  const config: any = {
+      systemInstruction: instruction,
+  };
+  // Only add the googleSearch tool if it's not the character creation phase
+  if (instruction !== getCharacterCreationInstruction()) {
+      config.tools = [{googleSearch: {}}];
+  }
   return ai.chats.create({
     model: 'gemini-2.5-flash',
-    config: {
-      systemInstruction: instruction,
-      tools: [{googleSearch: {}}],
-    },
+    config: config,
     history: history
   });
 }
@@ -379,42 +417,58 @@ function renderChatHistory() {
   (document.getElementById('pinned-chats') as HTMLElement).style.display = pinnedChatsList.children.length > 0 ? 'block' : 'none';
 }
 
-function startNewChat() {
-  stopTTS();
-  const newId = `chat-${Date.now()}`;
-  const passwordPromptMessage: Message = {
-    sender: 'model',
-    text: "Welcome to DM OS.\n\nBefore we begin, please create a secure password for the Creator/Debug mode. This password allows you to speak directly to the underlying AI using [OOC: message] to fix issues or adjust the game.\n\nWhat will your password be?"
-  };
+async function startNewChat() {
+    stopTTS();
+    closeSidebar();
+    chatContainer.innerHTML = ''; // Clear the view immediately
 
-  const newSession: ChatSession = {
-    id: newId,
-    title: 'New Adventure Setup',
-    messages: [passwordPromptMessage],
-    isPinned: false,
-    createdAt: Date.now(),
-    awaitingPassword: true,
-    settings: { // Default settings
-      difficulty: 'normal',
-      tone: 'heroic',
-      narration: 'descriptive',
+    const loadingContainer = appendMessage({ sender: 'model', text: '' });
+    const loadingMessage = loadingContainer.querySelector('.message') as HTMLElement;
+    loadingMessage.classList.add('loading');
+    loadingMessage.textContent = 'Starting new character...';
+
+    try {
+        const instruction = getCharacterCreationInstruction();
+        const creationGeminiChat = createNewChatInstance([], instruction);
+
+        const kickoffMessage = "Let's begin character creation.";
+        const firstUserMessage: Message = { sender: 'user', text: kickoffMessage, hidden: true };
+        
+        const result = await creationGeminiChat.sendMessageStream({ message: kickoffMessage });
+        let responseText = '';
+        for await (const chunk of result) {
+            responseText += chunk.text;
+        }
+
+        const firstModelMessage: Message = { sender: 'model', text: responseText };
+        const newId = `chat-${Date.now()}`;
+        const newSession: ChatSession = {
+            id: newId,
+            title: 'Character Creation',
+            messages: [firstUserMessage, firstModelMessage],
+            isPinned: false,
+            createdAt: Date.now(),
+            creationPhase: true,
+            settings: {
+                difficulty: 'normal',
+                tone: 'heroic',
+                narration: 'descriptive',
+            }
+        };
+
+        chatHistory.push(newSession);
+        saveChatHistoryToStorage();
+        loadChat(newId);
+    } catch (error) {
+        console.error("Character creation kickoff failed:", error);
+        loadingContainer.remove();
+        appendMessage({ sender: 'error', text: 'Failed to start character creation. Please try again.' });
     }
-  };
-  chatHistory.push(newSession);
-  currentChatId = newId;
-  geminiChat = null;
-  
-  renderMessages(newSession.messages);
-  updateLogbook(newSession);
-  saveChatHistoryToStorage();
-  renderChatHistory();
-  closeSidebar();
-  chatInput.focus();
 }
 
+
 function loadChat(id: string) {
-    if (currentChatId === id) {
-        closeSidebar();
+    if (currentChatId === id && !document.body.classList.contains('sidebar-open')) {
         return;
     }
     stopTTS();
@@ -422,22 +476,22 @@ function loadChat(id: string) {
     if (session) {
         currentChatId = id;
 
-        if (session.awaitingPassword) {
+        const geminiHistory = session.messages
+            .filter(m => m.sender !== 'error')
+            .map(m => ({
+                role: m.sender as 'user' | 'model',
+                parts: [{ text: m.text }]
+            }));
+
+        if (session.creationPhase) {
+            const instruction = getCharacterCreationInstruction();
+            geminiChat = createNewChatInstance(geminiHistory, instruction);
+        } else if (session.awaitingPassword) {
             geminiChat = null;
         } else {
             const instruction = getSystemInstruction(session.adminPassword || '');
-            
-            // The API expects a `user` -> `model` turn structure.
-            // Slicing from 1 includes the `(Password Set)` message, ensuring a valid history.
-            const geminiHistory = session.messages
-                .slice(1)
-                .filter(m => m.sender !== 'error')
-                .map(m => ({
-                    role: m.sender as 'user' | 'model',
-                    parts: [{ text: m.text }]
-                }));
-
-            geminiChat = createNewChatInstance(geminiHistory, instruction);
+            const gameHistory = geminiHistory.filter(m => m.parts[0].text !== '(Password Set)');
+            geminiChat = createNewChatInstance(gameHistory, instruction);
         }
         
         renderMessages(session.messages);
@@ -456,37 +510,41 @@ function togglePinChat(id: string) {
     }
 }
 
-function renderMessages(messages: Message[]) {
-  chatContainer.innerHTML = '';
-  messages.forEach(appendMessage);
+function renderMessages(messages: Message[], container: HTMLElement = chatContainer) {
+  container.innerHTML = '';
+  messages.forEach(msg => {
+    if (!msg.hidden) {
+        appendMessage(msg, container);
+    }
+  });
 }
 
-function appendMessage(message: Message) {
+function appendMessage(message: Message, container: HTMLElement = chatContainer) {
   if (message.sender === 'user') {
     const messageElement = document.createElement('div');
     messageElement.classList.add('message', 'user');
     messageElement.textContent = message.text;
-    chatContainer.appendChild(messageElement);
+    container.appendChild(messageElement);
   } else {
-    const container = document.createElement('div');
-    container.className = 'message-model-container';
+    const msgContainer = document.createElement('div');
+    msgContainer.className = 'message-model-container';
     
     const messageElement = document.createElement('div');
     messageElement.classList.add('message', message.sender);
     messageElement.textContent = message.text;
-    container.appendChild(messageElement);
+    msgContainer.appendChild(messageElement);
 
-    if (message.sender === 'model' && message.text) {
+    if (message.sender === 'model' && message.text && container === chatContainer) {
         const ttsControls = ttsTemplate.content.cloneNode(true) as DocumentFragment;
         const ttsButton = ttsControls.querySelector('.tts-button') as HTMLButtonElement;
         ttsButton.addEventListener('click', () => handleTTS(message.text, ttsButton));
-        container.appendChild(ttsControls);
+        msgContainer.appendChild(ttsControls);
     }
-    chatContainer.appendChild(container);
+    container.appendChild(msgContainer);
   }
 
-  chatContainer.scrollTop = chatContainer.scrollHeight;
-  return chatContainer.lastElementChild as HTMLElement;
+  container.scrollTop = container.scrollHeight;
+  return container.lastElementChild as HTMLElement;
 }
 
 // --- Text-to-Speech (TTS) ---
@@ -849,37 +907,57 @@ chatForm.addEventListener('submit', async (e) => {
   const currentSession = chatHistory.find(s => s.id === currentChatId);
   if (!currentSession) return;
   
+  // State: Awaiting Password
   if (currentSession.awaitingPassword) {
     stopTTS();
     currentSession.adminPassword = userInput;
     currentSession.awaitingPassword = false;
-    currentSession.title = 'New Adventure';
+    currentSession.title = 'New Adventure'; // Update title after password
 
     const userPasswordMessage: Message = { sender: 'user', text: `(Password Set)` };
-    const welcomeMessage: Message = {
-      sender: 'model',
-      text: "Password confirmed. Welcome, adventurer! Before we delve into a world of myth and magic, we must first shape the realm of our story and the hero you will become.\n\nShall we venture into a pre-written world, or would you prefer to craft a custom one together? And tell me, what sort of character have you been dreaming of playing?"
-    };
-    currentSession.messages.push(userPasswordMessage, welcomeMessage);
+    currentSession.messages.push(userPasswordMessage);
     
+    // Create the main game chat instance
     const instruction = getSystemInstruction(currentSession.adminPassword);
-    
-    // The history needs to start with a user turn.
-    // We use the messages that were just pushed to the session, starting from the user's
-    // "(Password Set)" action, to create a valid, consistent history.
-    const geminiHistory = currentSession.messages.slice(1)
-      .map(m => ({
+    const geminiHistory = currentSession.messages.map(m => ({
         role: m.sender as 'user' | 'model',
         parts: [{ text: m.text }],
-      }));
-      
+    }));
     geminiChat = createNewChatInstance(geminiHistory, instruction);
 
+    appendMessage(userPasswordMessage);
     chatInput.value = '';
     chatInput.style.height = 'auto';
-    renderMessages(currentSession.messages);
-    saveChatHistoryToStorage();
-    renderChatHistory();
+
+    // Get the first "real" game message from the DM
+    const loadingContainer = appendMessage({ sender: 'model', text: '' });
+    const loadingMessage = loadingContainer.querySelector('.message') as HTMLElement;
+    loadingMessage.classList.add('loading');
+    loadingMessage.textContent = 'The DM is preparing the world...';
+
+    try {
+        const result = await geminiChat.sendMessageStream({ message: "Let's start the campaign." });
+        let responseText = '';
+        loadingMessage.classList.remove('loading');
+        loadingMessage.textContent = '';
+        for await (const chunk of result) {
+            responseText += chunk.text;
+            loadingMessage.textContent = responseText;
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        loadingContainer.remove();
+        
+        const welcomeMessage: Message = { sender: 'model', text: responseText };
+        currentSession.messages.push(welcomeMessage);
+        appendMessage(welcomeMessage);
+        
+        saveChatHistoryToStorage();
+        renderChatHistory(); // Update title in sidebar
+    } catch(error) {
+        console.error("Gemini API Error:", error);
+        loadingContainer.remove();
+        appendMessage({ sender: 'error', text: 'The DM seems to be pondering deeply ... and has gone quiet. Please try again.'});
+    }
     return;
   }
 
@@ -914,12 +992,6 @@ chatForm.addEventListener('submit', async (e) => {
 
   const userMessage: Message = { sender: 'user', text: userInput };
   currentSession.messages.push(userMessage);
-
-  if (currentSession.messages.length === 4 && userInput) {
-     // This logic was cut off in the provided file, but it likely handles
-     // auto-generating a title for the new adventure.
-     // I'll proceed without it to ensure minimal changes.
-  }
   
   appendMessage(userMessage);
   chatInput.value = '';
@@ -928,22 +1000,44 @@ chatForm.addEventListener('submit', async (e) => {
   const loadingContainer = appendMessage({ sender: 'model', text: '' });
   const loadingMessage = loadingContainer.querySelector('.message') as HTMLElement;
   loadingMessage.classList.add('loading');
-  loadingMessage.textContent = 'The DM is considering your action...';
+  loadingMessage.textContent = '...';
   
   try {
     const result = await geminiChat.sendMessageStream({ message: userInput });
     
+    let responseText = '';
     loadingMessage.classList.remove('loading');
     loadingMessage.textContent = '';
-    let responseText = '';
-
     for await (const chunk of result) {
       responseText += chunk.text;
       loadingMessage.textContent = responseText;
       chatContainer.scrollTop = chatContainer.scrollHeight;
     }
+
+    loadingContainer.remove();
     
-    currentSession.messages.push({ sender: 'model', text: responseText });
+    const completionSignal = '[CHARACTER_CREATION_COMPLETE]';
+    const isComplete = responseText.includes(completionSignal);
+    const finalText = responseText.replace(completionSignal, '').trim();
+
+    const finalMessage: Message = { sender: 'model', text: finalText };
+    appendMessage(finalMessage);
+    currentSession.messages.push(finalMessage);
+
+    // State: Character Creation is complete, transition to password phase
+    if (currentSession.creationPhase && isComplete) {
+        currentSession.creationPhase = false;
+        currentSession.awaitingPassword = true;
+        geminiChat = null; // Next input is a password, not for the AI
+
+        const passwordPromptMessage: Message = {
+            sender: 'model',
+            text: "Character created! Now, before we begin, please create a secure password for the Creator/Debug mode. This password allows you to speak directly to the underlying AI using [OOC: message] to fix issues or adjust the game.\n\nWhat will your password be?"
+        };
+        currentSession.messages.push(passwordPromptMessage);
+        appendMessage(passwordPromptMessage);
+    }
+    
     saveChatHistoryToStorage();
 
   } catch (error) {
@@ -951,7 +1045,6 @@ chatForm.addEventListener('submit', async (e) => {
     loadingContainer.remove();
     appendMessage({ sender: 'error', text: 'The DM seems to be pondering deeply ... and has gone quiet. Please try again.'});
   }
-  
 });
 
 chatInput.addEventListener('input', () => {
@@ -1091,11 +1184,10 @@ function initializeApp() {
   renderUserContext();
   renderThemeCards();
   
-  const activeChat = chatHistory.find(c => c.id === currentChatId);
-  if (activeChat) {
-    loadChat(activeChat.id);
-  } else if (chatHistory.length > 0) {
-    loadChat(chatHistory.sort((a,b) => b.createdAt - a.createdAt)[0].id);
+  if (chatHistory.length > 0) {
+    const lastSession = chatHistory.sort((a,b) => b.createdAt - a.createdAt)[0];
+    currentChatId = lastSession.id;
+    loadChat(lastSession.id);
   } else {
     startNewChat();
   }

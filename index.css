@@ -588,9 +588,11 @@ main {
 
 .sound-wave span {
     width: 3px;
+    height: 100%;
     background-color: var(--text-secondary-color);
     animation: wave 1.2s infinite ease-in-out;
     animation-play-state: paused;
+    transform-origin: bottom;
 }
 .sound-wave.playing span {
     animation-play-state: running;
@@ -603,8 +605,8 @@ main {
 
 
 @keyframes wave {
-    0%, 100% { height: 2px; }
-    50% { height: 16px; }
+    0%, 100% { transform: scaleY(0.1); }
+    50% { transform: scaleY(1.0); }
 }
 
 
@@ -1005,9 +1007,7 @@ footer {
     border-top: 1px solid var(--border-color);
     display: flex;
     justify-content: flex-end;
-    margin-top: auto;
 }
-
 
 /* --- Log Book & Shared Button Styles --- */
 .logbook-update-btn {
