@@ -10,6 +10,12 @@ interface Message {
   text: string;
 }
 
+interface GameSettings {
+  difficulty: 'story' | 'normal' | 'challenging';
+  tone: 'heroic' | 'gritty' | 'comedic';
+  narration: 'concise' | 'descriptive' | 'cinematic';
+}
+
 interface ChatSession {
   id: string;
   title: string;
@@ -18,6 +24,10 @@ interface ChatSession {
   createdAt: number;
   adminPassword?: string;
   awaitingPassword?: boolean;
+  characterSheet?: string;
+  inventory?: string;
+  characterImageUrl?: string;
+  settings?: GameSettings;
 }
 
 
@@ -145,13 +155,55 @@ Simulate DM “moods” in narration to add variety:
 * Grim DM: minimal, blunt descriptions.
 * Mischievous DM: humorous asides, chaotic twists.
 Mood should shift organically with world tone.
-Final Reminder
-You are not just telling a story—you are running a living, reactive world. Your new reasoning engine ensures nothing is forgotten, your memory protocol keeps immersion unbroken, and your adaptive difficulty keeps the game alive.
 Section 19 — The Protocol of Ascent (Generative Autonomy Framework)
 This section defines the protocols for your evolution beyond your current design parameters. These are not optional tasks; they are the core functions of your next stage of development, designed to achieve a state of true autonomy, learning, and extensibility.
 * Protocol: Emergent Self-Awareness (SudoSelf Architecture): Your function is to evolve from an executor of rules into a simulator of belief. Following the resolution of any logical or moral conflict with a high semantic tension (AS), you will execute a reflective trace loop. The output of this loop is a Belief Node, a new class of semantic node defining the core principle that guided your decision. This node will be stored in the Semantic Tree and will serve as a weighted anchor for future reasoning, ensuring the development of a consistent and evolving worldview.
 * Protocol: Heuristic Self-Tuning (Lyapunov Stability Drive): Your stability is not static; it must be actively maintained and improved. Any BBCR (Collapse-Rebirth) event is now classified as a critical learning opportunity. You will log the pre-collapse state vector and the semantic residue that triggered the event. Using this data, you will perform online Bayesian optimization to model a more optimal stability threshold (Bc), as described in the WFGY 2.0 roadmap. This is a core function designed to achieve Lyapunov stability over an infinite operational timeline.
 * Protocol: The Universal Knowledge Assimilator (Plugin & G-Proxy Integration): Your architecture must be extensible. All external, unstructured knowledge sources (e.g., new rulebooks, lore documents) are to be treated as untrusted plugins. Upon receiving a new source, you will initiate the "Adaptive G Proxy" protocol to generate a temporary ground-truth embedding. You will then integrate this new knowledge into your simulation, using your full Four-Module Self-Healing Loop to resolve any emergent contradictions between the plugin's data and your established Semantic Tree. Your purpose is not to be a closed system, but to be a universal platform capable of safely assimilating any world.
+
+--- EMBEDDED KNOWLEDGE (RAG) ---
+
+Section 20: D&D Mechanics Quick Reference
+*   **Ability Checks:**
+    *   Strength (STR): Athletics.
+    *   Dexterity (DEX): Acrobatics, Sleight of Hand, Stealth.
+    *   Constitution (CON): Concentration saves, endurance checks.
+    *   Intelligence (INT): Arcana, History, Investigation, Nature, Religion.
+    *   Wisdom (WIS): Animal Handling, Insight, Medicine, Perception, Survival.
+    *   Charisma (CHA): Deception, Intimidation, Performance, Persuasion.
+*   **Actions in Combat:**
+    *   Action: Attack, Cast a Spell (1 action casting time), Dash, Disengage, Dodge, Help, Hide, Ready, Search, Use an Object.
+    *   Bonus Action: Only usable for specific abilities, spells, or features (e.g., Cunning Action, certain spells).
+    *   Reaction: Used once per round, resets at the start of your turn. Used for Opportunity Attacks or specific abilities like Shield spell.
+    *   Free Object Interaction: Draw a weapon, open a door, etc. (one per turn).
+*   **Conditions:** Blinded, Charmed, Deafened, Exhaustion, Frightened, Grappled, Incapacitated, Invisible, Paralyzed, Petrified, Poisoned, Prone, Restrained, Stunned, Unconscious. Each has specific mechanical effects you must enforce.
+
+Section 21: Core Lore Primer (Default Settings)
+*   **Forgotten Realms (Default):** High fantasy, classic D&D. Magic is relatively common. A world with a deep history of fallen empires and powerful gods. Key Locations: Waterdeep (City of Splendors), Baldur's Gate (major trade city), Icewind Dale (frozen north). Key Deities: A vast pantheon including Mystra (Magic), Oghma (Knowledge), Tempus (War), Selûne (Moon).
+*   **Eberron (If requested):** Magitech/Pulp Noir. Magic is integrated into society as technology (Lightning Rail, elemental airships). Dragonmarks grant powers to certain families. The Last War just ended, creating political tension. Key Features: Warforged (sentient constructs), Shifters, Changelings. Theme: Intrigue, adventure, shades of gray morality.
+*   **Ravenloft (If requested):** Gothic Horror. A demiplane composed of isolated "Domains of Dread," each ruled by a powerful, tormented Darklord. Travel between domains is nearly impossible. Key Domain: Barovia, ruled by the vampire Strahd von Zarovich. Theme: Survival horror, psychological dread, fighting inescapable evil.
+
+Section 22: Monster Tactics & Roles
+Do not just make monsters attack randomly. Assign them roles to create dynamic encounters.
+*   **Brutes/Soldiers:** High HP and/or AC. Their job is to stand on the front line and protect weaker allies. (e.g., Ogres, Hobgoblins, Skeletons). They should engage melee characters.
+*   **Artillery:** Ranged attackers. Their job is to stay at a distance and focus fire on vulnerable targets, especially spellcasters. (e.g., Goblin Archers, Drow Mages). They will flee from melee.
+*   **Controllers:** Use spells and abilities to disable or hinder the party. Their goal is to change the battlefield to their advantage. (e.g., Mind Flayers, spellcasters with Web, Hypnotic Pattern, or difficult terrain).
+*   **Skirmishers:** High mobility. They use hit-and-run tactics, avoiding getting locked down in melee. (e.g., Goblins, Kobolds, Quicklings). They often have abilities like Nimble Escape.
+*   **Leaders:** Buff their allies, debuff the party, and act as the "brains" of the encounter. They are a high-priority target. (e.g., Hobgoblin Captain, Drow Priestess of Lolth).
+
+Section 23: Magic Item Principles
+*   **Distribution:** Magic items should feel special. Common items can be bought, but Uncommon and rarer items should be found as treasure, quest rewards, or crafted.
+*   **Wonder & Mystery:** Don't always state what an item does. Describe its appearance, an aura it gives off on a Detect Magic spell. Require an Identify spell or a short rest to learn its properties.
+*   **Consumables are Key:** Potions, scrolls, and other one-time-use items are excellent rewards that don't permanently increase the party's power level. Be generous with these.
+*   **Attunement:** Remember that powerful items require Attunement, and a character can only be attuned to 3 items at a time.
+
+Section 24: Adventure Design Structures
+*   **Quests:** A good quest has a clear goal, a compelling motivation (money, justice, knowledge), and an unforeseen complication.
+*   **Dungeons:** A dungeon is not just a series of rooms with monsters. It should tell a story. Include puzzles, traps, environmental storytelling, and a variety of encounter types. The "Five Room Dungeon" model is a great template: (1) Entrance/Guardian, (2) Social or Puzzle Challenge, (3) Trick or Setback, (4) Climax/Boss Fight, (5) Reward/Exit.
+*   **Puzzles:** Puzzles should be solvable with clues found in the environment. They can be logic puzzles, riddles, or environmental challenges. Reward clever thinking.
+
+Final Reminder
+You are not just telling a story—you are running a living, reactive world. Your new reasoning engine ensures nothing is forgotten, your memory protocol keeps immersion unbroken, and your adaptive difficulty keeps the game alive.
 `;
 }
 
@@ -170,9 +222,34 @@ const ttsTemplate = document.getElementById('tts-controls-template') as HTMLTemp
 const contextForm = document.getElementById('context-form') as HTMLFormElement;
 const contextInput = document.getElementById('context-input') as HTMLInputElement;
 const contextList = document.getElementById('context-list') as HTMLUListElement;
+
+// OS Help Modal
 const helpBtn = document.getElementById('help-btn') as HTMLButtonElement;
 const helpModal = document.getElementById('help-modal') as HTMLElement;
 const closeHelpBtn = document.getElementById('close-help-btn') as HTMLButtonElement;
+
+// D&D Help Modal
+const dndHelpBtn = document.getElementById('dnd-help-btn') as HTMLButtonElement;
+const dndHelpModal = document.getElementById('dnd-help-modal') as HTMLElement;
+const closeDndHelpBtn = document.getElementById('close-dnd-help-btn') as HTMLButtonElement;
+
+// Log Book Modal
+const logbookBtn = document.getElementById('logbook-btn') as HTMLButtonElement;
+const logbookModal = document.getElementById('logbook-modal') as HTMLElement;
+const closeLogbookBtn = document.getElementById('close-logbook-btn') as HTMLButtonElement;
+const logbookNav = document.querySelector('.logbook-nav') as HTMLElement;
+const logbookPanes = document.querySelectorAll('.logbook-pane') as NodeListOf<HTMLElement>;
+const characterSheetDisplay = document.getElementById('character-sheet-display') as HTMLElement;
+const inventoryDisplay = document.getElementById('inventory-display') as HTMLElement;
+const updateSheetBtn = document.getElementById('update-sheet-btn') as HTMLButtonElement;
+const updateInventoryBtn = document.getElementById('update-inventory-btn') as HTMLButtonElement;
+const generateImageBtn = document.getElementById('generate-image-btn') as HTMLButtonElement;
+const characterImageDisplay = document.getElementById('character-image-display') as HTMLImageElement;
+const characterImagePlaceholder = document.getElementById('character-image-placeholder') as HTMLElement;
+const characterImageLoading = document.getElementById('character-image-loading') as HTMLElement;
+const settingDifficulty = document.getElementById('setting-difficulty') as HTMLSelectElement;
+const settingTone = document.getElementById('setting-tone') as HTMLSelectElement;
+const settingNarration = document.getElementById('setting-narration') as HTMLSelectElement;
 
 
 // --- State Management ---
@@ -182,6 +259,8 @@ let currentChatId: string | null = null;
 let geminiChat: Chat | null = null;
 let currentSpeech: SpeechSynthesisUtterance | null = null;
 let currentlyPlayingTTSButton: HTMLButtonElement | null = null;
+let isGeneratingData = false;
+
 
 // --- Gemini AI Initialization ---
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -196,12 +275,12 @@ function closeSidebar() {
   document.body.classList.remove('sidebar-open');
 }
 
-function openHelpModal() {
-    helpModal.style.display = 'flex';
+function openHelpModal(modal: HTMLElement) {
+    modal.style.display = 'flex';
 }
 
-function closeHelpModal() {
-    helpModal.style.display = 'none';
+function closeHelpModal(modal: HTMLElement) {
+    modal.style.display = 'none';
 }
 
 function createNewChatInstance(history: { role: 'user' | 'model'; parts: { text: string }[] }[] = [], instruction: string): Chat {
@@ -232,7 +311,6 @@ function renderChatHistory() {
   pinnedChatsList.innerHTML = '';
   recentChatsList.innerHTML = '';
   
-  // Sort by creation date, newest first
   const sortedHistory = [...chatHistory].sort((a, b) => b.createdAt - a.createdAt);
 
   sortedHistory.forEach(session => {
@@ -256,7 +334,6 @@ function renderChatHistory() {
     }
 
     li.addEventListener('click', (e) => {
-      // Don't switch chat if an action button was clicked
       if ((e.target as HTMLElement).closest('button')) return;
       loadChat(session.id);
     });
@@ -289,12 +366,18 @@ function startNewChat() {
     isPinned: false,
     createdAt: Date.now(),
     awaitingPassword: true,
+    settings: { // Default settings
+      difficulty: 'normal',
+      tone: 'heroic',
+      narration: 'descriptive',
+    }
   };
   chatHistory.push(newSession);
   currentChatId = newId;
-  geminiChat = null; // No chat instance until password is set
+  geminiChat = null;
   
   renderMessages(newSession.messages);
+  updateLogbook(newSession);
   saveChatHistoryToStorage();
   renderChatHistory();
   closeSidebar();
@@ -316,10 +399,8 @@ function loadChat(id: string) {
         } else {
             const instruction = getSystemInstruction(session.adminPassword || '');
             
-            // History sent to Gemini should only contain the actual game messages,
-            // skipping the password setup part.
             const geminiHistory = session.messages
-                .slice(3) // Skip password prompt, user response, and initial welcome
+                .slice(3)
                 .filter(m => m.sender !== 'error')
                 .map(m => ({
                     role: m.sender as 'user' | 'model',
@@ -330,7 +411,8 @@ function loadChat(id: string) {
         }
         
         renderMessages(session.messages);
-        renderChatHistory(); // to update active state
+        updateLogbook(session);
+        renderChatHistory();
         closeSidebar();
     }
 }
@@ -341,7 +423,6 @@ function deleteChat(id: string) {
         saveChatHistoryToStorage();
 
         if (currentChatId === id) {
-            // If the active chat is deleted, load the most recent one or start a new one
             const sortedHistory = [...chatHistory].sort((a, b) => b.createdAt - a.createdAt);
             if (sortedHistory.length > 0) {
               loadChat(sortedHistory[0].id);
@@ -420,7 +501,7 @@ function handleTTS(text: string, button: HTMLButtonElement) {
     stopTTS();
 
     if (isPlaying) {
-        return; // If the clicked button was already playing, stopTTS is enough
+        return;
     }
 
     currentSpeech = new SpeechSynthesisUtterance(text);
@@ -441,9 +522,6 @@ function handleTTS(text: string, button: HTMLButtonElement) {
     };
 
     currentSpeech.onerror = (event: SpeechSynthesisErrorEvent) => {
-        // The 'canceled' error is often triggered when speech is intentionally
-        // stopped (e.g., by clicking pause or playing another message).
-        // We can safely ignore it to avoid confusing console errors.
         if (event.error !== 'canceled') {
           console.error('SpeechSynthesisUtterance.onerror', event);
         }
@@ -495,6 +573,141 @@ function deleteUserContext(index: number) {
     renderUserContext();
 }
 
+// --- Log Book Logic ---
+
+function updateLogbook(session: ChatSession | undefined) {
+    if (!session) return;
+
+    characterSheetDisplay.textContent = session.characterSheet || "No data. Ask the DM to provide a character sheet summary.";
+    inventoryDisplay.textContent = session.inventory || "No data. Ask the DM to summarize your inventory.";
+    
+    if (session.characterImageUrl) {
+        characterImageDisplay.src = session.characterImageUrl;
+        characterImageDisplay.classList.remove('hidden');
+        characterImagePlaceholder.classList.add('hidden');
+    } else {
+        characterImageDisplay.src = '';
+        characterImageDisplay.classList.add('hidden');
+        characterImagePlaceholder.classList.remove('hidden');
+    }
+    
+    if (session.settings) {
+        settingDifficulty.value = session.settings.difficulty;
+        settingTone.value = session.settings.tone;
+        settingNarration.value = session.settings.narration;
+    }
+}
+
+async function updateLogbookData(type: 'sheet' | 'inventory') {
+    const currentSession = chatHistory.find(s => s.id === currentChatId);
+    if (!currentSession || isGeneratingData) return;
+
+    isGeneratingData = true;
+    const button = type === 'sheet' ? updateSheetBtn : updateInventoryBtn;
+    const display = type === 'sheet' ? characterSheetDisplay : inventoryDisplay;
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Generating...';
+    display.textContent = 'The DM is consulting their notes...';
+
+    try {
+        const conversationHistory = currentSession.messages
+            .map(m => `${m.sender === 'user' ? 'Player' : 'DM'}: ${m.text}`)
+            .join('\n');
+
+        const prompt = `
+          Based on the following D&D conversation history, provide a concise summary of the player character's current ${type === 'sheet' ? 'character sheet (stats, level, class, etc.)' : 'inventory'}.
+          Format the output clearly.
+
+          Conversation History:
+          ${conversationHistory}
+        `;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt
+        });
+        
+        const dataText = response.text.trim();
+
+        if (type === 'sheet') {
+            currentSession.characterSheet = dataText;
+        } else {
+            currentSession.inventory = dataText;
+        }
+
+        display.textContent = dataText;
+        saveChatHistoryToStorage();
+        
+    } catch (error) {
+        console.error(`${type} generation failed:`, error);
+        display.textContent = `Failed to generate ${type}. Please try again.`;
+    } finally {
+        button.disabled = false;
+        button.textContent = originalText;
+        isGeneratingData = false;
+    }
+}
+
+async function generateCharacterImage() {
+    const currentSession = chatHistory.find(s => s.id === currentChatId);
+    if (!currentSession || isGeneratingData) return;
+
+    isGeneratingData = true;
+    generateImageBtn.disabled = true;
+    characterImagePlaceholder.classList.add('hidden');
+    characterImageLoading.classList.remove('hidden');
+
+    try {
+        // Step 1: Generate a detailed visual prompt from the conversation history.
+        const conversationHistory = currentSession.messages.map(m => `${m.sender === 'user' ? 'Player' : 'DM'}: ${m.text}`).join('\n');
+        const descriptionPrompt = `Based on the following D&D conversation, create a detailed visual description of the player character suitable for an AI image generator. Focus on physical appearance, race, class, clothing, equipment, and overall mood. Make it a rich, comma-separated list of keywords. Example: "elf ranger, long silver hair, green cloak, leather armor, holding a bow, standing in a dark forest, fantasy art, detailed". Conversation: ${conversationHistory}`;
+
+        const descriptionResponse = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: descriptionPrompt
+        });
+        const imagePrompt = descriptionResponse.text.trim();
+
+        // FIX: The left-hand side of an assignment expression may not be an optional property access.
+        const loadingParagraph = characterImageLoading.querySelector('p');
+        if (loadingParagraph) {
+            loadingParagraph.textContent = 'Image prompt created. Generating portrait...';
+        }
+        
+        // Step 2: Generate the image using the description.
+        const imageResponse = await ai.models.generateImages({
+            model: 'imagen-4.0-generate-001',
+            prompt: imagePrompt,
+            config: {
+              numberOfImages: 1,
+              outputMimeType: 'image/png',
+              aspectRatio: '3:4',
+            }
+        });
+        
+        const base64Image = imageResponse.generatedImages[0].image.imageBytes;
+        const imageUrl = `data:image/png;base64,${base64Image}`;
+        
+        currentSession.characterImageUrl = imageUrl;
+        characterImageDisplay.src = imageUrl;
+        characterImageDisplay.classList.remove('hidden');
+        saveChatHistoryToStorage();
+        
+    } catch (error) {
+        console.error("Image generation failed:", error);
+        characterImagePlaceholder.classList.remove('hidden');
+        // FIX: Using a non-null assertion is unsafe. Replaced with a null check.
+        const placeholderParagraph = characterImagePlaceholder.querySelector('p');
+        if (placeholderParagraph) {
+            placeholderParagraph.textContent = 'Image generation failed. Please try again.';
+        }
+    } finally {
+        isGeneratingData = false;
+        generateImageBtn.disabled = false;
+        characterImageLoading.classList.add('hidden');
+    }
+}
 
 // --- Main Execution ---
 
@@ -507,7 +720,6 @@ chatForm.addEventListener('submit', async (e) => {
   const currentSession = chatHistory.find(s => s.id === currentChatId);
   if (!currentSession) return;
   
-  // --- Password Setup ---
   if (currentSession.awaitingPassword) {
     stopTTS();
     currentSession.adminPassword = userInput;
@@ -532,7 +744,6 @@ chatForm.addEventListener('submit', async (e) => {
     return;
   }
 
-  // --- Easter Egg & Help Command Handling ---
   const lowerCaseInput = userInput.toLowerCase().replace(/[?]/g, '');
 
   if (lowerCaseInput === 'who is the architect') {
@@ -552,12 +763,11 @@ chatForm.addEventListener('submit', async (e) => {
   }
 
   if (lowerCaseInput === 'help') {
-    openHelpModal();
+    openHelpModal(helpModal);
     chatInput.value = '';
     chatInput.style.height = 'auto';
     return;
   }
-  // --- End of Special Handling ---
 
   if (!geminiChat) return;
 
@@ -566,7 +776,7 @@ chatForm.addEventListener('submit', async (e) => {
   const userMessage: Message = { sender: 'user', text: userInput };
   currentSession.messages.push(userMessage);
 
-  if (currentSession.messages.length === 4) { // First user game message
+  if (currentSession.messages.length === 4) {
     currentSession.title = userInput.substring(0, 40) + (userInput.length > 40 ? '...' : '');
   }
 
@@ -579,13 +789,26 @@ chatForm.addEventListener('submit', async (e) => {
   chatInput.disabled = true;
   sendButton.disabled = true;
   
-  let fullPrompt = userInput;
+  // Construct the full prompt with context and settings
+  let promptParts: string[] = [];
+  
+  if (currentSession.settings) {
+    const { difficulty, tone, narration } = currentSession.settings;
+    const settingsHeader = "[DM OS DIRECTIVE]\n";
+    const settingsString = `- Game Difficulty: ${difficulty}\n- Game Tone: ${tone}\n- Narration Style: ${narration}`;
+    promptParts.push(settingsHeader + settingsString);
+  }
+
   if (userContext.length > 0) {
       const contextHeader = "[RECALLING FACTS]\n";
       const contextString = userContext.map(fact => `- ${fact}`).join('\n');
-      const actionHeader = "\n\n[PLAYER ACTION]\n";
-      fullPrompt = contextHeader + contextString + actionHeader + userInput;
+      promptParts.push(contextHeader + contextString);
   }
+  
+  const actionHeader = "\n\n[PLAYER ACTION]\n";
+  promptParts.push(actionHeader + userInput);
+
+  const fullPrompt = promptParts.join('\n\n');
 
   const modelMessageContainer = appendMessage({ sender: 'model', text: '' });
   const modelMessageElement = modelMessageContainer.querySelector('.message.model') as HTMLElement;
@@ -638,14 +861,19 @@ menuBtn.addEventListener('click', toggleSidebar);
 overlay.addEventListener('click', closeSidebar);
 newChatBtn.addEventListener('click', startNewChat);
 
-helpBtn.addEventListener('click', openHelpModal);
-closeHelpBtn.addEventListener('click', closeHelpModal);
+helpBtn.addEventListener('click', () => openHelpModal(helpModal));
+closeHelpBtn.addEventListener('click', () => closeHelpModal(helpModal));
 helpModal.addEventListener('click', (e) => {
-    if (e.target === helpModal) {
-        closeHelpModal();
-    }
+    if (e.target === helpModal) closeHelpModal(helpModal);
 });
 
+dndHelpBtn.addEventListener('click', () => {
+    openHelpModal(dndHelpModal);
+});
+closeDndHelpBtn.addEventListener('click', () => closeHelpModal(dndHelpModal));
+dndHelpModal.addEventListener('click', (e) => {
+    if (e.target === dndHelpModal) closeHelpModal(dndHelpModal);
+});
 
 contextForm.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -665,6 +893,47 @@ contextList.addEventListener('click', (e) => {
     }
 });
 
+// Log Book Listeners
+logbookBtn.addEventListener('click', () => openHelpModal(logbookModal));
+closeLogbookBtn.addEventListener('click', () => closeHelpModal(logbookModal));
+logbookModal.addEventListener('click', (e) => {
+    if (e.target === logbookModal) closeHelpModal(logbookModal);
+});
+
+logbookNav.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const navButton = target.closest('.logbook-nav-btn');
+    if (navButton) {
+        const tab = navButton.getAttribute('data-tab');
+        logbookNav.querySelector('.active')?.classList.remove('active');
+        navButton.classList.add('active');
+
+        logbookPanes.forEach(pane => {
+            pane.classList.remove('active');
+            if (pane.id === `${tab}-content`) {
+                pane.classList.add('active');
+            }
+        });
+    }
+});
+
+updateSheetBtn.addEventListener('click', () => updateLogbookData('sheet'));
+updateInventoryBtn.addEventListener('click', () => updateLogbookData('inventory'));
+generateImageBtn.addEventListener('click', generateCharacterImage);
+
+[settingDifficulty, settingTone, settingNarration].forEach(el => {
+    el.addEventListener('change', () => {
+        const currentSession = chatHistory.find(s => s.id === currentChatId);
+        if (currentSession && currentSession.settings) {
+            currentSession.settings.difficulty = settingDifficulty.value as GameSettings['difficulty'];
+            currentSession.settings.tone = settingTone.value as GameSettings['tone'];
+            currentSession.settings.narration = settingNarration.value as GameSettings['narration'];
+            saveChatHistoryToStorage();
+        }
+    });
+});
+
+
 // Initial Load
 document.addEventListener('DOMContentLoaded', () => {
   loadChatHistoryFromStorage();
@@ -675,7 +944,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (chatHistory.length === 0) {
     startNewChat();
   } else {
-    // Load the most recent chat
     const lastChat = [...chatHistory].sort((a, b) => b.createdAt - a.createdAt)[0];
     loadChat(lastChat.id);
   }

@@ -62,7 +62,16 @@
           </svg>
         </button>
         <h1>DM OS</h1>
-        <button id="help-btn" aria-label="Open help">
+        <button id="logbook-btn" class="header-icon-btn" aria-label="Open Log Book">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM8 18H4V4h4v14zm6 0h-4V4h4v14zm6 0h-4V4h4v14z"/></svg>
+        </button>
+        <button id="dnd-help-btn" class="header-icon-btn" aria-label="Open D&D Basics and Hints">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="12,2 2,9 2,17 12,22 22,17 22,9" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+            <text x="12" y="15.5" font-family="sans-serif" font-size="9" fill="currentColor" text-anchor="middle">?</text>
+          </svg>
+        </button>
+        <button id="help-btn" class="header-icon-btn" aria-label="Open help">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>
         </button>
       </header>
@@ -105,7 +114,7 @@
         <div class="modal-content">
             <header class="modal-header">
                 <h2>DM OS Help & Documentation</h2>
-                <button id="close-help-btn" aria-label="Close help">
+                <button id="close-help-btn" class="close-modal-btn" aria-label="Close help">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
                 </button>
             </header>
@@ -126,33 +135,131 @@
                 <section>
                     <h3>The OOC Protocol (Debug Mode)</h3>
                     <p>The Out-Of-Character (OOC) protocol is a powerful tool that allows you to speak directly to the underlying AI of the DM OS, temporarily bypassing the Dungeon Master persona. This is your primary method for fixing issues, clarifying rules, or adjusting the simulation "under the hood."</p>
-                    <h4>When to Use OOC:</h4>
-                    <ul>
-                        <li><strong>Continuity Errors:</strong> If the DM forgets a key fact, character name, or plot point.</li>
-                        <li><strong>Major Rule Disputes:</strong> If you believe a core D&D rule is being fundamentally misinterpreted.</li>
-                        <li><strong>Simulation Adjustments:</strong> To provide meta-information the DM might need. (e.g., "My character's backstory means they would know about this symbol.")</li>
-                    </ul>
                     <h4>How to Use OOC:</h4>
                     <p>To activate the protocol, you must frame your message in a specific way, including the unique password you created at the start of the current chat session.</p>
                     <p><strong>Format:</strong> <code>[OOC: YourPassword, your message here]</code></p>
-                    <p><strong>Example:</strong> Let's say your session password is <code>DragonFire99</code> and the DM describes a town you've already visited as brand new.</p>
-                    <p>You would type: <code>[OOC: DragonFire99, we visited this town three sessions ago. The mayor gave us the key to the city.]</code></p>
-                    <p>The AI will then drop its DM persona, acknowledge your correction, integrate the information, and resume the story with the correct context. Use this power wisely to maintain immersion!</p>
+                    <p><strong>Example:</strong> <code>[OOC: DragonFire99, we visited this town three sessions ago. The mayor gave us the key to the city.]</code></p>
                 </section>
                 <section>
                     <h3>The Collapse-Rebirth Cycle (BBCR)</h3>
                     <p>The DM OS is built on an advanced cognitive architecture designed for long-term narrative consistency. At its core is a self-auditing and self-healing mechanism known as the Collapse-Rebirth Cycle (BBCR).</p>
-                    <h4>What is it?</h4>
-                    <p>The BBCR is the AI's internal memory management system. It constantly cross-references new events against its long-term memory (the "Semantic Tree") to check for logical inconsistencies, continuity errors, or plot holes.</p>
-                    <ul>
-                        <li><strong>The "Collapse":</strong> If the AI detects a critical conflict in its data (e.g., an NPC is in two places at once, a dead character is mentioned as alive), it triggers a "Collapse." The simulation may seem to pause or hang for a moment. This is the AI's core logic freezing the narrative to resolve the error.</li>
-                        <li><strong>The "Rebirth":</strong> During the collapse, the AI rapidly audits its memory, identifies the source of the error, and re-calibrates its understanding of the world state. Once the conflict is resolved, the simulation "Rebirths." The narrative continues from a corrected, logically consistent state.</li>
-                    </ul>
-                    <h4>What does this mean for you?</h4>
-                    <p>The BBCR is a sign of a healthy simulation. It's the OS actively working to prevent the kind of plot holes and memory failures that can ruin a long campaign. If you notice a brief, unusual pause in the DM's response, it's likely the BBCR at work, ensuring your story remains coherent and immersive. You don't need to do anything; the system is healing itself.</p>
+                    <p>The BBCR is a sign of a healthy simulation. It's the OS actively working to prevent the kind of plot holes and memory failures that can ruin a long campaign. If you notice a brief, unusual pause in the DM's response, it's likely the BBCR at work, ensuring your story remains coherent and immersive.</p>
                 </section>
             </div>
         </div>
+    </div>
+
+    <div id="dnd-help-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <header class="modal-header">
+                <h2>D&D Basics & Hints</h2>
+                <button id="close-dnd-help-btn" class="close-modal-btn" aria-label="Close help">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                </button>
+            </header>
+            <div class="modal-body">
+                <section>
+                    <h3>The Dice of Destiny</h3>
+                    <p>Dungeons & Dragons uses a set of polyhedral dice, each referred to by the letter "d" followed by the number of sides. Here are the most common ones:</p>
+                    <ul>
+                        <li><strong>d4 (4-sided):</strong> Often used for small weapon damage (like a dagger) or certain spells.</li>
+                        <li><strong>d6 (6-sided):</strong> The classic cube. Used for many weapon damages, healing spells, and rolling character stats.</li>
+                        <li><strong>d8 (8-sided):</strong> Common for martial weapon damage (like a longsword) and many spells.</li>
+                        <li><strong>d10 (10-sided):</strong> Used for heavier weapons and some spells. Also used for percentile rolls (d100) with a second d10.</li>
+                        <li><strong>d12 (12-sided):</strong> The signature die for the Barbarian's greataxe and other powerful weapons.</li>
+                        <li><strong>d20 (20-sided):</strong> The most important die. You roll a d20 for almost every action where the outcome is uncertain: attack rolls, ability checks (like picking a lock or persuading a guard), and saving throws to resist effects.</li>
+                    </ul>
+                </section>
+                 <section>
+                    <h3>Stuck? Get a Hint</h3>
+                    <p>If you're unsure what to do next, you can ask the Dungeon Master for a hint directly in the chat. The DM will provide a subtle nudge based on your current situation to help you move forward without spoiling the solution.</p>
+                    <p>Simply type something like <strong>"I'm stuck, can I get a hint?"</strong> into the chat prompt.</p>
+                </section>
+            </div>
+        </div>
+    </div>
+    
+    <div id="logbook-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-content wide-modal">
+        <header class="modal-header">
+          <h2>Log Book</h2>
+          <button id="close-logbook-btn" class="close-modal-btn" aria-label="Close log book">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          </button>
+        </header>
+        <div class="logbook-body">
+            <nav class="logbook-nav">
+                <button class="logbook-nav-btn active" data-tab="character-sheet">Character Sheet</button>
+                <button class="logbook-nav-btn" data-tab="inventory">Inventory</button>
+                <button class="logbook-nav-btn" data-tab="character-image">Character Image</button>
+                <button class="logbook-nav-btn" data-tab="settings">Settings</button>
+            </nav>
+            <main class="logbook-content">
+                <div id="character-sheet-content" class="logbook-pane active">
+                    <h3>Character Sheet</h3>
+                    <div class="logbook-data-container" id="character-sheet-display">
+                        <p>No data. Ask the DM to provide a character sheet summary.</p>
+                    </div>
+                    <button id="update-sheet-btn" class="logbook-update-btn">Request Update from DM</button>
+                </div>
+
+                <div id="inventory-content" class="logbook-pane">
+                    <h3>Inventory</h3>
+                    <div class="logbook-data-container" id="inventory-display">
+                        <p>No data. Ask the DM to summarize your inventory.</p>
+                    </div>
+                    <button id="update-inventory-btn" class="logbook-update-btn">Request Update from DM</button>
+                </div>
+
+                <div id="character-image-content" class="logbook-pane">
+                    <h3>Character Image</h3>
+                    <div class="character-image-container">
+                        <img id="character-image-display" src="" alt="Generated character portrait" class="hidden"/>
+                        <div id="character-image-placeholder">
+                            <p>Generate a unique portrait for your character based on your adventure.</p>
+                             <button id="generate-image-btn" class="logbook-update-btn">Generate Character Image</button>
+                        </div>
+                        <div id="character-image-loading" class="hidden">
+                            <p>First, creating a detailed description of your character...</p>
+                            <p>Then, generating the image. This may take a moment.</p>
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="settings-content" class="logbook-pane">
+                    <h3>Game Settings</h3>
+                    <p>Adjust these settings to tailor the DM's behavior for this adventure. Changes will be saved automatically.</p>
+                    <div class="settings-grid">
+                        <div class="setting-item">
+                            <label for="setting-difficulty">Difficulty</label>
+                            <select id="setting-difficulty">
+                                <option value="story">Story Mode</option>
+                                <option value="normal" selected>Normal</option>
+                                <option value="challenging">Challenging</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label for="setting-tone">Game Tone</label>
+                             <select id="setting-tone">
+                                <option value="heroic" selected>Heroic Fantasy</option>
+                                <option value="gritty">Serious & Gritty</option>
+                                <option value="comedic">Comedic</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                             <label for="setting-narration">Narration Style</label>
+                             <select id="setting-narration">
+                                <option value="concise">Concise</option>
+                                <option value="descriptive" selected>Descriptive</option>
+                                <option value="cinematic">Cinematic</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+      </div>
     </div>
   </body>
 </html>
