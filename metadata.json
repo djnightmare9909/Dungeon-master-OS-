@@ -1,0 +1,5 @@
+{
+  "name": "DM OS",
+  "description": "An AI Dungeon Master for Dungeons & Dragons, powered by Gemini.",
+  "requestFramePermissions": []
+}

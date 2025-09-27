@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>DM OS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Uncial+Antiqua&family=Merriweather:ital,wght@0,400;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="index.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/genai": "https://esm.sh/@google/genai@^0.7.0"
+        }
+      }
+    </script>
+    <script type="module" src="index.tsx"></script>
+  </head>
+  <body>
+    <nav id="sidebar">
+      <div class="sidebar-header">
+        <button id="new-chat-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          <span>New Chat</span>
+        </button>
+      </div>
+      <div id="chat-history-container">
+        <div id="pinned-chats">
+          <h2>Pinned</h2>
+          <ul id="pinned-chats-list"></ul>
+        </div>
+        <div id="recent-chats">
+          <h2>Recent</h2>
+          <ul id="recent-chats-list"></ul>
+        </div>
+      </div>
+       <div class="sidebar-footer">
+          <div id="context-manager">
+            <h2>User Context</h2>
+            <form id="context-form">
+                <input type="text" id="context-input" placeholder="Add a fact to remember..." required />
+                <button type="submit" aria-label="Add Context">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                </button>
+            </form>
+            <ul id="context-list">
+                <!-- Context items will be rendered here by JS -->
+            </ul>
+          </div>
+       </div>
+    </nav>
+    <div id="overlay"></div>
+
+    <div class="chat-view">
+      <header>
+        <button id="menu-btn" aria-label="Toggle menu">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+          </svg>
+        </button>
+        <h1>DM OS</h1>
+      </header>
+      <main id="chat-container"></main>
+      <footer>
+        <form id="chat-form">
+          <textarea
+            id="chat-input"
+            placeholder="What do you do?"
+            rows="1"
+            required
+            aria-label="Your action or dialogue"
+          ></textarea>
+          <button type="submit" aria-label="Send message">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+            </svg>
+          </button>
+        </form>
+      </footer>
+    </div>
+
+    <template id="tts-controls-template">
+        <div class="tts-controls">
+            <button class="tts-button" aria-label="Play audio">
+                <svg class="play-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                <svg class="pause-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="display: none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            </button>
+            <div class="sound-wave">
+                <span></span><span></span><span></span><span></span>
+            </div>
+        </div>
+    </template>
+  </body>
+</html>
