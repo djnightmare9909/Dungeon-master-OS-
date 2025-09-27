@@ -211,7 +211,7 @@ You are not just telling a story—you are running a living, reactive world. You
 const chatContainer = document.getElementById('chat-container') as HTMLElement;
 const chatForm = document.getElementById('chat-form') as HTMLFormElement;
 const chatInput = document.getElementById('chat-input') as HTMLTextAreaElement;
-const sendButton = chatForm.querySelector('button') as HTMLButtonElement;
+const sendButton = chatForm.querySelector('button[type="submit"]') as HTMLButtonElement;
 const menuBtn = document.getElementById('menu-btn') as HTMLButtonElement;
 const newChatBtn = document.getElementById('new-chat-btn') as HTMLButtonElement;
 const sidebar = document.getElementById('sidebar') as HTMLElement;
@@ -222,6 +222,9 @@ const ttsTemplate = document.getElementById('tts-controls-template') as HTMLTemp
 const contextForm = document.getElementById('context-form') as HTMLFormElement;
 const contextInput = document.getElementById('context-input') as HTMLInputElement;
 const contextList = document.getElementById('context-list') as HTMLUListElement;
+const fileUploadBtn = document.getElementById('file-upload-btn') as HTMLButtonElement;
+const fileInput = document.getElementById('file-input') as HTMLInputElement;
+const filePreviewContainer = document.getElementById('file-preview-container') as HTMLElement;
 
 // OS Help Modal
 const helpBtn = document.getElementById('help-btn') as HTMLButtonElement;
@@ -251,15 +254,23 @@ const settingDifficulty = document.getElementById('setting-difficulty') as HTMLS
 const settingTone = document.getElementById('setting-tone') as HTMLSelectElement;
 const settingNarration = document.getElementById('setting-narration') as HTMLSelectElement;
 
+// Rename Chat Modal
+const renameModal = document.getElementById('rename-modal') as HTMLElement;
+const renameForm = document.getElementById('rename-form') as HTMLFormElement;
+const renameInput = document.getElementById('rename-input') as HTMLInputElement;
+const closeRenameBtn = document.getElementById('close-rename-btn') as HTMLButtonElement;
+
 
 // --- State Management ---
 let chatHistory: ChatSession[] = [];
 let userContext: string[] = [];
+let selectedFiles: File[] = [];
 let currentChatId: string | null = null;
 let geminiChat: Chat | null = null;
 let currentSpeech: SpeechSynthesisUtterance | null = null;
 let currentlyPlayingTTSButton: HTMLButtonElement | null = null;
 let isGeneratingData = false;
+let chatIdToRename: string | null = null;
 
 
 // --- Gemini AI Initialization ---
@@ -318,15 +329,10 @@ function renderChatHistory() {
     li.className = 'chat-history-item';
     li.dataset.id = session.id;
     li.innerHTML = `
-      <span>${session.title}</span>
-      <div class="actions">
-        <button class="pin-btn ${session.isPinned ? 'pinned' : ''}" aria-label="Pin chat">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M16 9V4h1V2H7v2h1v5l-2 2v2h5.2v7l1.8 2 1.8-2v-7H18v-2l-2-2z"/></svg>
-        </button>
-        <button class="delete-btn" aria-label="Delete chat">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-        </button>
-      </div>
+      <button class="pin-btn ${session.isPinned ? 'pinned' : ''}" aria-label="Pin chat">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M16 9V4h1V2H7v2h1v5l-2 2v2h5.2v7l1.8 2 1.8-2v-7H18v-2l-2-2z"/></svg>
+      </button>
+      <span class="chat-title">${session.title}</span>
     `;
 
     if (session.id === currentChatId) {
@@ -339,7 +345,23 @@ function renderChatHistory() {
     });
 
     li.querySelector('.pin-btn')?.addEventListener('click', () => togglePinChat(session.id));
-    li.querySelector('.delete-btn')?.addEventListener('click', () => deleteChat(session.id));
+
+    // Long-press and right-click to rename
+    let pressTimer: number;
+    li.addEventListener('touchstart', (e) => {
+        if ((e.target as HTMLElement).closest('.pin-btn')) return;
+        pressTimer = window.setTimeout(() => openRenameModal(session.id), 500);
+    }, { passive: true });
+    
+    const cancelTimer = () => clearTimeout(pressTimer);
+    li.addEventListener('touchend', cancelTimer);
+    li.addEventListener('touchmove', cancelTimer);
+
+    li.addEventListener('contextmenu', (e) => {
+        if ((e.target as HTMLElement).closest('.pin-btn')) return;
+        e.preventDefault();
+        openRenameModal(session.id);
+    });
     
     if (session.isPinned) {
       pinnedChatsList.appendChild(li);
@@ -414,23 +436,6 @@ function loadChat(id: string) {
         updateLogbook(session);
         renderChatHistory();
         closeSidebar();
-    }
-}
-
-function deleteChat(id: string) {
-    if (confirm('Are you sure you want to delete this chat?')) {
-        chatHistory = chatHistory.filter(s => s.id !== id);
-        saveChatHistoryToStorage();
-
-        if (currentChatId === id) {
-            const sortedHistory = [...chatHistory].sort((a, b) => b.createdAt - a.createdAt);
-            if (sortedHistory.length > 0) {
-              loadChat(sortedHistory[0].id);
-            } else {
-              startNewChat();
-            }
-        }
-        renderChatHistory();
     }
 }
 
@@ -669,7 +674,6 @@ async function generateCharacterImage() {
         });
         const imagePrompt = descriptionResponse.text.trim();
 
-        // FIX: The left-hand side of an assignment expression may not be an optional property access.
         const loadingParagraph = characterImageLoading.querySelector('p');
         if (loadingParagraph) {
             loadingParagraph.textContent = 'Image prompt created. Generating portrait...';
@@ -697,7 +701,6 @@ async function generateCharacterImage() {
     } catch (error) {
         console.error("Image generation failed:", error);
         characterImagePlaceholder.classList.remove('hidden');
-        // FIX: Using a non-null assertion is unsafe. Replaced with a null check.
         const placeholderParagraph = characterImagePlaceholder.querySelector('p');
         if (placeholderParagraph) {
             placeholderParagraph.textContent = 'Image generation failed. Please try again.';
@@ -709,13 +712,89 @@ async function generateCharacterImage() {
     }
 }
 
+// --- Rename Modal Logic ---
+function openRenameModal(id: string) {
+    chatIdToRename = id;
+    const session = chatHistory.find(s => s.id === id);
+    if (session) {
+        renameInput.value = session.title;
+        renameModal.style.display = 'flex';
+        renameInput.focus();
+        renameInput.select();
+    }
+}
+
+function closeRenameModal() {
+    renameModal.style.display = 'none';
+    chatIdToRename = null;
+}
+
+
+// --- File Handling Logic ---
+
+/** Converts a File object to a base64 encoded string. */
+function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const result = reader.result as string;
+            // remove "data:mime/type;base64," prefix
+            resolve(result.split(',')[1]);
+        };
+        reader.onerror = (error) => reject(error);
+    });
+}
+
+/** Renders the previews for the selected files. */
+function renderFilePreviews() {
+    filePreviewContainer.innerHTML = '';
+    if (selectedFiles.length === 0) {
+        filePreviewContainer.style.display = 'none';
+        return;
+    }
+    filePreviewContainer.style.display = 'flex';
+    selectedFiles.forEach((file, index) => {
+        const previewElement = document.createElement('div');
+        previewElement.className = 'file-preview-item';
+        // Using a proper times symbol for the remove button
+        previewElement.innerHTML = `
+            <span>${file.name}</span>
+            <button class="remove-file-btn" data-index="${index}" aria-label="Remove ${file.name}">&times;</button>
+        `;
+        filePreviewContainer.appendChild(previewElement);
+    });
+}
+
 // --- Main Execution ---
 
 // Event Listeners
+fileUploadBtn.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', () => {
+    if (fileInput.files) {
+        selectedFiles.push(...Array.from(fileInput.files));
+        renderFilePreviews();
+        fileInput.value = ''; // Allow selecting the same file again
+    }
+});
+
+filePreviewContainer.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const removeBtn = target.closest('.remove-file-btn');
+    if (removeBtn) {
+        const index = parseInt(removeBtn.getAttribute('data-index')!, 10);
+        if (!isNaN(index)) {
+            selectedFiles.splice(index, 1);
+            renderFilePreviews();
+        }
+    }
+});
+
 chatForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const userInput = chatInput.value.trim();
-  if (!userInput || !currentChatId) return;
+  if ((!userInput && selectedFiles.length === 0) || !currentChatId) return;
 
   const currentSession = chatHistory.find(s => s.id === currentChatId);
   if (!currentSession) return;
@@ -776,7 +855,7 @@ chatForm.addEventListener('submit', async (e) => {
   const userMessage: Message = { sender: 'user', text: userInput };
   currentSession.messages.push(userMessage);
 
-  if (currentSession.messages.length === 4) {
+  if (currentSession.messages.length === 4 && userInput) {
     currentSession.title = userInput.substring(0, 40) + (userInput.length > 40 ? '...' : '');
   }
 
@@ -788,34 +867,52 @@ chatForm.addEventListener('submit', async (e) => {
   chatInput.style.height = 'auto';
   chatInput.disabled = true;
   sendButton.disabled = true;
+  fileUploadBtn.disabled = true;
   
-  // Construct the full prompt with context and settings
-  let promptParts: string[] = [];
+  // Construct the full prompt text part
+  let promptTextParts: string[] = [];
   
   if (currentSession.settings) {
     const { difficulty, tone, narration } = currentSession.settings;
     const settingsHeader = "[DM OS DIRECTIVE]\n";
     const settingsString = `- Game Difficulty: ${difficulty}\n- Game Tone: ${tone}\n- Narration Style: ${narration}`;
-    promptParts.push(settingsHeader + settingsString);
+    promptTextParts.push(settingsHeader + settingsString);
   }
 
   if (userContext.length > 0) {
       const contextHeader = "[RECALLING FACTS]\n";
       const contextString = userContext.map(fact => `- ${fact}`).join('\n');
-      promptParts.push(contextHeader + contextString);
+      promptTextParts.push(contextHeader + contextString);
   }
   
-  const actionHeader = "\n\n[PLAYER ACTION]\n";
-  promptParts.push(actionHeader + userInput);
-
-  const fullPrompt = promptParts.join('\n\n');
+  if (userInput) {
+    const actionHeader = "\n\n[PLAYER ACTION]\n";
+    promptTextParts.push(actionHeader + userInput);
+  }
+  
+  const fullPromptText = promptTextParts.join('\n\n');
 
   const modelMessageContainer = appendMessage({ sender: 'model', text: '' });
   const modelMessageElement = modelMessageContainer.querySelector('.message.model') as HTMLElement;
   modelMessageElement.classList.add('loading');
 
   try {
-    const stream = await geminiChat.sendMessageStream({ message: fullPrompt });
+    const contentParts: ({ text: string; } | { inlineData: { mimeType: string; data: string; }; })[] = [];
+
+    const filePromises = selectedFiles.map(async (file) => {
+        const base64Data = await fileToBase64(file);
+        return {
+            inlineData: {
+                mimeType: file.type || 'application/octet-stream',
+                data: base64Data
+            }
+        };
+    });
+    const fileParts = await Promise.all(filePromises);
+    contentParts.push(...fileParts);
+    contentParts.push({ text: fullPromptText });
+
+    const stream = await geminiChat.sendMessageStream({ parts: contentParts });
     
     let fullResponse = '';
     modelMessageElement.classList.remove('loading');
@@ -848,7 +945,10 @@ chatForm.addEventListener('submit', async (e) => {
     saveChatHistoryToStorage();
     chatInput.disabled = false;
     sendButton.disabled = false;
+    fileUploadBtn.disabled = false;
     chatInput.focus();
+    selectedFiles = [];
+    renderFilePreviews();
   }
 });
 
@@ -933,6 +1033,28 @@ generateImageBtn.addEventListener('click', generateCharacterImage);
     });
 });
 
+// Rename Modal Listeners
+renameForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const newTitle = renameInput.value.trim();
+    if (newTitle && chatIdToRename) {
+        const session = chatHistory.find(s => s.id === chatIdToRename);
+        if (session) {
+            session.title = newTitle;
+            saveChatHistoryToStorage();
+            renderChatHistory();
+        }
+    }
+    closeRenameModal();
+});
+
+closeRenameBtn.addEventListener('click', closeRenameModal);
+
+renameModal.addEventListener('click', (e) => {
+    if (e.target === renameModal) {
+        closeRenameModal();
+    }
+});
 
 // Initial Load
 document.addEventListener('DOMContentLoaded', () => {

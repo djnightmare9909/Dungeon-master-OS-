@@ -34,6 +34,18 @@ body {
   overflow: hidden;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
 /* --- Sidebar & Overlay --- */
 #sidebar {
   background-color: var(--sidebar-color);
@@ -106,46 +118,39 @@ body.sidebar-open #sidebar {
 .chat-history-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 0.75rem;
   padding: 0.75rem;
   border-radius: 8px;
   cursor: pointer;
   transition: background-color 0.2s;
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .chat-history-item:hover, .chat-history-item.active {
   background-color: var(--model-message-bg);
 }
 
-.chat-history-item span {
+.chat-history-item .chat-title {
   flex-grow: 1;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.chat-history-item .actions {
-  display: none;
-  gap: 0.5rem;
-}
-
-.chat-history-item:hover .actions {
-  display: flex;
-}
-
-.chat-history-item .actions button {
+.chat-history-item .pin-btn {
   background: none;
   border: none;
   color: var(--text-secondary-color);
   cursor: pointer;
   padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
-.chat-history-item .actions button:hover {
+.chat-history-item .pin-btn:hover {
   color: var(--text-color);
 }
-.chat-history-item .actions button.pin-btn.pinned {
+.chat-history-item .pin-btn.pinned {
     color: var(--accent-color);
 }
 
@@ -395,19 +400,100 @@ footer {
 
 #chat-form {
   display: flex;
-  gap: 0.75rem;
-  align-items: flex-end;
+  flex-direction: column;
   max-width: 800px;
   margin: 0 auto;
   background-color: var(--model-message-bg);
   border: 1px solid var(--border-color);
   border-radius: 2rem;
-  padding: 0.5rem 0.5rem 0.5rem 1.25rem;
 }
 
 #chat-form:focus-within {
   border-color: var(--accent-color);
 }
+
+.input-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+  padding: 0.5rem 0.5rem 0.5rem 1.25rem;
+}
+
+#file-upload-btn {
+  background: none;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+  color: var(--text-secondary-color);
+  padding: 0;
+}
+#file-upload-btn:hover {
+  background-color: var(--sidebar-color);
+  color: var(--text-color);
+}
+#file-upload-btn:disabled {
+    cursor: not-allowed;
+    color: #555;
+}
+#file-upload-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+#file-preview-container {
+  display: none;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.file-preview-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: var(--background-color);
+  color: var(--text-secondary-color);
+  font-size: 0.8rem;
+  padding: 0.25rem 0.25rem 0.25rem 0.75rem;
+  border-radius: 1rem;
+  border: 1px solid var(--border-color);
+}
+
+.file-preview-item span {
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.remove-file-btn {
+  background-color: var(--border-color);
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+.remove-file-btn:hover {
+  background-color: var(--danger-color);
+}
+
 
 #chat-input {
   flex-grow: 1;
@@ -428,7 +514,7 @@ footer {
   outline: none;
 }
 
-#chat-form button {
+#chat-form button[type="submit"] {
   background-color: var(--accent-color);
   border: none;
   width: 40px;
@@ -442,16 +528,16 @@ footer {
   flex-shrink: 0;
 }
 
-#chat-form button:hover {
+#chat-form button[type="submit"]:hover {
   background-color: var(--accent-hover-color);
 }
 
-#chat-form button:disabled {
+#chat-form button[type="submit"]:disabled {
   background-color: #555;
   cursor: not-allowed;
 }
 
-#chat-form button svg {
+#chat-form button[type="submit"] svg {
   width: 24px;
   height: 24px;
   fill: var(--background-color);
@@ -561,7 +647,7 @@ footer {
     height: 16px;
 }
 
-/* --- Help Modals --- */
+/* --- Modals --- */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -585,6 +671,12 @@ footer {
     display: flex;
     flex-direction: column;
     box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+}
+
+.modal-content form {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1; /* For rename modal */
 }
 
 .modal-header {
@@ -617,7 +709,7 @@ footer {
 }
 
 .modal-body {
-    padding: 0 1.5rem 1.5rem;
+    padding: 1.5rem;
     overflow-y: auto;
     line-height: 1.7;
 }
@@ -625,6 +717,10 @@ footer {
 .modal-body section {
     margin-top: 1.5rem;
 }
+.modal-body section:first-child {
+    margin-top: 0;
+}
+
 
 .modal-body h3 {
     font-family: var(--primary-font);
@@ -664,12 +760,37 @@ footer {
     color: var(--accent-hover-color);
 }
 
+.modal-body #rename-input {
+    width: 100%;
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    border-radius: 4px;
+    padding: 0.75rem;
+    font-family: var(--primary-font);
+    font-size: 1rem;
+}
+.modal-body #rename-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+
 .modal-body .help-clue {
     font-style: italic;
     color: var(--text-secondary-color);
     margin-top: 1rem;
     text-align: center;
 }
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    margin-top: auto;
+}
+
 
 /* --- Log Book & Shared Button Styles --- */
 .logbook-update-btn {
