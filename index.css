@@ -288,6 +288,11 @@ body.sidebar-open #sidebar {
   padding: 1rem;
 }
 
+.sidebar-header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 #new-chat-btn {
   display: flex;
   align-items: center;
@@ -300,7 +305,7 @@ body.sidebar-open #sidebar {
   font-family: var(--primary-font);
   font-size: 1rem;
   cursor: pointer;
-  width: 100%;
+  flex-grow: 1;
   transition: background-color 0.2s;
 }
 
@@ -312,6 +317,25 @@ body.sidebar-open #sidebar {
   width: 20px;
   height: 20px;
 }
+
+#import-chat-btn {
+  background-color: var(--model-message-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  color: var(--text-color);
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  padding: 0;
+}
+#import-chat-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+#import-chat-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
 
 #chat-history-container {
   flex-grow: 1;
@@ -342,6 +366,7 @@ body.sidebar-open #sidebar {
   cursor: pointer;
   transition: background-color 0.2s;
   overflow: hidden;
+  position: relative;
 }
 
 .chat-history-item:hover, .chat-history-item.active {
@@ -353,9 +378,10 @@ body.sidebar-open #sidebar {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  padding-right: 2rem; /* Space for the button */
 }
 
-.chat-history-item .pin-btn {
+.chat-history-item .options-btn {
   background: none;
   border: none;
   color: var(--text-secondary-color);
@@ -364,12 +390,22 @@ body.sidebar-open #sidebar {
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 0.2s;
 }
-.chat-history-item .pin-btn:hover {
+.chat-history-item:hover .options-btn, .chat-history-item.active .options-btn {
+  opacity: 1;
+}
+.chat-history-item .options-btn:hover {
   color: var(--text-color);
 }
-.chat-history-item .pin-btn.pinned {
-    color: var(--accent-color);
+.chat-history-item .options-btn svg {
+  width: 20px;
+  height: 20px;
 }
 
 #overlay {
@@ -541,6 +577,23 @@ main {
   align-self: center;
   width: 100%;
   max-width: 600px;
+}
+
+.message.system-roll {
+  align-self: center;
+  background-color: var(--background-color);
+  border: 1px dashed var(--accent-color);
+  color: var(--text-secondary-color);
+  font-family: var(--mono-font);
+  text-align: center;
+  padding: 0.5rem 1rem;
+  max-width: 80%;
+  border-radius: 8px;
+}
+
+.message.system-roll strong {
+    color: var(--text-color);
+    font-weight: bold;
 }
 
 
@@ -1009,6 +1062,77 @@ footer {
     justify-content: flex-end;
 }
 
+/* --- Chat Options Menu --- */
+.chat-options-menu {
+    position: absolute;
+    z-index: 1001;
+    background-color: var(--model-message-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    list-style: none;
+    padding: 0.5rem 0;
+    min-width: 150px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.chat-options-menu li {
+    padding: 0.75rem 1.25rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+.chat-options-menu li:hover {
+    background-color: var(--user-message-bg);
+}
+
+
+/* --- I/O Modal --- */
+.io-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+.io-option-btn {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background-color: var(--model-message-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 1.25rem;
+    border-radius: 8px;
+    font-family: var(--primary-font);
+    font-size: 1.1rem;
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 0.2s, border-color 0.2s;
+    position: relative;
+}
+.io-option-btn:not(:disabled):hover {
+    background-color: var(--user-message-bg);
+    border-color: var(--accent-color);
+}
+.io-option-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+.io-option-btn svg {
+    width: 28px;
+    height: 28px;
+    color: var(--accent-color);
+    flex-shrink: 0;
+}
+.coming-soon-badge {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.75rem;
+    font-size: 0.7rem;
+    background-color: var(--accent-color);
+    color: var(--background-color);
+    padding: 0.1rem 0.4rem;
+    border-radius: 1rem;
+    font-weight: bold;
+}
+
+
 /* --- Log Book & Shared Button Styles --- */
 .logbook-update-btn {
     background-color: var(--user-message-bg);
@@ -1231,6 +1355,194 @@ footer {
     background-color: var(--model-message-bg);
     text-align: center;
     font-weight: bold;
+}
+
+/* --- Dice Roller Modal --- */
+.dice-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.dice-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+.dice-controls label {
+    color: var(--text-secondary-color);
+}
+#dice-theme-select {
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-family: var(--primary-font);
+}
+
+.dice-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 1.5rem;
+}
+
+.die-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    background-color: var(--user-message-bg);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.die-item:hover {
+    border-color: var(--accent-color);
+}
+
+
+.die-visual {
+    width: 80px;
+    height: 80px;
+    cursor: pointer;
+    transition: transform 0.2s ease-in-out;
+}
+.die-visual:hover {
+    transform: scale(1.1);
+}
+.die-visual.rolling {
+    animation: roll-animation 0.5s ease-in-out;
+}
+
+.die-visual svg {
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.25));
+}
+
+.die-visual .die-text {
+    font-family: "Helvetica Neue", Lato, "Montserrat", sans-serif;
+    font-size: 28px;
+    font-weight: bold;
+    fill: #ffffff;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    pointer-events: none;
+}
+
+
+@keyframes roll-animation {
+    0% { transform: scale(1) rotate(0deg); }
+    25% { transform: scale(1.2) rotate(15deg); }
+    75% { transform: scale(0.9) rotate(-15deg); }
+    100% { transform: scale(1) rotate(0deg); }
+}
+
+.quantity-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.quantity-control button {
+    width: 28px;
+    height: 28px;
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary-color);
+    cursor: pointer;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    line-height: 1;
+    transition: background-color 0.2s;
+}
+
+.quantity-control button:hover {
+    background-color: var(--model-message-bg);
+    color: var(--text-color);
+}
+
+.quantity-control input {
+    width: 40px;
+    text-align: center;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
+    font-size: 1rem;
+    -moz-appearance: textfield;
+}
+
+.quantity-control input::-webkit-outer-spin-button,
+.quantity-control input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.dice-results-area {
+    border-top: 1px solid var(--border-color);
+    padding-top: 1rem;
+}
+.dice-results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+.dice-results-header h3 {
+    margin: 0;
+    border: none;
+    padding: 0;
+}
+
+#clear-results-btn {
+    background: none;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary-color);
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+#clear-results-btn:hover {
+    background-color: var(--model-message-bg);
+    color: var(--text-color);
+}
+
+
+#dice-results-log {
+    background-color: var(--background-color);
+    min-height: 80px;
+    max-height: 150px;
+    overflow-y: auto;
+    border-radius: 4px;
+    padding: 0.5rem;
+    margin-bottom: 1rem;
+    font-family: var(--mono-font);
+}
+#dice-results-log p {
+    margin: 0 0 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px dashed var(--border-color);
+}
+#dice-results-log p:last-child {
+    margin-bottom: 0;
+    border-bottom: none;
+}
+
+
+.dice-results-total {
+    text-align: right;
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+#dice-total-value {
+    color: var(--accent-color);
+    margin-left: 0.5rem;
+    font-size: 1.5rem;
 }
 
 /* --- Responsive Design --- */

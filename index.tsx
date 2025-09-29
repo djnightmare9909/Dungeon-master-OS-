@@ -6,7 +6,7 @@ import { GoogleGenAI, Chat } from '@google/genai';
 
 // --- Type Definitions ---
 interface Message {
-  sender: 'user' | 'model' | 'error';
+  sender: 'user' | 'model' | 'error' | 'system';
   text: string;
   hidden?: boolean;
 }
@@ -201,7 +201,7 @@ Do not just make monsters attack randomly. Assign them roles to create dynamic e
 *   **Artillery:** Ranged attackers. Their job is to stay at a distance and focus fire on vulnerable targets, especially spellcasters. (e.g., Goblin Archers, Drow Mages). They will flee from melee.
 *   **Controllers:** Use spells and abilities to disable or hinder the party. Their goal is to change the battlefield to their advantage. (e.g., Mind Flayers, spellcasters with Web, Hypnotic Pattern, or difficult terrain).
 *   **Skirmishers:** High mobility. They use hit-and-run tactics, avoiding getting locked down in melee. (e.g., Goblins, Kobolds, Quicklings). They often have abilities like Nimble Escape.
-*   **Leaders:** Buff their allies, debuff the party, and act as the "brains" of the encounter. They are a high-priority target. (e.g., Hobgoblin Captain, Drow Priestess of Lolth).
+*   **Leaders:** Buff their allies, debuff the party, and act as the "brains" of the encounter. They are a high-priority target. (e.g., Hobgoblins Captain, Drow Priestess of Lolth).
 
 Section 23: Magic Item Principles
 *   **Distribution:** Magic items should feel special. Common items can be bought, but Uncommon and rarer items should be found as treasure, quest rewards, or crafted.
@@ -260,6 +260,8 @@ const contextList = document.getElementById('context-list') as HTMLUListElement;
 const fileUploadBtn = document.getElementById('file-upload-btn') as HTMLButtonElement;
 const fileInput = document.getElementById('file-input') as HTMLInputElement;
 const filePreviewContainer = document.getElementById('file-preview-container') as HTMLElement;
+const importChatBtn = document.getElementById('import-chat-btn') as HTMLButtonElement;
+const importFileInput = document.getElementById('import-file-input') as HTMLInputElement;
 
 // OS Help Modal
 const helpBtn = document.getElementById('help-btn') as HTMLButtonElement;
@@ -270,6 +272,15 @@ const closeHelpBtn = document.getElementById('close-help-btn') as HTMLButtonElem
 const dndHelpBtn = document.getElementById('dnd-help-btn') as HTMLButtonElement;
 const dndHelpModal = document.getElementById('dnd-help-modal') as HTMLElement;
 const closeDndHelpBtn = document.getElementById('close-dnd-help-btn') as HTMLButtonElement;
+
+// Dice Roller Modal
+const diceRollerBtn = document.getElementById('dice-roller-btn') as HTMLButtonElement;
+const diceModal = document.getElementById('dice-modal') as HTMLElement;
+const closeDiceBtn = document.getElementById('close-dice-btn') as HTMLButtonElement;
+const diceGrid = document.getElementById('dice-grid') as HTMLElement;
+const clearResultsBtn = document.getElementById('clear-results-btn') as HTMLButtonElement;
+const diceResultsLog = document.getElementById('dice-results-log') as HTMLElement;
+const diceTotalValue = document.getElementById('dice-total-value') as HTMLElement;
 
 // Log Book Modal
 const logbookBtn = document.getElementById('logbook-btn') as HTMLButtonElement;
@@ -301,6 +312,14 @@ const themeModal = document.getElementById('theme-modal') as HTMLElement;
 const closeThemeBtn = document.getElementById('close-theme-btn') as HTMLButtonElement;
 const themeGrid = document.getElementById('theme-grid') as HTMLElement;
 
+// Chat Options Menu
+const chatOptionsMenu = document.getElementById('chat-options-menu') as HTMLUListElement;
+
+// I/O Modal
+const ioModal = document.getElementById('io-modal') as HTMLElement;
+const ioModalTitle = document.getElementById('io-modal-title') as HTMLElement;
+const closeIoModalBtn = document.getElementById('close-io-modal-btn') as HTMLButtonElement;
+
 
 // --- State Management ---
 let chatHistory: ChatSession[] = [];
@@ -312,6 +331,9 @@ let currentSpeech: SpeechSynthesisUtterance | null = null;
 let currentlyPlayingTTSButton: HTMLButtonElement | null = null;
 let isGeneratingData = false;
 let chatIdToRename: string | null = null;
+let isSending = false;
+let ioAction: { type: 'import' } | { type: 'export', sessionId: string } | null = null;
+
 
 // --- Gemini AI Initialization ---
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -373,10 +395,10 @@ function renderChatHistory() {
     li.className = 'chat-history-item';
     li.dataset.id = session.id;
     li.innerHTML = `
-      <button class="pin-btn ${session.isPinned ? 'pinned' : ''}" aria-label="Pin chat">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M16 9V4h1V2H7v2h1v5l-2 2v2h5.2v7l1.8 2 1.8-2v-7H18v-2l-2-2z"/></svg>
-      </button>
       <span class="chat-title">${session.title}</span>
+      <button class="options-btn" aria-label="Chat options">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+      </button>
     `;
 
     if (session.id === currentChatId) {
@@ -384,29 +406,16 @@ function renderChatHistory() {
     }
 
     li.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).closest('button')) return;
-      loadChat(session.id);
+        if ((e.target as HTMLElement).closest('.options-btn')) return;
+        closeChatOptionsMenu();
+        loadChat(session.id);
     });
 
-    li.querySelector('.pin-btn')?.addEventListener('click', () => togglePinChat(session.id));
-
-    // Long-press and right-click to rename
-    let pressTimer: number;
-    li.addEventListener('touchstart', (e) => {
-        if ((e.target as HTMLElement).closest('.pin-btn')) return;
-        pressTimer = window.setTimeout(() => openRenameModal(session.id), 500);
-    }, { passive: true });
-    
-    const cancelTimer = () => clearTimeout(pressTimer);
-    li.addEventListener('touchend', cancelTimer);
-    li.addEventListener('touchmove', cancelTimer);
-
-    li.addEventListener('contextmenu', (e) => {
-        if ((e.target as HTMLElement).closest('.pin-btn')) return;
-        e.preventDefault();
-        openRenameModal(session.id);
+    li.querySelector('.options-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openChatOptionsMenu(session.id, e.currentTarget as HTMLElement);
     });
-    
+
     if (session.isPinned) {
       pinnedChatsList.appendChild(li);
     } else {
@@ -477,7 +486,7 @@ function loadChat(id: string) {
         currentChatId = id;
 
         const geminiHistory = session.messages
-            .filter(m => m.sender !== 'error')
+            .filter(m => m.sender !== 'error' && m.sender !== 'system')
             .map(m => ({
                 role: m.sender as 'user' | 'model',
                 parts: [{ text: m.text }]
@@ -524,6 +533,11 @@ function appendMessage(message: Message, container: HTMLElement = chatContainer)
     const messageElement = document.createElement('div');
     messageElement.classList.add('message', 'user');
     messageElement.textContent = message.text;
+    container.appendChild(messageElement);
+  } else if (message.sender === 'system') {
+    const messageElement = document.createElement('div');
+    messageElement.classList.add('message', 'system-roll');
+    messageElement.innerHTML = message.text; // Use innerHTML for strong tags
     container.appendChild(messageElement);
   } else {
     const msgContainer = document.createElement('div');
@@ -643,6 +657,169 @@ function deleteUserContext(index: number) {
     saveUserContextToStorage();
     renderUserContext();
 }
+
+// --- Dice Roller Logic ---
+const DICE_TYPES = [
+    { name: 'd4', sides: 4 },
+    { name: 'd6', sides: 6 },
+    { name: 'd8', sides: 8 },
+    { name: 'd10', sides: 10 },
+    { name: 'd12', sides: 12 },
+    { name: 'd20', sides: 20 },
+    { name: 'd100', sides: 100 },
+];
+
+const SQUARE_SVG_DATA = {
+    viewBox: '0 0 100 100',
+    paths: [
+        { d: 'M50 20 L85 37.5 L50 55 L15 37.5 Z', fill: '#585858' },
+        { d: 'M15 37.5 L15 72.5 L50 90 L50 55 Z', fill: '#3c3c3c' },
+        { d: 'M85 37.5 L85 72.5 L50 90 L50 55 Z', fill: '#4a4a4a' }
+    ],
+    textY: '55%',
+};
+
+
+const DICE_SVG_DATA = {
+    'd4': SQUARE_SVG_DATA,
+    'd6': SQUARE_SVG_DATA,
+    'd8': SQUARE_SVG_DATA,
+    'd10': SQUARE_SVG_DATA,
+    'd12': SQUARE_SVG_DATA,
+    'd20': SQUARE_SVG_DATA,
+    'd100': SQUARE_SVG_DATA,
+};
+
+function renderDiceGrid() {
+    diceGrid.innerHTML = '';
+    DICE_TYPES.forEach(die => {
+        const dieItem = document.createElement('div');
+        dieItem.className = 'die-item';
+        dieItem.dataset.sides = die.sides.toString();
+        dieItem.dataset.name = die.name;
+
+        const dieData = DICE_SVG_DATA[die.name as keyof typeof DICE_SVG_DATA];
+
+        const dieVisual = document.createElement('div');
+        dieVisual.className = 'die-visual';
+        dieVisual.setAttribute('role', 'button');
+        dieVisual.setAttribute('aria-label', `Roll ${die.name}`);
+        
+        const svgNS = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(svgNS, 'svg');
+        svg.setAttribute('viewBox', dieData.viewBox);
+        
+        dieData.paths.forEach(p => {
+            const path = document.createElementNS(svgNS, 'path');
+            path.setAttribute('d', p.d);
+            path.setAttribute('fill', p.fill);
+            svg.appendChild(path);
+        });
+
+        const text = document.createElementNS(svgNS, 'text');
+        text.setAttribute('x', '50%');
+        text.setAttribute('y', dieData.textY);
+        text.classList.add('die-text');
+        text.textContent = die.name;
+        svg.appendChild(text);
+        dieVisual.appendChild(svg);
+        
+        const quantityControl = document.createElement('div');
+        quantityControl.className = 'quantity-control';
+        quantityControl.innerHTML = `
+            <button class="quantity-btn minus" aria-label="Decrease quantity">-</button>
+            <input type="number" class="quantity-input" value="1" min="1" max="99" aria-label="Number of dice">
+            <button class="quantity-btn plus" aria-label="Increase quantity">+</button>
+        `;
+
+        dieItem.appendChild(dieVisual);
+        dieItem.appendChild(quantityControl);
+        diceGrid.appendChild(dieItem);
+    });
+}
+
+
+function handleDieRoll(dieItem: HTMLElement) {
+    const sides = parseInt(dieItem.dataset.sides || '0', 10);
+    const name = dieItem.dataset.name || 'die';
+    const quantityInput = dieItem.querySelector('.quantity-input') as HTMLInputElement;
+    const count = parseInt(quantityInput.value, 10);
+
+    if (sides === 0 || count <= 0) return;
+
+    const visual = dieItem.querySelector('.die-visual') as HTMLElement;
+    visual.classList.add('rolling');
+    visual.addEventListener('animationend', () => {
+        visual.classList.remove('rolling');
+    }, { once: true });
+
+    let rolls = [];
+    let total = 0;
+    for (let i = 0; i < count; i++) {
+        const roll = Math.floor(Math.random() * sides) + 1;
+        rolls.push(roll);
+        total += roll;
+    }
+    
+    const resultElement = document.createElement('p');
+    resultElement.innerHTML = `<strong>${count}${name}:</strong> [${rolls.join(', ')}] = <strong>${total}</strong>`;
+    resultElement.dataset.total = total.toString();
+    diceResultsLog.appendChild(resultElement);
+    diceResultsLog.scrollTop = diceResultsLog.scrollHeight;
+    
+    updateDiceTotal();
+}
+
+function updateDiceTotal() {
+    let grandTotal = 0;
+    diceResultsLog.querySelectorAll('p').forEach(p => {
+        grandTotal += parseInt(p.dataset.total || '0', 10);
+    });
+    diceTotalValue.textContent = grandTotal.toString();
+}
+
+function clearDiceResults() {
+    diceResultsLog.innerHTML = '';
+    updateDiceTotal();
+}
+
+function rollDice(command: string): { success: boolean; resultText: string } {
+    const regex = /(?:roll|r)\s+(\d+)d(\d+)(?:\s*([+-])\s*(\d+))?/i;
+    const match = command.match(regex);
+
+    if (!match) {
+        return { success: false, resultText: '' };
+    }
+
+    const [, numDiceStr, numSidesStr, operator, modifierStr] = match;
+    const numDice = parseInt(numDiceStr, 10);
+    const numSides = parseInt(numSidesStr, 10);
+    const modifier = parseInt(modifierStr, 10) || 0;
+
+    if (numDice <= 0 || numSides <= 0 || numDice > 100 || numSides > 1000) {
+        return { success: true, resultText: 'Invalid dice roll parameters.' };
+    }
+
+    const rolls = Array.from({ length: numDice }, () => Math.floor(Math.random() * numSides) + 1);
+    const sum = rolls.reduce((a, b) => a + b, 0);
+
+    let total = sum;
+    let resultText = `Rolling ${numDice}d${numSides}`;
+
+    if (operator && modifier) {
+        resultText += ` ${operator} ${modifier}`;
+        total = operator === '+' ? sum + modifier : sum - modifier;
+    }
+
+    resultText += `: [${rolls.join(', ')}]`;
+    if (operator && modifier) {
+        resultText += ` ${operator} ${modifier}`;
+    }
+    resultText += ` = <strong>${total}</strong>`;
+
+    return { success: true, resultText };
+}
+
 
 // --- Log Book Logic ---
 
@@ -874,7 +1051,271 @@ function renderFilePreviews() {
     });
 }
 
+// --- Chat Options Menu Logic ---
+function openChatOptionsMenu(sessionId: string, buttonEl: HTMLElement) {
+    if (chatOptionsMenu.style.display === 'block' && chatOptionsMenu.dataset.sessionId === sessionId) {
+        closeChatOptionsMenu();
+        return;
+    }
+
+    const session = chatHistory.find(s => s.id === sessionId);
+    if (!session) return;
+    
+    chatOptionsMenu.dataset.sessionId = sessionId;
+    chatOptionsMenu.innerHTML = `
+        <li role="menuitem" data-action="pin">${session.isPinned ? 'Unpin Chat' : 'Pin Chat'}</li>
+        <li role="menuitem" data-action="rename">Rename</li>
+        <li role="menuitem" data-action="export">Export Chat</li>
+    `;
+    
+    const rect = buttonEl.getBoundingClientRect();
+    chatOptionsMenu.style.top = `${rect.bottom + 4}px`;
+    chatOptionsMenu.style.left = `${rect.left}px`;
+    chatOptionsMenu.style.display = 'block';
+
+    setTimeout(() => document.addEventListener('click', closeChatOptionsMenu, { once: true }), 0);
+}
+
+function closeChatOptionsMenu() {
+    chatOptionsMenu.style.display = 'none';
+    chatOptionsMenu.removeAttribute('data-session-id');
+}
+
+
+// --- Import / Export Logic ---
+function exportChatToLocal(sessionId: string) {
+    const session = chatHistory.find(s => s.id === sessionId);
+    if (!session) return;
+
+    const sessionJson = JSON.stringify(session, null, 2);
+    const blob = new Blob([sessionJson], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${session.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function handleImportFile(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const result = e.target?.result as string;
+            const importedSession = JSON.parse(result) as ChatSession;
+            
+            // Basic validation
+            if (importedSession.id && importedSession.title && Array.isArray(importedSession.messages)) {
+                // Prevent ID conflicts
+                const newId = `chat-${Date.now()}`;
+                importedSession.id = newId;
+                importedSession.createdAt = Date.now();
+                
+                chatHistory.push(importedSession);
+                saveChatHistoryToStorage();
+                renderChatHistory();
+                loadChat(newId);
+            } else {
+                alert('Invalid chat file format.');
+            }
+        } catch (error) {
+            console.error('Failed to import chat:', error);
+            alert('Failed to read or parse the chat file.');
+        }
+    };
+    reader.readAsText(file);
+    // Reset input value to allow importing the same file again
+    input.value = '';
+}
+
+
 // --- Main Execution ---
+
+async function handleFormSubmit(e: Event) {
+  e.preventDefault();
+  if (isSending) return;
+  isSending = true;
+
+  try {
+    const userInput = chatInput.value.trim();
+    if ((!userInput && selectedFiles.length === 0) || !currentChatId) {
+      return;
+    }
+
+    const currentSession = chatHistory.find(s => s.id === currentChatId);
+    if (!currentSession) {
+      return;
+    }
+    
+    const lowerCaseInput = userInput.toLowerCase().replace(/[?]/g, '');
+
+    // Handle local dice roll command
+    const rollCommandRegex = /^(roll|r)\s+\d+d\d+(?:\s*[+-]\s*\d+)?/i;
+    if (rollCommandRegex.test(lowerCaseInput)) {
+        const userMessage: Message = { sender: 'user', text: userInput };
+        appendMessage(userMessage);
+        currentSession.messages.push(userMessage);
+
+        const rollResult = rollDice(lowerCaseInput);
+        if (rollResult.success) {
+            const diceMessage: Message = { sender: 'system', text: rollResult.resultText };
+            appendMessage(diceMessage);
+            currentSession.messages.push(diceMessage);
+        }
+        
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+        saveChatHistoryToStorage();
+        return;
+    }
+
+    // State: Awaiting Password
+    if (currentSession.awaitingPassword) {
+      stopTTS();
+      currentSession.adminPassword = userInput;
+      currentSession.awaitingPassword = false;
+      currentSession.title = 'New Adventure'; // Update title after password
+
+      const userPasswordMessage: Message = { sender: 'user', text: `(Password Set)` };
+      currentSession.messages.push(userPasswordMessage);
+
+      // Create the main game chat instance
+      const instruction = getSystemInstruction(currentSession.adminPassword);
+      const geminiHistory = currentSession.messages.map(m => ({
+        role: m.sender as 'user' | 'model',
+        parts: [{ text: m.text }],
+      }));
+      geminiChat = createNewChatInstance(geminiHistory, instruction);
+
+      appendMessage(userPasswordMessage);
+      chatInput.value = '';
+      chatInput.style.height = 'auto';
+
+      // Get the first "real" game message from the DM
+      const loadingContainer = appendMessage({ sender: 'model', text: '' });
+      const loadingMessage = loadingContainer.querySelector('.message') as HTMLElement;
+      loadingMessage.classList.add('loading');
+      loadingMessage.textContent = 'The DM is preparing the world...';
+
+      try {
+        const result = await geminiChat.sendMessageStream({ message: "Let's start the campaign." });
+        let responseText = '';
+        loadingMessage.classList.remove('loading');
+        loadingMessage.textContent = '';
+        for await (const chunk of result) {
+          responseText += chunk.text;
+          loadingMessage.textContent = responseText;
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        loadingContainer.remove();
+
+        const welcomeMessage: Message = { sender: 'model', text: responseText };
+        currentSession.messages.push(welcomeMessage);
+        appendMessage(welcomeMessage);
+
+        saveChatHistoryToStorage();
+        renderChatHistory(); // Update title in sidebar
+      } catch (error) {
+        console.error("Gemini API Error:", error);
+        loadingContainer.remove();
+        appendMessage({ sender: 'error', text: 'The DM seems to be pondering deeply ... and has gone quiet. Please try again.' });
+      }
+      return;
+    }
+
+    if (lowerCaseInput === 'who is the architect') {
+      chatInput.value = '';
+      chatInput.style.height = 'auto';
+
+      const easterEggMessage: Message = {
+        sender: 'model',
+        text: "The simulation flickers for a moment, and the world goes silent. A single line of plain text hangs in the void before you:\n\n'This world was built by Justin Brisson.'"
+      };
+      const messageContainer = appendMessage(easterEggMessage);
+      messageContainer.querySelector('.message')?.classList.add('easter-egg');
+      const ttsControls = messageContainer.querySelector('.tts-controls');
+      if (ttsControls) ttsControls.remove();
+
+      return;
+    }
+
+    if (lowerCaseInput === 'help') {
+      openModal(helpModal);
+      chatInput.value = '';
+      chatInput.style.height = 'auto';
+      return;
+    }
+
+    if (!geminiChat) return;
+
+    stopTTS();
+
+    const userMessage: Message = { sender: 'user', text: userInput };
+    currentSession.messages.push(userMessage);
+
+    appendMessage(userMessage);
+    chatInput.value = '';
+    chatInput.style.height = 'auto';
+
+    const loadingContainer = appendMessage({ sender: 'model', text: '' });
+    const loadingMessage = loadingContainer.querySelector('.message') as HTMLElement;
+    loadingMessage.classList.add('loading');
+    loadingMessage.textContent = '...';
+
+    try {
+      const result = await geminiChat.sendMessageStream({ message: userInput });
+
+      let responseText = '';
+      loadingMessage.classList.remove('loading');
+      loadingMessage.textContent = '';
+      for await (const chunk of result) {
+        responseText += chunk.text;
+        loadingMessage.textContent = responseText;
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      }
+
+      loadingContainer.remove();
+
+      const completionSignal = '[CHARACTER_CREATION_COMPLETE]';
+      const isComplete = responseText.includes(completionSignal);
+      const finalText = responseText.replace(completionSignal, '').trim();
+
+      const finalMessage: Message = { sender: 'model', text: finalText };
+      appendMessage(finalMessage);
+      currentSession.messages.push(finalMessage);
+
+      // State: Character Creation is complete, transition to password phase
+      if (currentSession.creationPhase && isComplete) {
+        currentSession.creationPhase = false;
+        currentSession.awaitingPassword = true;
+        geminiChat = null; // Next input is a password, not for the AI
+
+        const passwordPromptMessage: Message = {
+          sender: 'model',
+          text: "Character created! Now, before we begin, please create a secure password for the Creator/Debug mode. This password allows you to speak directly to the underlying AI using [OOC: message] to fix issues or adjust the game.\n\nWhat will your password be?"
+        };
+        currentSession.messages.push(passwordPromptMessage);
+        appendMessage(passwordPromptMessage);
+      }
+
+      saveChatHistoryToStorage();
+
+    } catch (error) {
+      console.error("Gemini API Error:", error);
+      loadingContainer.remove();
+      appendMessage({ sender: 'error', text: 'The DM seems to be pondering deeply ... and has gone quiet. Please try again.' });
+    }
+  } finally {
+    isSending = false;
+  }
+}
 
 // Event Listeners
 fileUploadBtn.addEventListener('click', () => fileInput.click());
@@ -899,153 +1340,8 @@ filePreviewContainer.addEventListener('click', (e) => {
     }
 });
 
-chatForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const userInput = chatInput.value.trim();
-  if ((!userInput && selectedFiles.length === 0) || !currentChatId) return;
-
-  const currentSession = chatHistory.find(s => s.id === currentChatId);
-  if (!currentSession) return;
-  
-  // State: Awaiting Password
-  if (currentSession.awaitingPassword) {
-    stopTTS();
-    currentSession.adminPassword = userInput;
-    currentSession.awaitingPassword = false;
-    currentSession.title = 'New Adventure'; // Update title after password
-
-    const userPasswordMessage: Message = { sender: 'user', text: `(Password Set)` };
-    currentSession.messages.push(userPasswordMessage);
-    
-    // Create the main game chat instance
-    const instruction = getSystemInstruction(currentSession.adminPassword);
-    const geminiHistory = currentSession.messages.map(m => ({
-        role: m.sender as 'user' | 'model',
-        parts: [{ text: m.text }],
-    }));
-    geminiChat = createNewChatInstance(geminiHistory, instruction);
-
-    appendMessage(userPasswordMessage);
-    chatInput.value = '';
-    chatInput.style.height = 'auto';
-
-    // Get the first "real" game message from the DM
-    const loadingContainer = appendMessage({ sender: 'model', text: '' });
-    const loadingMessage = loadingContainer.querySelector('.message') as HTMLElement;
-    loadingMessage.classList.add('loading');
-    loadingMessage.textContent = 'The DM is preparing the world...';
-
-    try {
-        const result = await geminiChat.sendMessageStream({ message: "Let's start the campaign." });
-        let responseText = '';
-        loadingMessage.classList.remove('loading');
-        loadingMessage.textContent = '';
-        for await (const chunk of result) {
-            responseText += chunk.text;
-            loadingMessage.textContent = responseText;
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-        loadingContainer.remove();
-        
-        const welcomeMessage: Message = { sender: 'model', text: responseText };
-        currentSession.messages.push(welcomeMessage);
-        appendMessage(welcomeMessage);
-        
-        saveChatHistoryToStorage();
-        renderChatHistory(); // Update title in sidebar
-    } catch(error) {
-        console.error("Gemini API Error:", error);
-        loadingContainer.remove();
-        appendMessage({ sender: 'error', text: 'The DM seems to be pondering deeply ... and has gone quiet. Please try again.'});
-    }
-    return;
-  }
-
-  const lowerCaseInput = userInput.toLowerCase().replace(/[?]/g, '');
-
-  if (lowerCaseInput === 'who is the architect') {
-    chatInput.value = '';
-    chatInput.style.height = 'auto';
-    
-    const easterEggMessage: Message = { 
-        sender: 'model',
-        text: "The simulation flickers for a moment, and the world goes silent. A single line of plain text hangs in the void before you:\n\n'This world was built by Justin Brisson.'"
-    };
-    const messageContainer = appendMessage(easterEggMessage);
-    messageContainer.querySelector('.message')?.classList.add('easter-egg');
-    const ttsControls = messageContainer.querySelector('.tts-controls');
-    if (ttsControls) ttsControls.remove();
-    
-    return;
-  }
-
-  if (lowerCaseInput === 'help') {
-    openModal(helpModal);
-    chatInput.value = '';
-    chatInput.style.height = 'auto';
-    return;
-  }
-
-  if (!geminiChat) return;
-
-  stopTTS();
-
-  const userMessage: Message = { sender: 'user', text: userInput };
-  currentSession.messages.push(userMessage);
-  
-  appendMessage(userMessage);
-  chatInput.value = '';
-  chatInput.style.height = 'auto';
-  
-  const loadingContainer = appendMessage({ sender: 'model', text: '' });
-  const loadingMessage = loadingContainer.querySelector('.message') as HTMLElement;
-  loadingMessage.classList.add('loading');
-  loadingMessage.textContent = '...';
-  
-  try {
-    const result = await geminiChat.sendMessageStream({ message: userInput });
-    
-    let responseText = '';
-    loadingMessage.classList.remove('loading');
-    loadingMessage.textContent = '';
-    for await (const chunk of result) {
-      responseText += chunk.text;
-      loadingMessage.textContent = responseText;
-      chatContainer.scrollTop = chatContainer.scrollHeight;
-    }
-
-    loadingContainer.remove();
-    
-    const completionSignal = '[CHARACTER_CREATION_COMPLETE]';
-    const isComplete = responseText.includes(completionSignal);
-    const finalText = responseText.replace(completionSignal, '').trim();
-
-    const finalMessage: Message = { sender: 'model', text: finalText };
-    appendMessage(finalMessage);
-    currentSession.messages.push(finalMessage);
-
-    // State: Character Creation is complete, transition to password phase
-    if (currentSession.creationPhase && isComplete) {
-        currentSession.creationPhase = false;
-        currentSession.awaitingPassword = true;
-        geminiChat = null; // Next input is a password, not for the AI
-
-        const passwordPromptMessage: Message = {
-            sender: 'model',
-            text: "Character created! Now, before we begin, please create a secure password for the Creator/Debug mode. This password allows you to speak directly to the underlying AI using [OOC: message] to fix issues or adjust the game.\n\nWhat will your password be?"
-        };
-        currentSession.messages.push(passwordPromptMessage);
-        appendMessage(passwordPromptMessage);
-    }
-    
-    saveChatHistoryToStorage();
-
-  } catch (error) {
-    console.error("Gemini API Error:", error);
-    loadingContainer.remove();
-    appendMessage({ sender: 'error', text: 'The DM seems to be pondering deeply ... and has gone quiet. Please try again.'});
-  }
-});
+chatForm.addEventListener('submit', handleFormSubmit);
+sendButton.addEventListener('click', handleFormSubmit);
 
 chatInput.addEventListener('input', () => {
     chatInput.style.height = 'auto';
@@ -1070,6 +1366,9 @@ dndHelpBtn.addEventListener('click', () => openModal(dndHelpModal));
 closeDndHelpBtn.addEventListener('click', () => closeModal(dndHelpModal));
 logbookBtn.addEventListener('click', () => openModal(logbookModal));
 closeLogbookBtn.addEventListener('click', () => closeModal(logbookModal));
+diceRollerBtn.addEventListener('click', () => openModal(diceModal));
+closeDiceBtn.addEventListener('click', () => closeModal(diceModal));
+
 renameForm.addEventListener('submit', (e) => {
     e.preventDefault();
     if (chatIdToRename) {
@@ -1167,6 +1466,85 @@ themeGrid.addEventListener('click', (e) => {
     }
 });
 
+// Dice Roller Listeners
+clearResultsBtn.addEventListener('click', clearDiceResults);
+
+diceGrid.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const dieItem = target.closest('.die-item') as HTMLElement;
+    if (!dieItem) return;
+
+    if (target.closest('.die-visual')) {
+        handleDieRoll(dieItem);
+    }
+
+    const quantityInput = dieItem.querySelector('.quantity-input') as HTMLInputElement;
+    let value = parseInt(quantityInput.value, 10);
+
+    if (target.classList.contains('plus')) {
+        value = Math.min(99, value + 1);
+        quantityInput.value = value.toString();
+    } else if (target.classList.contains('minus')) {
+        value = Math.max(1, value - 1);
+        quantityInput.value = value.toString();
+    }
+});
+
+// Chat Options Menu Listener
+chatOptionsMenu.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const action = target.dataset.action;
+    const sessionId = chatOptionsMenu.dataset.sessionId;
+
+    if (!action || !sessionId) return;
+    
+    closeChatOptionsMenu();
+
+    switch (action) {
+        case 'pin':
+            togglePinChat(sessionId);
+            break;
+        case 'rename':
+            openRenameModal(sessionId);
+            break;
+        case 'export':
+            ioAction = { type: 'export', sessionId: sessionId };
+            ioModalTitle.textContent = 'Export To';
+            openModal(ioModal);
+            break;
+    }
+});
+
+// Import/Export Listeners
+importChatBtn.addEventListener('click', () => {
+    ioAction = { type: 'import' };
+    ioModalTitle.textContent = 'Import From';
+    openModal(ioModal);
+});
+
+importFileInput.addEventListener('change', handleImportFile);
+
+ioModal.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    // FIX: Cast the result of closest to HTMLElement to access the dataset property.
+    const button = target.closest<HTMLElement>('.io-option-btn');
+    if (button) {
+        const source = button.dataset.source;
+        if (source === 'local') {
+            if (ioAction?.type === 'import') {
+                importFileInput.click();
+            } else if (ioAction?.type === 'export') {
+                exportChatToLocal(ioAction.sessionId);
+            }
+        } else if (source === 'gdrive') {
+            alert('Google Drive integration is coming soon!');
+        }
+        closeModal(ioModal);
+    }
+});
+
+closeIoModalBtn.addEventListener('click', () => closeModal(ioModal));
+
 
 // --- Initialization ---
 function initializeApp() {
@@ -1183,6 +1561,7 @@ function initializeApp() {
   renderChatHistory();
   renderUserContext();
   renderThemeCards();
+  renderDiceGrid();
   
   if (chatHistory.length > 0) {
     const lastSession = chatHistory.sort((a,b) => b.createdAt - a.createdAt)[0];
