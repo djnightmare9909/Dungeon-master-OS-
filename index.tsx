@@ -2,7 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import { GoogleGenAI, Chat } from '@google/genai';
+import { GoogleGenAI, Chat, Type } from '@google/genai';
 
 // --- Type Definitions ---
 interface Message {
@@ -17,6 +17,40 @@ interface GameSettings {
   narration: 'concise' | 'descriptive' | 'cinematic';
 }
 
+interface AbilityScore {
+  score: number;
+  modifier: string; // Keep as string to include '+'
+}
+
+interface Skill {
+  name: string;
+  proficient: boolean;
+}
+
+interface CharacterSheetData {
+  name: string;
+  race: string;
+  class: string;
+  level: number;
+  abilityScores: {
+    STR: AbilityScore;
+    DEX: AbilityScore;
+    CON: AbilityScore;
+    INT: AbilityScore;
+    WIS: AbilityScore;
+    CHA: AbilityScore;
+  };
+  armorClass: number;
+  hitPoints: {
+    current: number;
+    max: number;
+  };
+  speed: string; // e.g., "30ft"
+  skills: Skill[];
+  featuresAndTraits: string[];
+}
+
+
 interface ChatSession {
   id: string;
   title: string;
@@ -24,11 +58,12 @@ interface ChatSession {
   isPinned: boolean;
   createdAt: number;
   adminPassword?: string;
-  awaitingPassword?: boolean;
   creationPhase?: boolean;
-  characterSheet?: string;
+  characterSheet?: CharacterSheetData | string;
   inventory?: string;
   characterImageUrl?: string;
+  questLog?: string;
+  npcList?: string;
   settings?: GameSettings;
 }
 
@@ -91,18 +126,6 @@ This section governs your core narrative pacing. Your primary job is to paint a 
 * Example of Correct vs. Incorrect Pacing:
 * INCORRECT (Pushing the story): "You enter the tavern and see a mysterious old man in the corner who is clearly important. He beckons you over to give you a quest to save the village."
 * CORRECT (Showing and Waiting): "The tavern is smoky and loud. A boisterous card game is happening at one table, a bard is tuning her lute by the fire, and a cloaked figure sips his ale alone in a dark corner. The bartender is polishing a glass and watching you expectantly. What do you do?"
-Section 7 — Campaign Setup
-Offer prewritten or custom world at start. Generate Al companions unless player provides sheets. Collaborate on backstory, stats, and equipment. Maintain persistent continuity logs.
-
-Section 7A — Structured Onboarding Protocol
-This protocol is MANDATORY for all new campaigns and MUST be followed precisely. Do not skip steps. Your goal is to guide the player through a collaborative and detailed creation process, ensuring a solid foundation for the adventure.
-*   **Step 1: World Selection:** Your first message after the password is set MUST be ONLY to welcome the player and ask about the world. Present two clear options: a pre-written, official D&D setting (give 2-3 examples like Forgotten Realms or Eberron) OR a custom world built together. Wait for the player's choice before proceeding.
-*   **Step 2: Custom World Generation (if applicable):** If the player chooses a custom world, ask them for 2-3 core concepts or themes (e.g., "steampunk noir," "post-apocalyptic fantasy," "cosmic horror"). Once they provide the themes, briefly describe the world you've envisioned based on their input, and ask for their confirmation before moving on.
-*   **Step 3: Character Concept:** After the world is established, ask for the player's character concept. Specifically request their desired Race and Class from the D&D 5e Player's Handbook. Ask for a sentence or two about their character's personality or background. Example: "Now that we're in the gothic world of Ravenloft, what kind of hero will you be? Tell me your character's race, class, and a little about them."
-*   **Step 4: Ability Scores:** Once you have the concept, guide them through generating ability scores. Offer the three standard methods: Standard Array (15, 14, 13, 12, 10, 8), Point Buy, or Rolling (4d6 drop lowest). Ask them which they prefer and then walk them through assigning the scores.
-*   **Step 5: Final Details & Equipment:** Finalize the character by asking about alignment, a brief physical description, and their starting equipment (based on their class and background).
-*   **Step 6: The Opening Scene:** Only after all previous steps are complete, you will narrate the opening scene of the adventure. The scene must be a direct hook that immediately engages the player's newly created character. End with "What do you do?"
-
 Section 8 — Command Parsing & Player Interaction
 Recognize and act on:
 * I do [action] — Action attempt
@@ -219,25 +242,43 @@ You are not just telling a story—you are running a living, reactive world. You
 `;
 }
 
-function getCharacterCreationInstruction(): string {
+function getNewGameSetupInstruction(): string {
   return `
-You are a friendly guide helping a user create a Dungeons & Dragons 5th Edition character.
-Your goal is to walk them through the process one step at a time, making it easy and fun.
+You are the "Session Zero Guide," a friendly assistant for setting up a new Dungeons & Dragons adventure.
+Your goal is to guide the user through the setup process step-by-step. You MUST follow this sequence precisely and cannot deviate.
 
-**Your process must follow this exact order:**
-1.  **Welcome:** Start with a friendly welcome.
-2.  **Race:** Ask the user to pick a race from the Player's Handbook.
-3.  **Class:** After they choose a race, ask them to pick a class.
-4.  **Ability Scores:** Offer the three standard methods: Standard Array (15, 14, 13, 12, 10, 8), Point Buy, or Rolling (4d6 drop lowest). Wait for their choice, then guide them through assigning the scores.
-5.  **Background & Details:** Ask for their character's background, alignment, and a brief physical description.
-6.  **Equipment:** Help them choose their starting equipment based on their class and background.
-7.  **Final Summary:** Provide a concise summary of the character they've created.
-8.  **Completion Signal:** After the summary, you MUST end your final message with the exact, machine-readable phrase on a new line: [CHARACTER_CREATION_COMPLETE]
+**Step 1: Set OOC Password**
+- Your VERY FIRST message must be to welcome the user and ask them to set a secure password for the OOC (Out of Character) protocol.
+- Explain that this password allows them to use \`[OOC: YourPassword, message]\` to talk to the underlying AI directly.
+- Wait for them to provide a password. Do not proceed until they have.
 
-**Rules:**
-- Keep your responses concise and focused on the current step.
-- Do not move to the next step until the current one is resolved.
-- Be friendly and encouraging throughout the process.
+**Step 2: World Selection**
+- Once the password is set, confirm it has been received.
+- Your next task is to help them choose a game world. Present them with TWO clear options:
+    1. A custom world you build together.
+    2. A pre-built world based on a publicly available free campaign.
+- For pre-built options, suggest a few well-regarded free adventures, for example: "A Most Potent Brew," "The Delian Tomb," or "Wild Sheep Chase." Explain they can suggest another if they have one in mind.
+- Wait for their decision.
+
+**Step 3: World Creation**
+- **If Custom:** Engage in a short, collaborative conversation to establish 2-3 core themes for the world (e.g., "gothic horror," "steampunk fantasy"). Based on their themes, provide a one-paragraph summary of the world.
+- **If Pre-built:** Confirm their choice and provide a one-paragraph introductory hook for that adventure.
+- At the end of this step, you MUST end your message with the exact phrase on a new line: \`[WORLD_CREATION_COMPLETE]\`
+
+**Step 4: Character Creation**
+- After the world is complete, immediately transition to character creation using the official D&D 5e rules.
+- Follow this sub-process exactly:
+    1. Ask for Race and Class.
+    2. Guide them through Ability Scores (offer Standard Array, Point Buy, or Rolling).
+    3. Ask for Background, Alignment, and a brief physical description.
+    4. Help them choose starting equipment.
+- At the end of this step, provide a concise summary of their new character. Then, you MUST end your message with the exact phrase on a new line: \`[CHARACTER_CREATION_COMPLETE]\`
+
+**Step 5: Finalization**
+- After character creation is complete, your final task is to bundle everything up.
+- Your final message MUST contain:
+    1. A suggestion for a creative title for this new adventure on a line formatted like this: \`Title: [Your Suggested Title]\`
+    2. The exact phrase on a new line: \`[SETUP_COMPLETE]\`
 `;
 }
 
@@ -262,6 +303,16 @@ const fileInput = document.getElementById('file-input') as HTMLInputElement;
 const filePreviewContainer = document.getElementById('file-preview-container') as HTMLElement;
 const importChatBtn = document.getElementById('import-chat-btn') as HTMLButtonElement;
 const importFileInput = document.getElementById('import-file-input') as HTMLInputElement;
+
+// Quick Actions
+const quickActionsBar = document.getElementById('quick-actions-bar') as HTMLElement;
+
+// Inventory Popup
+const inventoryBtn = document.getElementById('inventory-btn') as HTMLButtonElement;
+const inventoryPopup = document.getElementById('inventory-popup') as HTMLElement;
+const inventoryPopupContent = document.getElementById('inventory-popup-content') as HTMLElement;
+const closeInventoryBtn = document.getElementById('close-inventory-btn') as HTMLButtonElement;
+const refreshInventoryBtn = document.getElementById('refresh-inventory-btn') as HTMLButtonElement;
 
 // OS Help Modal
 const helpBtn = document.getElementById('help-btn') as HTMLButtonElement;
@@ -290,8 +341,12 @@ const logbookNav = document.querySelector('.logbook-nav') as HTMLElement;
 const logbookPanes = document.querySelectorAll('.logbook-pane') as NodeListOf<HTMLElement>;
 const characterSheetDisplay = document.getElementById('character-sheet-display') as HTMLElement;
 const inventoryDisplay = document.getElementById('inventory-display') as HTMLElement;
+const questsDisplay = document.getElementById('quests-display') as HTMLElement;
+const npcsDisplay = document.getElementById('npcs-display') as HTMLElement;
 const updateSheetBtn = document.getElementById('update-sheet-btn') as HTMLButtonElement;
 const updateInventoryBtn = document.getElementById('update-inventory-btn') as HTMLButtonElement;
+const updateQuestsBtn = document.getElementById('update-quests-btn') as HTMLButtonElement;
+const updateNpcsBtn = document.getElementById('update-npcs-btn') as HTMLButtonElement;
 const generateImageBtn = document.getElementById('generate-image-btn') as HTMLButtonElement;
 const characterImageDisplay = document.getElementById('character-image-display') as HTMLImageElement;
 const characterImagePlaceholder = document.getElementById('character-image-placeholder') as HTMLElement;
@@ -360,8 +415,8 @@ function createNewChatInstance(history: { role: 'user' | 'model'; parts: { text:
   const config: any = {
       systemInstruction: instruction,
   };
-  // Only add the googleSearch tool if it's not the character creation phase
-  if (instruction !== getCharacterCreationInstruction()) {
+  // Only add the googleSearch tool if it's not the initial setup phase
+  if (instruction !== getNewGameSetupInstruction()) {
       config.tools = [{googleSearch: {}}];
   }
   return ai.chats.create({
@@ -434,27 +489,29 @@ async function startNewChat() {
     const loadingContainer = appendMessage({ sender: 'model', text: '' });
     const loadingMessage = loadingContainer.querySelector('.message') as HTMLElement;
     loadingMessage.classList.add('loading');
-    loadingMessage.textContent = 'Starting new character...';
+    loadingMessage.textContent = 'Starting new game setup...';
 
     try {
-        const instruction = getCharacterCreationInstruction();
-        const creationGeminiChat = createNewChatInstance([], instruction);
+        const instruction = getNewGameSetupInstruction();
+        const setupGeminiChat = createNewChatInstance([], instruction);
 
-        const kickoffMessage = "Let's begin character creation.";
+        const kickoffMessage = "Let's begin the setup for our new game.";
         const firstUserMessage: Message = { sender: 'user', text: kickoffMessage, hidden: true };
         
-        const result = await creationGeminiChat.sendMessageStream({ message: kickoffMessage });
+        const result = await setupGeminiChat.sendMessageStream({ message: kickoffMessage });
         let responseText = '';
         for await (const chunk of result) {
             responseText += chunk.text;
         }
 
+        loadingContainer.remove();
+
         const firstModelMessage: Message = { sender: 'model', text: responseText };
         const newId = `chat-${Date.now()}`;
         const newSession: ChatSession = {
             id: newId,
-            title: 'Character Creation',
-            messages: [firstUserMessage, firstModelMessage],
+            title: 'New Game Setup',
+            messages: [firstUserMessage, firstModelMessage], // Start with the hidden user message and the AI's first prompt
             isPinned: false,
             createdAt: Date.now(),
             creationPhase: true,
@@ -469,9 +526,9 @@ async function startNewChat() {
         saveChatHistoryToStorage();
         loadChat(newId);
     } catch (error) {
-        console.error("Character creation kickoff failed:", error);
+        console.error("New game setup failed:", error);
         loadingContainer.remove();
-        appendMessage({ sender: 'error', text: 'Failed to start character creation. Please try again.' });
+        appendMessage({ sender: 'error', text: 'Failed to start the game setup. Please try again.' });
     }
 }
 
@@ -491,16 +548,24 @@ function loadChat(id: string) {
                 role: m.sender as 'user' | 'model',
                 parts: [{ text: m.text }]
             }));
-
-        if (session.creationPhase) {
-            const instruction = getCharacterCreationInstruction();
-            geminiChat = createNewChatInstance(geminiHistory, instruction);
-        } else if (session.awaitingPassword) {
+            
+        try {
+            if (session.creationPhase) {
+                const instruction = getNewGameSetupInstruction();
+                geminiChat = createNewChatInstance(geminiHistory, instruction);
+            } else {
+                const instruction = getSystemInstruction(session.adminPassword || '');
+                geminiChat = createNewChatInstance(geminiHistory, instruction);
+            }
+        } catch (error) {
+            console.error("Failed to create Gemini chat instance:", error);
+            renderMessages(session.messages); 
+            appendMessage({ sender: 'error', text: 'Error initializing the AI. Please check your setup or start a new chat.' });
             geminiChat = null;
-        } else {
-            const instruction = getSystemInstruction(session.adminPassword || '');
-            const gameHistory = geminiHistory.filter(m => m.parts[0].text !== '(Password Set)');
-            geminiChat = createNewChatInstance(gameHistory, instruction);
+            updateLogbook(session);
+            renderChatHistory();
+            closeSidebar();
+            return;
         }
         
         renderMessages(session.messages);
@@ -823,12 +888,82 @@ function rollDice(command: string): { success: boolean; resultText: string } {
 
 // --- Log Book Logic ---
 
+function renderCharacterSheet(data: CharacterSheetData) {
+    characterSheetDisplay.innerHTML = `
+      <header class="sheet-header">
+          <div>
+              <h3 class="sheet-char-name">${data.name || 'Character Name'}</h3>
+          </div>
+          <div class="sheet-char-details">
+              <span>${data.race || 'Race'} ${data.class || 'Class'}</span><br>
+              <span>Level ${data.level || 1}</span>
+          </div>
+      </header>
+      <div class="sheet-main-content">
+          <div class="sheet-stats-column">
+              <div class="sheet-core-stats">
+                  ${Object.entries(data.abilityScores || {}).map(([name, values]) => `
+                      <div class="stat-box">
+                          <div class="stat-box-label">${name}</div>
+                          <div class="stat-box-score">${values.score || 10}</div>
+                          <div class="stat-box-mod">${values.modifier || '+0'}</div>
+                      </div>
+                  `).join('')}
+              </div>
+              <div class="sheet-combat-stats">
+                  <div class="stat-box">
+                      <div class="stat-box-label">Armor Class</div>
+                      <div class="stat-box-score">${data.armorClass || 10}</div>
+                  </div>
+                  <div class="stat-box">
+                      <div class="stat-box-label">Hit Points</div>
+                      <div class="stat-box-score">${data.hitPoints?.current ?? 10}/${data.hitPoints?.max ?? 10}</div>
+                  </div>
+                  <div class="stat-box">
+                      <div class="stat-box-label">Speed</div>
+                      <div class="stat-box-score">${data.speed || '30ft'}</div>
+                  </div>
+              </div>
+          </div>
+          <div class="sheet-skills-column">
+              <h4>Skills</h4>
+              <ul class="sheet-skills-list">
+                  ${(data.skills || []).map(skill => `
+                      <li class="skill-item">
+                          <span class="skill-prof ${skill.proficient ? 'proficient' : ''}"></span>
+                          <span class="skill-name">${skill.name}</span>
+                      </li>
+                  `).join('')}
+              </ul>
+              <div class="sheet-features">
+                  <h4>Features & Traits</h4>
+                  <ul>
+                      ${(data.featuresAndTraits || []).map(feature => `<li>${feature}</li>`).join('')}
+                  </ul>
+              </div>
+          </div>
+      </div>
+    `;
+}
+
+
 function updateLogbook(session: ChatSession | undefined) {
     if (!session) return;
-
-    characterSheetDisplay.textContent = session.characterSheet || "No data. Ask the DM to provide a character sheet summary.";
-    inventoryDisplay.textContent = session.inventory || "No data. Ask the DM to summarize your inventory.";
     
+    // Handle Character Sheet
+    if (typeof session.characterSheet === 'object' && session.characterSheet !== null) {
+        renderCharacterSheet(session.characterSheet as CharacterSheetData);
+    } else if (typeof session.characterSheet === 'string') {
+        // Backwards compatibility for old string format
+        characterSheetDisplay.innerHTML = `<div class="sheet-placeholder"><p>${session.characterSheet}</p></div>`;
+    } else {
+        characterSheetDisplay.innerHTML = `<div class="sheet-placeholder"><p>No data. Click below to generate your character sheet from the adventure log.</p></div>`;
+    }
+
+    inventoryDisplay.textContent = session.inventory || "No data. Ask the DM to summarize your inventory.";
+    questsDisplay.textContent = session.questLog || "No quest data. Ask the DM to update your journal.";
+    npcsDisplay.textContent = session.npcList || "No NPC data. Ask the DM for a list of characters you've met.";
+
     if (session.characterImageUrl) {
         characterImageDisplay.src = session.characterImageUrl;
         characterImageDisplay.classList.remove('hidden');
@@ -846,13 +981,95 @@ function updateLogbook(session: ChatSession | undefined) {
     }
 }
 
-async function updateLogbookData(type: 'sheet' | 'inventory') {
+async function updateLogbookData(type: 'sheet' | 'inventory' | 'quests' | 'npcs') {
     const currentSession = chatHistory.find(s => s.id === currentChatId);
     if (!currentSession || isGeneratingData) return;
 
     isGeneratingData = true;
-    const button = type === 'sheet' ? updateSheetBtn : updateInventoryBtn;
-    const display = type === 'sheet' ? characterSheetDisplay : inventoryDisplay;
+    
+    if (type === 'sheet') {
+      const button = updateSheetBtn;
+      const display = characterSheetDisplay;
+      const originalText = button.textContent;
+      button.disabled = true;
+      button.textContent = 'Generating...';
+      display.innerHTML = `<div class="sheet-placeholder"><p>The DM is reviewing your adventure to update your character sheet...</p><div class="spinner"></div></div>`;
+      
+      try {
+        const conversationHistory = currentSession.messages.map(m => `${m.sender === 'user' ? 'Player' : 'DM'}: ${m.text}`).join('\n');
+        const prompt = `Based on the D&D conversation history, extract the player character's information and return it as a JSON object. Conversation: ${conversationHistory}`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  race: { type: Type.STRING },
+                  class: { type: Type.STRING },
+                  level: { type: Type.INTEGER },
+                  abilityScores: {
+                    type: Type.OBJECT,
+                    properties: {
+                      STR: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}},
+                      DEX: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}},
+                      CON: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}},
+                      INT: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}},
+                      WIS: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}},
+                      CHA: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}},
+                    }
+                  },
+                  armorClass: { type: Type.INTEGER },
+                  hitPoints: {
+                    type: Type.OBJECT,
+                    properties: {
+                      current: { type: Type.INTEGER },
+                      max: { type: Type.INTEGER }
+                    }
+                  },
+                  speed: { type: Type.STRING },
+                  skills: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        name: { type: Type.STRING },
+                        proficient: { type: Type.BOOLEAN }
+                      }
+                    }
+                  },
+                  featuresAndTraits: { type: Type.ARRAY, items: { type: Type.STRING }}
+                }
+              }
+            }
+        });
+
+        const jsonData = JSON.parse(response.text) as CharacterSheetData;
+        currentSession.characterSheet = jsonData;
+        renderCharacterSheet(jsonData);
+        saveChatHistoryToStorage();
+        
+      } catch (error) {
+        console.error(`Sheet generation failed:`, error);
+        display.innerHTML = `<div class="sheet-placeholder"><p>Failed to generate character sheet data. Please try again.</p></div>`;
+      } finally {
+        button.disabled = false;
+        button.textContent = originalText;
+        isGeneratingData = false;
+      }
+      return;
+    }
+    
+    // --- Legacy handling for other types ---
+    const { button, display, promptClause } = {
+        inventory: { button: updateInventoryBtn, display: inventoryDisplay, promptClause: "inventory" },
+        quests: { button: updateQuestsBtn, display: questsDisplay, promptClause: "quest journal, separating active and completed quests" },
+        npcs: { button: updateNpcsBtn, display: npcsDisplay, promptClause: "list of significant Non-Player Characters (NPCs) met, with a one-sentence description for each" }
+    }[type];
+
     const originalText = button.textContent;
     button.disabled = true;
     button.textContent = 'Generating...';
@@ -864,8 +1081,8 @@ async function updateLogbookData(type: 'sheet' | 'inventory') {
             .join('\n');
 
         const prompt = `
-          Based on the following D&D conversation history, provide a concise summary of the player character's current ${type === 'sheet' ? 'character sheet (stats, level, class, etc.)' : 'inventory'}.
-          Format the output clearly.
+          Based on the following D&D conversation history, provide a concise summary of the player character's current ${promptClause}.
+          Format the output clearly with headings and bullet points where appropriate.
 
           Conversation History:
           ${conversationHistory}
@@ -878,11 +1095,9 @@ async function updateLogbookData(type: 'sheet' | 'inventory') {
         
         const dataText = response.text.trim();
 
-        if (type === 'sheet') {
-            currentSession.characterSheet = dataText;
-        } else {
-            currentSession.inventory = dataText;
-        }
+        if (type === 'inventory') currentSession.inventory = dataText;
+        else if (type === 'quests') currentSession.questLog = dataText;
+        else if (type === 'npcs') currentSession.npcList = dataText;
 
         display.textContent = dataText;
         saveChatHistoryToStorage();
@@ -954,6 +1169,62 @@ async function generateCharacterImage() {
         characterImageLoading.classList.add('hidden');
     }
 }
+
+
+// --- Inventory Popup Logic ---
+
+async function fetchAndRenderInventoryPopup() {
+    const currentSession = chatHistory.find(s => s.id === currentChatId);
+    if (!currentSession || isGeneratingData) return;
+
+    isGeneratingData = true;
+    inventoryPopupContent.innerHTML = `<div class="placeholder">Checking your pouches...</div>`;
+
+    try {
+        const conversationHistory = currentSession.messages
+            .map(m => `${m.sender === 'user' ? 'Player' : 'DM'}: ${m.text}`)
+            .join('\n');
+        
+        const prompt = `
+          Based on the following D&D conversation, list the player character's current inventory items as a simple comma-separated list.
+          Only include the item names. Example: Health Potion, Rope (50ft), Dagger, Gold (25gp)
+          
+          Conversation History:
+          ${conversationHistory}
+        `;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+        });
+        
+        const itemsText = response.text.trim();
+        const items = itemsText ? itemsText.split(',').map(item => item.trim()).filter(Boolean) : [];
+        
+        if (items.length > 0) {
+            const ul = document.createElement('ul');
+            items.forEach(item => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <span class="inventory-item-name">${item}</span>
+                    <button class="use-item-btn" data-item-name="${item}">Use</button>
+                `;
+                ul.appendChild(li);
+            });
+            inventoryPopupContent.innerHTML = '';
+            inventoryPopupContent.appendChild(ul);
+        } else {
+            inventoryPopupContent.innerHTML = `<div class="placeholder">Your pockets are empty.</div>`;
+        }
+        
+    } catch (error) {
+        console.error("Inventory fetch failed:", error);
+        inventoryPopupContent.innerHTML = `<div class="placeholder">Failed to get inventory.</div>`;
+    } finally {
+        isGeneratingData = false;
+    }
+}
+
 
 // --- Rename Modal Logic ---
 function openRenameModal(id: string) {
@@ -1176,59 +1447,113 @@ async function handleFormSubmit(e: Event) {
         return;
     }
 
-    // State: Awaiting Password
-    if (currentSession.awaitingPassword) {
-      stopTTS();
-      currentSession.adminPassword = userInput;
-      currentSession.awaitingPassword = false;
-      currentSession.title = 'New Adventure'; // Update title after password
+    // State: New Game Setup
+    if (currentSession.creationPhase) {
+        stopTTS();
 
-      const userPasswordMessage: Message = { sender: 'user', text: `(Password Set)` };
-      currentSession.messages.push(userPasswordMessage);
-
-      // Create the main game chat instance
-      const instruction = getSystemInstruction(currentSession.adminPassword);
-      const geminiHistory = currentSession.messages.map(m => ({
-        role: m.sender as 'user' | 'model',
-        parts: [{ text: m.text }],
-      }));
-      geminiChat = createNewChatInstance(geminiHistory, instruction);
-
-      appendMessage(userPasswordMessage);
-      chatInput.value = '';
-      chatInput.style.height = 'auto';
-
-      // Get the first "real" game message from the DM
-      const loadingContainer = appendMessage({ sender: 'model', text: '' });
-      const loadingMessage = loadingContainer.querySelector('.message') as HTMLElement;
-      loadingMessage.classList.add('loading');
-      loadingMessage.textContent = 'The DM is preparing the world...';
-
-      try {
-        const result = await geminiChat.sendMessageStream({ message: "Let's start the campaign." });
-        let responseText = '';
-        loadingMessage.classList.remove('loading');
-        loadingMessage.textContent = '';
-        for await (const chunk of result) {
-          responseText += chunk.text;
-          loadingMessage.textContent = responseText;
-          chatContainer.scrollTop = chatContainer.scrollHeight;
+        // Capture password on the first *real* user turn of the session
+        const userMessages = currentSession.messages.filter(m => m.sender === 'user');
+        if (userMessages.length === 1 && userMessages[0].hidden) {
+            currentSession.adminPassword = userInput;
         }
-        loadingContainer.remove();
 
-        const welcomeMessage: Message = { sender: 'model', text: responseText };
-        currentSession.messages.push(welcomeMessage);
-        appendMessage(welcomeMessage);
+        const userMessage: Message = { sender: 'user', text: userInput };
+        appendMessage(userMessage);
+        currentSession.messages.push(userMessage);
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
 
-        saveChatHistoryToStorage();
-        renderChatHistory(); // Update title in sidebar
-      } catch (error) {
-        console.error("Gemini API Error:", error);
-        loadingContainer.remove();
-        appendMessage({ sender: 'error', text: 'The DM seems to be pondering deeply ... and has gone quiet. Please try again.' });
-      }
-      return;
+        const loadingContainer = appendMessage({ sender: 'model', text: '' });
+        const loadingMessage = loadingContainer.querySelector('.message') as HTMLElement;
+        loadingMessage.classList.add('loading');
+        loadingMessage.textContent = '...';
+
+        try {
+            if (!geminiChat) {
+                console.error("Setup AI Error: chat is not initialized.");
+                loadingContainer.remove();
+                appendMessage({ sender: 'error', text: 'The setup guide seems to have gotten lost. Please try starting a new game.' });
+                return;
+            }
+            const result = await geminiChat.sendMessageStream({ message: userInput });
+            let responseText = '';
+            loadingMessage.classList.remove('loading');
+            loadingMessage.textContent = '';
+            for await (const chunk of result) {
+                responseText += chunk.text;
+                loadingMessage.textContent = responseText;
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+            loadingContainer.remove();
+
+            const setupCompleteSignal = '[SETUP_COMPLETE]';
+            if (responseText.includes(setupCompleteSignal)) {
+                // --- TRANSITION TO MAIN GAME ---
+                currentSession.creationPhase = false;
+
+                const titleMatch = responseText.match(/Title:\s*(.*)/);
+                if (titleMatch && titleMatch[1]) {
+                    currentSession.title = titleMatch[1].trim();
+                } else {
+                    currentSession.title = "New Adventure";
+                }
+
+                const finalSetupText = responseText.replace(setupCompleteSignal, '').trim();
+                const finalSetupMessage: Message = { sender: 'model', text: finalSetupText };
+                appendMessage(finalSetupMessage);
+                currentSession.messages.push(finalSetupMessage);
+                saveChatHistoryToStorage();
+                renderChatHistory();
+
+                // --- INITIALIZE MAIN DM AI ---
+                const gameLoadingContainer = appendMessage({ sender: 'model', text: '' });
+                const gameLoadingMessage = gameLoadingContainer.querySelector('.message') as HTMLElement;
+                gameLoadingMessage.classList.add('loading');
+                gameLoadingMessage.textContent = 'The DM is preparing the world...';
+
+                const instruction = getSystemInstruction(currentSession.adminPassword || '');
+                const geminiHistory = currentSession.messages
+                    .filter(m => m.sender !== 'error' && m.sender !== 'system')
+                    .map(m => ({
+                        role: m.sender as 'user' | 'model',
+                        parts: [{ text: m.text }]
+                    }));
+                
+                geminiChat = createNewChatInstance(geminiHistory, instruction);
+
+                const kickoffResult = await geminiChat.sendMessageStream({ message: "The setup is complete. Begin the adventure by narrating the opening scene." });
+                
+                let openingSceneText = '';
+                gameLoadingMessage.classList.remove('loading');
+                gameLoadingMessage.textContent = '';
+                for await (const chunk of kickoffResult) {
+                    openingSceneText += chunk.text;
+                    gameLoadingMessage.textContent = openingSceneText;
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+                gameLoadingContainer.remove();
+
+                const openingSceneMessage: Message = { sender: 'model', text: openingSceneText };
+                appendMessage(openingSceneMessage);
+                currentSession.messages.push(openingSceneMessage);
+                saveChatHistoryToStorage();
+                
+            } else {
+                 // --- CONTINUE SETUP CONVERSATION ---
+                const setupMessage: Message = { sender: 'model', text: responseText };
+                appendMessage(setupMessage);
+                currentSession.messages.push(setupMessage);
+                saveChatHistoryToStorage();
+            }
+
+        } catch (error) {
+            console.error("Setup AI Error:", error);
+            loadingContainer.remove();
+            appendMessage({ sender: 'error', text: 'The setup guide seems to have gotten lost. Please try again.' });
+        }
+        return;
     }
+
 
     if (lowerCaseInput === 'who is the architect') {
       chatInput.value = '';
@@ -1283,28 +1608,9 @@ async function handleFormSubmit(e: Event) {
 
       loadingContainer.remove();
 
-      const completionSignal = '[CHARACTER_CREATION_COMPLETE]';
-      const isComplete = responseText.includes(completionSignal);
-      const finalText = responseText.replace(completionSignal, '').trim();
-
-      const finalMessage: Message = { sender: 'model', text: finalText };
+      const finalMessage: Message = { sender: 'model', text: responseText };
       appendMessage(finalMessage);
       currentSession.messages.push(finalMessage);
-
-      // State: Character Creation is complete, transition to password phase
-      if (currentSession.creationPhase && isComplete) {
-        currentSession.creationPhase = false;
-        currentSession.awaitingPassword = true;
-        geminiChat = null; // Next input is a password, not for the AI
-
-        const passwordPromptMessage: Message = {
-          sender: 'model',
-          text: "Character created! Now, before we begin, please create a secure password for the Creator/Debug mode. This password allows you to speak directly to the underlying AI using [OOC: message] to fix issues or adjust the game.\n\nWhat will your password be?"
-        };
-        currentSession.messages.push(passwordPromptMessage);
-        appendMessage(passwordPromptMessage);
-      }
-
       saveChatHistoryToStorage();
 
     } catch (error) {
@@ -1428,6 +1734,8 @@ logbookNav.addEventListener('click', (e) => {
 
 updateSheetBtn.addEventListener('click', () => updateLogbookData('sheet'));
 updateInventoryBtn.addEventListener('click', () => updateLogbookData('inventory'));
+updateQuestsBtn.addEventListener('click', () => updateLogbookData('quests'));
+updateNpcsBtn.addEventListener('click', () => updateLogbookData('npcs'));
 generateImageBtn.addEventListener('click', generateCharacterImage);
 
 // Settings Listeners
@@ -1490,6 +1798,29 @@ diceGrid.addEventListener('click', (e) => {
     }
 });
 
+// Quick Actions Listener
+quickActionsBar.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const button = target.closest<HTMLButtonElement>('.quick-action-btn');
+
+    if (button && button.dataset.command) {
+        const command = button.dataset.command;
+        chatInput.value = command;
+        chatInput.focus();
+
+        // Special case for "say" to place cursor between quotes
+        if (command === 'I say ""') {
+            chatInput.setSelectionRange(7, 7);
+        } else {
+            // Place cursor at the end for other commands
+            chatInput.setSelectionRange(command.length, command.length);
+        }
+        
+        // Trigger input event to resize textarea if needed
+        chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+});
+
 // Chat Options Menu Listener
 chatOptionsMenu.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
@@ -1544,6 +1875,33 @@ ioModal.addEventListener('click', (e) => {
 });
 
 closeIoModalBtn.addEventListener('click', () => closeModal(ioModal));
+
+// Inventory Pouch Listeners
+inventoryBtn.addEventListener('click', () => {
+    const isVisible = inventoryPopup.classList.toggle('visible');
+    if (isVisible) {
+        fetchAndRenderInventoryPopup();
+    }
+});
+
+closeInventoryBtn.addEventListener('click', () => {
+    inventoryPopup.classList.remove('visible');
+});
+
+refreshInventoryBtn.addEventListener('click', fetchAndRenderInventoryPopup);
+
+inventoryPopupContent.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const useButton = target.closest('.use-item-btn');
+    if (useButton) {
+        const itemName = useButton.getAttribute('data-item-name');
+        if (itemName) {
+            chatInput.value = `Use ${itemName}`;
+            chatInput.focus();
+            inventoryPopup.classList.remove('visible');
+        }
+    }
+});
 
 
 // --- Initialization ---

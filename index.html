@@ -85,11 +85,38 @@
       </header>
       <main id="chat-container"></main>
       <footer>
+        <div id="quick-actions-bar" class="quick-actions-bar">
+          <button class="quick-action-btn" data-command="I do ">Do</button>
+          <button class="quick-action-btn" data-command="I say &quot;&quot;">Say</button>
+          <button class="quick-action-btn" data-command="Roll for ">Roll</button>
+          <button class="quick-action-btn" data-command="Check my ">Check</button>
+          <button class="quick-action-btn" data-command="Use ">Use</button>
+          <button class="quick-action-btn" data-command="Cast ">Cast</button>
+        </div>
         <form id="chat-form">
           <div id="file-preview-container"></div>
+          <div id="inventory-popup" class="inventory-popup">
+              <header class="inventory-header">
+                <h3>Inventory</h3>
+                <div>
+                  <button type="button" id="refresh-inventory-btn" class="inventory-header-btn" aria-label="Refresh inventory">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                  </button>
+                  <button type="button" id="close-inventory-btn" class="inventory-header-btn" aria-label="Close inventory">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                  </button>
+                </div>
+              </header>
+              <div id="inventory-popup-content" class="inventory-popup-content">
+                <!-- Inventory items will be rendered here by JS -->
+              </div>
+          </div>
           <div class="input-row">
             <button type="button" id="file-upload-btn" aria-label="Attach file">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v11.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
+            </button>
+            <button type="button" id="inventory-btn" aria-label="Open Inventory Pouch">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M5 6.34C5 4.53 6.36 3.03 8.13 3h7.74C17.64 3.03 19 4.53 19 6.34V20c0 .55-.45 1-1 1H6c-.55 0-1-.45-1-1V6.34zM7 6h10v-1c0-.55-.45-1-1-1H8c-.55 0-1 .45-1 1v1zm-2 0v14h14V6c0-1.3-.84-2.4-2-2.82V2h-2v1.18C13.84 3.06 13 4.16 13 5.34V6h-2v-.66C11 4.16 10.16 3.06 9.18 3.18V2H7v1.18C6.16 3.6 5.31 4.7 5.31 6H3c-.55 0-1 .45-1 1s.45 1 1 1h2z"/></svg>
             </button>
             <input type="file" id="file-input" multiple hidden />
             <textarea
@@ -101,7 +128,7 @@
             <button type="submit" aria-label="Send message">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
+                viewBox="0 0 24"
                 fill="currentColor"
               >
                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
@@ -203,16 +230,19 @@
         </header>
         <div class="logbook-body">
             <nav class="logbook-nav">
-                <button class="logbook-nav-btn active" data-tab="character-sheet">Character Sheet</button>
+                <button class="logbook-nav-btn active" data-tab="character-sheet">Character</button>
                 <button class="logbook-nav-btn" data-tab="inventory">Inventory</button>
-                <button class="logbook-nav-btn" data-tab="character-image">Character Image</button>
+                <button class="logbook-nav-btn" data-tab="quests">Quests</button>
+                <button class="logbook-nav-btn" data-tab="npcs">NPCs</button>
                 <button class="logbook-nav-btn" data-tab="settings">Settings</button>
             </nav>
             <main class="logbook-content">
                 <div id="character-sheet-content" class="logbook-pane active">
-                    <h3>Character Sheet</h3>
-                    <div class="logbook-data-container" id="character-sheet-display">
-                        <p>No data. Ask the DM to provide a character sheet summary.</p>
+                    <div id="character-sheet-display" class="character-sheet">
+                      <div class="sheet-placeholder">
+                        <p>No data. Click below to generate your character sheet from the adventure log.</p>
+                      </div>
+                      <!-- Character Sheet data will be rendered here by JS -->
                     </div>
                     <button id="update-sheet-btn" class="logbook-update-btn">Request Update from DM</button>
                 </div>
@@ -224,9 +254,25 @@
                     </div>
                     <button id="update-inventory-btn" class="logbook-update-btn">Request Update from DM</button>
                 </div>
+                
+                <div id="quests-content" class="logbook-pane">
+                    <h3>Quest Journal</h3>
+                    <div class="logbook-data-container" id="quests-display">
+                        <p>No quest data. Ask the DM to update your journal.</p>
+                    </div>
+                    <button id="update-quests-btn" class="logbook-update-btn">Update Quest Log</button>
+                </div>
 
-                <div id="character-image-content" class="logbook-pane">
-                    <h3>Character Image</h3>
+                <div id="npcs-content" class="logbook-pane">
+                    <h3>Dramatis Personae (NPCs)</h3>
+                    <div class="logbook-data-container" id="npcs-display">
+                        <p>No NPC data. Ask the DM for a list of characters you've met.</p>
+                    </div>
+                    <button id="update-npcs-btn" class="logbook-update-btn">Update NPC List</button>
+                </div>
+
+                <div id="settings-content" class="logbook-pane">
+                     <h3>Character Image</h3>
                     <div class="character-image-container">
                         <img id="character-image-display" src="" alt="Generated character portrait" class="hidden"/>
                         <div id="character-image-placeholder">
@@ -235,13 +281,11 @@
                         </div>
                         <div id="character-image-loading" class="hidden">
                             <p>First, creating a detailed description of your character...</p>
-                            <p>Then, generating the image. This may take a moment.</p>
+                            <p>Then, generating the portrait. This may take a moment.</p>
                             <div class="spinner"></div>
                         </div>
                     </div>
-                </div>
-
-                <div id="settings-content" class="logbook-pane">
+                    <div class="settings-separator"></div>
                     <h3>Game Settings</h3>
                     <p>Adjust these settings to tailor the DM's behavior for this adventure. Changes will be saved automatically.</p>
                     <div class="settings-grid">
