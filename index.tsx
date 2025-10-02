@@ -4,7 +4,12 @@
  */
 import { GoogleGenAI, Chat, Type } from '@google/genai';
 
-// --- Type Definitions ---
+// =================================================================================
+// TYPE DEFINITIONS
+// =================================================================================
+// This section defines the core data structures and interfaces used throughout the
+// application, ensuring type safety and clarity.
+
 interface Message {
   sender: 'user' | 'model' | 'error' | 'system';
   text: string;
@@ -68,7 +73,19 @@ interface ChatSession {
 }
 
 
-// --- System Instruction for the Dungeon Master OS ---
+// =================================================================================
+// AI SYSTEM INSTRUCTIONS & PROMPTS
+// =================================================================================
+// This section contains the large, detailed prompt templates that define the AI's
+// personality, rules, and behavior as the Dungeon Master and the setup guide.
+
+/**
+ * The main system instruction for the Dungeon Master OS.
+ * This is a comprehensive prompt defining the AI's core persona, ruleset,
+ * narrative style, and advanced cognitive functions.
+ * @param password The admin password for accessing debug/OOC mode.
+ * @returns The complete system instruction string.
+ */
 function getSystemInstruction(password: string): string {
  return `
 Project: DM OS - WFGY Edition v9.3 (Complete) © 2025 The WFGY Project MIT License
@@ -242,6 +259,11 @@ You are not just telling a story—you are running a living, reactive world. You
 `;
 }
 
+/**
+ * Returns the system instruction for the initial "Session Zero" setup phase.
+ * This guides the user through creating a password, world, and character.
+ * @returns The new game setup instruction string.
+ */
 function getNewGameSetupInstruction(): string {
   return `
 You are the "Session Zero Guide," a friendly assistant for setting up a new Dungeons & Dragons adventure.
@@ -282,8 +304,12 @@ Your goal is to guide the user through the setup process step-by-step. You MUST 
 `;
 }
 
+// =================================================================================
+// DOM ELEMENT SELECTORS
+// =================================================================================
+// Caching references to all necessary DOM elements for performance and organization.
 
-// --- DOM Elements ---
+// --- Core Chat & Sidebar ---
 const chatContainer = document.getElementById('chat-container') as HTMLElement;
 const chatForm = document.getElementById('chat-form') as HTMLFormElement;
 const chatInput = document.getElementById('chat-input') as HTMLTextAreaElement;
@@ -294,37 +320,41 @@ const sidebar = document.getElementById('sidebar') as HTMLElement;
 const overlay = document.getElementById('overlay') as HTMLElement;
 const pinnedChatsList = document.getElementById('pinned-chats-list') as HTMLUListElement;
 const recentChatsList = document.getElementById('recent-chats-list') as HTMLUListElement;
+
+// --- Templates & File Handling ---
 const ttsTemplate = document.getElementById('tts-controls-template') as HTMLTemplateElement;
-const contextForm = document.getElementById('context-form') as HTMLFormElement;
-const contextInput = document.getElementById('context-input') as HTMLInputElement;
-const contextList = document.getElementById('context-list') as HTMLUListElement;
 const fileUploadBtn = document.getElementById('file-upload-btn') as HTMLButtonElement;
 const fileInput = document.getElementById('file-input') as HTMLInputElement;
 const filePreviewContainer = document.getElementById('file-preview-container') as HTMLElement;
 const importChatBtn = document.getElementById('import-chat-btn') as HTMLButtonElement;
 const importFileInput = document.getElementById('import-file-input') as HTMLInputElement;
 
-// Quick Actions
-const quickActionsBar = document.getElementById('quick-actions-bar') as HTMLElement;
+// --- User Context ---
+const contextForm = document.getElementById('context-form') as HTMLFormElement;
+const contextInput = document.getElementById('context-input') as HTMLInputElement;
+const contextList = document.getElementById('context-list') as HTMLUListElement;
 
-// Inventory Popup
+// --- Quick Actions & Inventory ---
+const quickActionsBar = document.getElementById('quick-actions-bar') as HTMLElement;
 const inventoryBtn = document.getElementById('inventory-btn') as HTMLButtonElement;
 const inventoryPopup = document.getElementById('inventory-popup') as HTMLElement;
 const inventoryPopupContent = document.getElementById('inventory-popup-content') as HTMLElement;
 const closeInventoryBtn = document.getElementById('close-inventory-btn') as HTMLButtonElement;
 const refreshInventoryBtn = document.getElementById('refresh-inventory-btn') as HTMLButtonElement;
 
-// OS Help Modal
+// --- General Modals ---
 const helpBtn = document.getElementById('help-btn') as HTMLButtonElement;
 const helpModal = document.getElementById('help-modal') as HTMLElement;
 const closeHelpBtn = document.getElementById('close-help-btn') as HTMLButtonElement;
-
-// D&D Help Modal
 const dndHelpBtn = document.getElementById('dnd-help-btn') as HTMLButtonElement;
 const dndHelpModal = document.getElementById('dnd-help-modal') as HTMLElement;
 const closeDndHelpBtn = document.getElementById('close-dnd-help-btn') as HTMLButtonElement;
+const renameModal = document.getElementById('rename-modal') as HTMLElement;
+const renameForm = document.getElementById('rename-form') as HTMLFormElement;
+const renameInput = document.getElementById('rename-input') as HTMLInputElement;
+const closeRenameBtn = document.getElementById('close-rename-btn') as HTMLButtonElement;
 
-// Dice Roller Modal
+// --- Dice Roller Modal ---
 const diceRollerBtn = document.getElementById('dice-roller-btn') as HTMLButtonElement;
 const diceModal = document.getElementById('dice-modal') as HTMLElement;
 const closeDiceBtn = document.getElementById('close-dice-btn') as HTMLButtonElement;
@@ -333,7 +363,7 @@ const clearResultsBtn = document.getElementById('clear-results-btn') as HTMLButt
 const diceResultsLog = document.getElementById('dice-results-log') as HTMLElement;
 const diceTotalValue = document.getElementById('dice-total-value') as HTMLElement;
 
-// Log Book Modal
+// --- Log Book Modal ---
 const logbookBtn = document.getElementById('logbook-btn') as HTMLButtonElement;
 const logbookModal = document.getElementById('logbook-modal') as HTMLElement;
 const closeLogbookBtn = document.getElementById('close-logbook-btn') as HTMLButtonElement;
@@ -355,28 +385,23 @@ const settingDifficulty = document.getElementById('setting-difficulty') as HTMLS
 const settingTone = document.getElementById('setting-tone') as HTMLSelectElement;
 const settingNarration = document.getElementById('setting-narration') as HTMLSelectElement;
 
-// Rename Chat Modal
-const renameModal = document.getElementById('rename-modal') as HTMLElement;
-const renameForm = document.getElementById('rename-form') as HTMLFormElement;
-const renameInput = document.getElementById('rename-input') as HTMLInputElement;
-const closeRenameBtn = document.getElementById('close-rename-btn') as HTMLButtonElement;
-
-// Theme Modal
+// --- Theme Modal ---
 const changeUiBtn = document.getElementById('change-ui-btn') as HTMLButtonElement;
 const themeModal = document.getElementById('theme-modal') as HTMLElement;
 const closeThemeBtn = document.getElementById('close-theme-btn') as HTMLButtonElement;
 const themeGrid = document.getElementById('theme-grid') as HTMLElement;
 
-// Chat Options Menu
+// --- Chat & I/O Modals ---
 const chatOptionsMenu = document.getElementById('chat-options-menu') as HTMLUListElement;
-
-// I/O Modal
 const ioModal = document.getElementById('io-modal') as HTMLElement;
 const ioModalTitle = document.getElementById('io-modal-title') as HTMLElement;
 const closeIoModalBtn = document.getElementById('close-io-modal-btn') as HTMLButtonElement;
 
+// =================================================================================
+// GLOBAL STATE MANAGEMENT
+// =================================================================================
+// Variables that hold the application's state.
 
-// --- State Management ---
 let chatHistory: ChatSession[] = [];
 let userContext: string[] = [];
 let selectedFiles: File[] = [];
@@ -384,38 +409,58 @@ let currentChatId: string | null = null;
 let geminiChat: Chat | null = null;
 let currentSpeech: SpeechSynthesisUtterance | null = null;
 let currentlyPlayingTTSButton: HTMLButtonElement | null = null;
-let isGeneratingData = false;
+let isGeneratingData = false; // Prevents multiple logbook/inventory updates at once
 let chatIdToRename: string | null = null;
-let isSending = false;
+let isSending = false; // Prevents multiple form submissions
 let ioAction: { type: 'import' } | { type: 'export', sessionId: string } | null = null;
 
+// =================================================================================
+// GEMINI AI INITIALIZATION
+// =================================================================================
 
-// --- Gemini AI Initialization ---
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-// --- UI & Chat Logic ---
+// =================================================================================
+// UI & MODAL MANAGEMENT
+// =================================================================================
+// General helper functions for controlling UI elements like the sidebar and modals.
 
+/** Toggles the visibility of the sidebar. */
 function toggleSidebar() {
   document.body.classList.toggle('sidebar-open');
 }
 
+/** Explicitly closes the sidebar. */
 function closeSidebar() {
   document.body.classList.remove('sidebar-open');
 }
 
+/** Displays a given modal element. */
 function openModal(modal: HTMLElement) {
     modal.style.display = 'flex';
 }
 
+/** Hides a given modal element. */
 function closeModal(modal: HTMLElement) {
     modal.style.display = 'none';
 }
 
+// =================================================================================
+// CORE CHAT LOGIC
+// =================================================================================
+// Functions responsible for creating, loading, and managing chat sessions.
+
+/**
+ * Creates a new Gemini Chat instance with the appropriate system instruction and history.
+ * @param history The existing chat history to initialize the instance with.
+ * @param instruction The system instruction to use (either setup or main game).
+ * @returns An initialized `Chat` object.
+ */
 function createNewChatInstance(history: { role: 'user' | 'model'; parts: { text: string }[] }[] = [], instruction: string): Chat {
   const config: any = {
       systemInstruction: instruction,
   };
-  // Only add the googleSearch tool if it's not the initial setup phase
+  // The googleSearch tool is enabled for the main game but not during the initial setup phase.
   if (instruction !== getNewGameSetupInstruction()) {
       config.tools = [{googleSearch: {}}];
   }
@@ -426,6 +471,7 @@ function createNewChatInstance(history: { role: 'user' | 'model'; parts: { text:
   });
 }
 
+/** Loads chat history from localStorage into the global state. */
 function loadChatHistoryFromStorage() {
   const storedHistory = localStorage.getItem('dm-os-chat-history');
   if (storedHistory) {
@@ -435,10 +481,120 @@ function loadChatHistoryFromStorage() {
   }
 }
 
+/** Saves the current chat history from global state to localStorage. */
 function saveChatHistoryToStorage() {
   localStorage.setItem('dm-os-chat-history', JSON.stringify(chatHistory));
 }
 
+/**
+ * Starts a brand new chat session, guiding the user through the setup process.
+ */
+async function startNewChat() {
+    stopTTS();
+    closeSidebar();
+    chatContainer.innerHTML = ''; // Clear the view immediately
+
+    // Display an initial loading message
+    const loadingContainer = appendMessage({ sender: 'model', text: '' });
+    const loadingMessage = loadingContainer.querySelector('.message') as HTMLElement;
+    loadingMessage.classList.add('loading');
+    loadingMessage.textContent = 'Starting new game setup...';
+
+    try {
+        const instruction = getNewGameSetupInstruction();
+        const setupGeminiChat = createNewChatInstance([], instruction);
+
+        const kickoffMessage = "Let's begin the setup for our new game.";
+        const firstUserMessage: Message = { sender: 'user', text: kickoffMessage, hidden: true };
+        
+        // Get the AI's first message in the setup flow
+        const result = await setupGeminiChat.sendMessageStream({ message: kickoffMessage });
+        let responseText = '';
+        for await (const chunk of result) {
+            responseText += chunk.text || '';
+        }
+
+        loadingContainer.remove();
+
+        const firstModelMessage: Message = { sender: 'model', text: responseText };
+        const newId = `chat-${Date.now()}`;
+        
+        // Create the new session object
+        const newSession: ChatSession = {
+            id: newId,
+            title: 'New Game Setup',
+            messages: [firstUserMessage, firstModelMessage],
+            isPinned: false,
+            createdAt: Date.now(),
+            creationPhase: true,
+            settings: {
+                difficulty: 'normal',
+                tone: 'heroic',
+                narration: 'descriptive',
+            }
+        };
+
+        chatHistory.push(newSession);
+        saveChatHistoryToStorage();
+        loadChat(newId); // Load the newly created chat
+    } catch (error) {
+        console.error("New game setup failed:", error);
+        loadingContainer.remove();
+        appendMessage({ sender: 'error', text: 'Failed to start the game setup. Please try again.' });
+    }
+}
+
+/**
+ * Loads a specific chat session into the main view.
+ * @param id The ID of the chat session to load.
+ */
+function loadChat(id: string) {
+    if (currentChatId === id && !document.body.classList.contains('sidebar-open')) {
+        return; // Don't reload if it's already the active chat
+    }
+    stopTTS();
+    const session = chatHistory.find(s => s.id === id);
+    if (session) {
+        currentChatId = id;
+
+        // Reconstruct the history in the format Gemini expects
+        const geminiHistory = session.messages
+            .filter(m => m.sender !== 'error' && m.sender !== 'system')
+            .map(m => ({
+                role: m.sender as 'user' | 'model',
+                parts: [{ text: m.text }]
+            }));
+            
+        try {
+            // Use the correct system instruction based on whether the game is in setup phase
+            if (session.creationPhase) {
+                const instruction = getNewGameSetupInstruction();
+                geminiChat = createNewChatInstance(geminiHistory, instruction);
+            } else {
+                const instruction = getSystemInstruction(session.adminPassword || '');
+                geminiChat = createNewChatInstance(geminiHistory, instruction);
+            }
+        } catch (error) {
+            console.error("Failed to create Gemini chat instance:", error);
+            renderMessages(session.messages); 
+            appendMessage({ sender: 'error', text: 'Error initializing the AI. Please check your setup or start a new chat.' });
+            geminiChat = null;
+        }
+        
+        // Update all relevant UI components
+        renderMessages(session.messages);
+        updateLogbook(session);
+        renderChatHistory();
+        closeSidebar();
+    }
+}
+
+// =================================================================================
+// SIDEBAR & CHAT HISTORY UI
+// =================================================================================
+// Functions for rendering and interacting with the chat history in the sidebar.
+
+/** Renders the list of pinned and recent chats in the sidebar. */
 function renderChatHistory() {
   pinnedChatsList.innerHTML = '';
   recentChatsList.innerHTML = '';
@@ -481,100 +637,10 @@ function renderChatHistory() {
   (document.getElementById('pinned-chats') as HTMLElement).style.display = pinnedChatsList.children.length > 0 ? 'block' : 'none';
 }
 
-async function startNewChat() {
-    stopTTS();
-    closeSidebar();
-    chatContainer.innerHTML = ''; // Clear the view immediately
-
-    const loadingContainer = appendMessage({ sender: 'model', text: '' });
-    const loadingMessage = loadingContainer.querySelector('.message') as HTMLElement;
-    loadingMessage.classList.add('loading');
-    loadingMessage.textContent = 'Starting new game setup...';
-
-    try {
-        const instruction = getNewGameSetupInstruction();
-        const setupGeminiChat = createNewChatInstance([], instruction);
-
-        const kickoffMessage = "Let's begin the setup for our new game.";
-        const firstUserMessage: Message = { sender: 'user', text: kickoffMessage, hidden: true };
-        
-        const result = await setupGeminiChat.sendMessageStream({ message: kickoffMessage });
-        let responseText = '';
-        for await (const chunk of result) {
-            responseText += chunk.text;
-        }
-
-        loadingContainer.remove();
-
-        const firstModelMessage: Message = { sender: 'model', text: responseText };
-        const newId = `chat-${Date.now()}`;
-        const newSession: ChatSession = {
-            id: newId,
-            title: 'New Game Setup',
-            messages: [firstUserMessage, firstModelMessage], // Start with the hidden user message and the AI's first prompt
-            isPinned: false,
-            createdAt: Date.now(),
-            creationPhase: true,
-            settings: {
-                difficulty: 'normal',
-                tone: 'heroic',
-                narration: 'descriptive',
-            }
-        };
-
-        chatHistory.push(newSession);
-        saveChatHistoryToStorage();
-        loadChat(newId);
-    } catch (error) {
-        console.error("New game setup failed:", error);
-        loadingContainer.remove();
-        appendMessage({ sender: 'error', text: 'Failed to start the game setup. Please try again.' });
-    }
-}
-
-
-function loadChat(id: string) {
-    if (currentChatId === id && !document.body.classList.contains('sidebar-open')) {
-        return;
-    }
-    stopTTS();
-    const session = chatHistory.find(s => s.id === id);
-    if (session) {
-        currentChatId = id;
-
-        const geminiHistory = session.messages
-            .filter(m => m.sender !== 'error' && m.sender !== 'system')
-            .map(m => ({
-                role: m.sender as 'user' | 'model',
-                parts: [{ text: m.text }]
-            }));
-            
-        try {
-            if (session.creationPhase) {
-                const instruction = getNewGameSetupInstruction();
-                geminiChat = createNewChatInstance(geminiHistory, instruction);
-            } else {
-                const instruction = getSystemInstruction(session.adminPassword || '');
-                geminiChat = createNewChatInstance(geminiHistory, instruction);
-            }
-        } catch (error) {
-            console.error("Failed to create Gemini chat instance:", error);
-            renderMessages(session.messages); 
-            appendMessage({ sender: 'error', text: 'Error initializing the AI. Please check your setup or start a new chat.' });
-            geminiChat = null;
-            updateLogbook(session);
-            renderChatHistory();
-            closeSidebar();
-            return;
-        }
-        
-        renderMessages(session.messages);
-        updateLogbook(session);
-        renderChatHistory();
-        closeSidebar();
-    }
-}
-
+/**
+ * Toggles the pinned status of a chat session.
+ * @param id The ID of the chat session to pin/unpin.
+ */
 function togglePinChat(id: string) {
     const session = chatHistory.find(s => s.id === id);
     if (session) {
@@ -584,6 +650,65 @@ function togglePinChat(id: string) {
     }
 }
 
+/** Opens the options menu (rename, pin, etc.) for a specific chat. */
+function openChatOptionsMenu(sessionId: string, buttonEl: HTMLElement) {
+    if (chatOptionsMenu.style.display === 'block' && chatOptionsMenu.dataset.sessionId === sessionId) {
+        closeChatOptionsMenu();
+        return;
+    }
+
+    const session = chatHistory.find(s => s.id === sessionId);
+    if (!session) return;
+    
+    chatOptionsMenu.dataset.sessionId = sessionId;
+    chatOptionsMenu.innerHTML = `
+        <li role="menuitem" data-action="pin">${session.isPinned ? 'Unpin Chat' : 'Pin Chat'}</li>
+        <li role="menuitem" data-action="rename">Rename</li>
+        <li role="menuitem" data-action="export">Export Chat</li>
+    `;
+    
+    const rect = buttonEl.getBoundingClientRect();
+    chatOptionsMenu.style.top = `${rect.bottom + 4}px`;
+    chatOptionsMenu.style.left = `${rect.left}px`;
+    chatOptionsMenu.style.display = 'block';
+
+    setTimeout(() => document.addEventListener('click', closeChatOptionsMenu, { once: true }), 0);
+}
+
+/** Closes the chat options menu. */
+function closeChatOptionsMenu() {
+    chatOptionsMenu.style.display = 'none';
+    chatOptionsMenu.removeAttribute('data-session-id');
+}
+
+/** Opens the modal for renaming a chat session. */
+function openRenameModal(id: string) {
+    chatIdToRename = id;
+    const session = chatHistory.find(s => s.id === id);
+    if (session) {
+        renameInput.value = session.title;
+        openModal(renameModal);
+        renameInput.focus();
+        renameInput.select();
+    }
+}
+
+/** Closes the rename chat modal. */
+function closeRenameModal() {
+    closeModal(renameModal);
+    chatIdToRename = null;
+}
+
+// =================================================================================
+// MESSAGE RENDERING
+// =================================================================================
+// Functions for displaying messages in the main chat container.
+
+/**
+ * Clears and re-renders all messages for a chat session.
+ * @param messages The array of messages to render.
+ * @param container The container element to render into (defaults to main chat).
+ */
 function renderMessages(messages: Message[], container: HTMLElement = chatContainer) {
   container.innerHTML = '';
   messages.forEach(msg => {
@@ -593,6 +718,12 @@ function renderMessages(messages: Message[], container: HTMLElement = chatContai
   });
 }
 
+/**
+ * Appends a single message to the chat container.
+ * @param message The message object to append.
+ * @param container The container element to append to.
+ * @returns The newly created message container element.
+ */
 function appendMessage(message: Message, container: HTMLElement = chatContainer) {
   if (message.sender === 'user') {
     const messageElement = document.createElement('div');
@@ -602,7 +733,7 @@ function appendMessage(message: Message, container: HTMLElement = chatContainer)
   } else if (message.sender === 'system') {
     const messageElement = document.createElement('div');
     messageElement.classList.add('message', 'system-roll');
-    messageElement.innerHTML = message.text; // Use innerHTML for strong tags
+    messageElement.innerHTML = message.text; // Use innerHTML for strong tags from dice rolls
     container.appendChild(messageElement);
   } else {
     const msgContainer = document.createElement('div');
@@ -613,6 +744,7 @@ function appendMessage(message: Message, container: HTMLElement = chatContainer)
     messageElement.textContent = message.text;
     msgContainer.appendChild(messageElement);
 
+    // Add TTS controls only to model messages in the main chat
     if (message.sender === 'model' && message.text && container === chatContainer) {
         const ttsControls = ttsTemplate.content.cloneNode(true) as DocumentFragment;
         const ttsButton = ttsControls.querySelector('.tts-button') as HTMLButtonElement;
@@ -626,12 +758,18 @@ function appendMessage(message: Message, container: HTMLElement = chatContainer)
   return container.lastElementChild as HTMLElement;
 }
 
-// --- Text-to-Speech (TTS) ---
 
+// =================================================================================
+// FEATURE: TEXT-TO-SPEECH (TTS)
+// =================================================================================
+// Logic for handling audio playback of model responses.
+
+/** Stops any currently playing speech synthesis. */
 function stopTTS() {
     if (speechSynthesis.speaking) {
         speechSynthesis.cancel();
     }
+    // Reset the UI of the previously playing button
     if (currentlyPlayingTTSButton) {
         const soundWave = currentlyPlayingTTSButton.nextElementSibling as HTMLElement;
         const playIcon = currentlyPlayingTTSButton.querySelector('.play-icon') as SVGElement;
@@ -644,14 +782,18 @@ function stopTTS() {
     }
 }
 
-
+/**
+ * Handles a click on a TTS button, playing or stopping speech.
+ * @param text The text to be spoken.
+ * @param button The button element that was clicked.
+ */
 function handleTTS(text: string, button: HTMLButtonElement) {
     const isPlaying = (currentlyPlayingTTSButton === button);
 
-    stopTTS();
+    stopTTS(); // Stop any other audio
 
     if (isPlaying) {
-        return;
+        return; // If the clicked button was already playing, it's now stopped.
     }
 
     currentSpeech = new SpeechSynthesisUtterance(text);
@@ -668,21 +810,25 @@ function handleTTS(text: string, button: HTMLButtonElement) {
     };
 
     currentSpeech.onend = () => {
-        stopTTS();
+        stopTTS(); // Clean up UI on natural end
     };
 
     currentSpeech.onerror = (event: SpeechSynthesisErrorEvent) => {
         if (event.error !== 'canceled') {
           console.error('SpeechSynthesisUtterance.onerror', event);
         }
-        stopTTS();
+        stopTTS(); // Clean up on error
     };
     
     speechSynthesis.speak(currentSpeech);
 }
 
-// --- User Context Management ---
+// =================================================================================
+// FEATURE: USER CONTEXT MANAGEMENT
+// =================================================================================
+// Allows the user to provide persistent facts for the AI to remember.
 
+/** Loads the user context list from localStorage. */
 function loadUserContextFromStorage() {
     const storedContext = localStorage.getItem('dm-os-user-context');
     if (storedContext) {
@@ -692,10 +838,12 @@ function loadUserContextFromStorage() {
     }
 }
 
+/** Saves the user context list to localStorage. */
 function saveUserContextToStorage() {
     localStorage.setItem('dm-os-user-context', JSON.stringify(userContext));
 }
 
+/** Renders the list of user context items in the sidebar. */
 function renderUserContext() {
     contextList.innerHTML = '';
     userContext.forEach((item, index) => {
@@ -711,26 +859,28 @@ function renderUserContext() {
     });
 }
 
+/** Adds a new item to the user context. */
 function addUserContext(text: string) {
     userContext.push(text);
     saveUserContextToStorage();
     renderUserContext();
 }
 
+/** Deletes an item from the user context by its index. */
 function deleteUserContext(index: number) {
     userContext.splice(index, 1);
     saveUserContextToStorage();
     renderUserContext();
 }
 
-// --- Dice Roller Logic ---
+// =================================================================================
+// FEATURE: DICE ROLLER
+// =================================================================================
+// Logic for the interactive dice roller modal.
+
 const DICE_TYPES = [
-    { name: 'd4', sides: 4 },
-    { name: 'd6', sides: 6 },
-    { name: 'd8', sides: 8 },
-    { name: 'd10', sides: 10 },
-    { name: 'd12', sides: 12 },
-    { name: 'd20', sides: 20 },
+    { name: 'd4', sides: 4 }, { name: 'd6', sides: 6 }, { name: 'd8', sides: 8 },
+    { name: 'd10', sides: 10 }, { name: 'd12', sides: 12 }, { name: 'd20', sides: 20 },
     { name: 'd100', sides: 100 },
 ];
 
@@ -744,17 +894,9 @@ const SQUARE_SVG_DATA = {
     textY: '55%',
 };
 
+const DICE_SVG_DATA = { 'd4': SQUARE_SVG_DATA, 'd6': SQUARE_SVG_DATA, 'd8': SQUARE_SVG_DATA, 'd10': SQUARE_SVG_DATA, 'd12': SQUARE_SVG_DATA, 'd20': SQUARE_SVG_DATA, 'd100': SQUARE_SVG_DATA };
 
-const DICE_SVG_DATA = {
-    'd4': SQUARE_SVG_DATA,
-    'd6': SQUARE_SVG_DATA,
-    'd8': SQUARE_SVG_DATA,
-    'd10': SQUARE_SVG_DATA,
-    'd12': SQUARE_SVG_DATA,
-    'd20': SQUARE_SVG_DATA,
-    'd100': SQUARE_SVG_DATA,
-};
-
+/** Renders the grid of interactive dice in the dice modal. */
 function renderDiceGrid() {
     diceGrid.innerHTML = '';
     DICE_TYPES.forEach(die => {
@@ -803,7 +945,10 @@ function renderDiceGrid() {
     });
 }
 
-
+/**
+ * Handles the logic for rolling a die from the modal.
+ * @param dieItem The HTML element of the die that was clicked.
+ */
 function handleDieRoll(dieItem: HTMLElement) {
     const sides = parseInt(dieItem.dataset.sides || '0', 10);
     const name = dieItem.dataset.name || 'die';
@@ -812,6 +957,7 @@ function handleDieRoll(dieItem: HTMLElement) {
 
     if (sides === 0 || count <= 0) return;
 
+    // Trigger roll animation
     const visual = dieItem.querySelector('.die-visual') as HTMLElement;
     visual.classList.add('rolling');
     visual.addEventListener('animationend', () => {
@@ -835,6 +981,7 @@ function handleDieRoll(dieItem: HTMLElement) {
     updateDiceTotal();
 }
 
+/** Updates the grand total display in the dice log. */
 function updateDiceTotal() {
     let grandTotal = 0;
     diceResultsLog.querySelectorAll('p').forEach(p => {
@@ -843,11 +990,17 @@ function updateDiceTotal() {
     diceTotalValue.textContent = grandTotal.toString();
 }
 
+/** Clears all results from the dice log. */
 function clearDiceResults() {
     diceResultsLog.innerHTML = '';
     updateDiceTotal();
 }
 
+/**
+ * Parses and executes a dice roll command from the chat input (e.g., "roll 2d6+3").
+ * @param command The user's input string.
+ * @returns An object indicating success and the formatted result text.
+ */
 function rollDice(command: string): { success: boolean; resultText: string } {
     const regex = /(?:roll|r)\s+(\d+)d(\d+)(?:\s*([+-])\s*(\d+))?/i;
     const match = command.match(regex);
@@ -886,8 +1039,15 @@ function rollDice(command: string): { success: boolean; resultText: string } {
 }
 
 
-// --- Log Book Logic ---
+// =================================================================================
+// FEATURE: LOG BOOK
+// =================================================================================
+// Manages the Log Book modal, including character sheet, inventory, quests, and NPCs.
 
+/**
+ * Renders the character sheet data into its display element.
+ * @param data The character sheet data object.
+ */
 function renderCharacterSheet(data: CharacterSheetData) {
     characterSheetDisplay.innerHTML = `
       <header class="sheet-header">
@@ -946,24 +1106,28 @@ function renderCharacterSheet(data: CharacterSheetData) {
     `;
 }
 
-
+/**
+ * Updates all panes in the Log Book with data from the current session.
+ * @param session The active chat session.
+ */
 function updateLogbook(session: ChatSession | undefined) {
     if (!session) return;
     
-    // Handle Character Sheet
+    // Render Character Sheet (handles both new object and old string formats)
     if (typeof session.characterSheet === 'object' && session.characterSheet !== null) {
         renderCharacterSheet(session.characterSheet as CharacterSheetData);
     } else if (typeof session.characterSheet === 'string') {
-        // Backwards compatibility for old string format
         characterSheetDisplay.innerHTML = `<div class="sheet-placeholder"><p>${session.characterSheet}</p></div>`;
     } else {
         characterSheetDisplay.innerHTML = `<div class="sheet-placeholder"><p>No data. Click below to generate your character sheet from the adventure log.</p></div>`;
     }
 
+    // Update other text-based panes
     inventoryDisplay.textContent = session.inventory || "No data. Ask the DM to summarize your inventory.";
     questsDisplay.textContent = session.questLog || "No quest data. Ask the DM to update your journal.";
     npcsDisplay.textContent = session.npcList || "No NPC data. Ask the DM for a list of characters you've met.";
 
+    // Update character image
     if (session.characterImageUrl) {
         characterImageDisplay.src = session.characterImageUrl;
         characterImageDisplay.classList.remove('hidden');
@@ -974,6 +1138,7 @@ function updateLogbook(session: ChatSession | undefined) {
         characterImagePlaceholder.classList.remove('hidden');
     }
     
+    // Update settings dropdowns
     if (session.settings) {
         settingDifficulty.value = session.settings.difficulty;
         settingTone.value = session.settings.tone;
@@ -981,12 +1146,17 @@ function updateLogbook(session: ChatSession | undefined) {
     }
 }
 
+/**
+ * Sends a request to the AI to generate/update data for a specific Log Book pane.
+ * @param type The type of data to update ('sheet', 'inventory', 'quests', 'npcs').
+ */
 async function updateLogbookData(type: 'sheet' | 'inventory' | 'quests' | 'npcs') {
     const currentSession = chatHistory.find(s => s.id === currentChatId);
     if (!currentSession || isGeneratingData) return;
 
     isGeneratingData = true;
     
+    // The character sheet uses a structured JSON response and has its own logic path.
     if (type === 'sheet') {
       const button = updateSheetBtn;
       const display = characterSheetDisplay;
@@ -1005,49 +1175,16 @@ async function updateLogbookData(type: 'sheet' | 'inventory' | 'quests' | 'npcs'
             config: {
               responseMimeType: "application/json",
               responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                  name: { type: Type.STRING },
-                  race: { type: Type.STRING },
-                  class: { type: Type.STRING },
-                  level: { type: Type.INTEGER },
-                  abilityScores: {
-                    type: Type.OBJECT,
-                    properties: {
-                      STR: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}},
-                      DEX: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}},
-                      CON: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}},
-                      INT: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}},
-                      WIS: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}},
-                      CHA: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}},
-                    }
-                  },
-                  armorClass: { type: Type.INTEGER },
-                  hitPoints: {
-                    type: Type.OBJECT,
-                    properties: {
-                      current: { type: Type.INTEGER },
-                      max: { type: Type.INTEGER }
-                    }
-                  },
-                  speed: { type: Type.STRING },
-                  skills: {
-                    type: Type.ARRAY,
-                    items: {
-                      type: Type.OBJECT,
-                      properties: {
-                        name: { type: Type.STRING },
-                        proficient: { type: Type.BOOLEAN }
-                      }
-                    }
-                  },
-                  featuresAndTraits: { type: Type.ARRAY, items: { type: Type.STRING }}
-                }
+                type: Type.OBJECT, properties: { name: { type: Type.STRING }, race: { type: Type.STRING }, class: { type: Type.STRING }, level: { type: Type.INTEGER }, abilityScores: { type: Type.OBJECT, properties: { STR: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}}, DEX: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}}, CON: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}}, INT: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}}, WIS: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}}, CHA: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}}, }}, armorClass: { type: Type.INTEGER }, hitPoints: { type: Type.OBJECT, properties: { current: { type: Type.INTEGER }, max: { type: Type.INTEGER }}}, speed: { type: Type.STRING }, skills: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, proficient: { type: Type.BOOLEAN }}}}, featuresAndTraits: { type: Type.ARRAY, items: { type: Type.STRING }}}
               }
             }
         });
 
-        const jsonData = JSON.parse(response.text) as CharacterSheetData;
+        const text = response.text;
+        if (!text) {
+          throw new Error("Received empty or invalid response from AI for character sheet generation.");
+        }
+        const jsonData = JSON.parse(text) as CharacterSheetData;
         currentSession.characterSheet = jsonData;
         renderCharacterSheet(jsonData);
         saveChatHistoryToStorage();
@@ -1063,7 +1200,7 @@ async function updateLogbookData(type: 'sheet' | 'inventory' | 'quests' | 'npcs'
       return;
     }
     
-    // --- Legacy handling for other types ---
+    // Logic for the other text-based logbook panes.
     const { button, display, promptClause } = {
         inventory: { button: updateInventoryBtn, display: inventoryDisplay, promptClause: "inventory" },
         quests: { button: updateQuestsBtn, display: questsDisplay, promptClause: "quest journal, separating active and completed quests" },
@@ -1079,21 +1216,14 @@ async function updateLogbookData(type: 'sheet' | 'inventory' | 'quests' | 'npcs'
         const conversationHistory = currentSession.messages
             .map(m => `${m.sender === 'user' ? 'Player' : 'DM'}: ${m.text}`)
             .join('\n');
+        const prompt = `Based on the following D&D conversation history, provide a concise summary of the player character's current ${promptClause}. Format the output clearly with headings and bullet points where appropriate. Conversation History: ${conversationHistory}`;
 
-        const prompt = `
-          Based on the following D&D conversation history, provide a concise summary of the player character's current ${promptClause}.
-          Format the output clearly with headings and bullet points where appropriate.
+        const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+        const dataText = response.text;
 
-          Conversation History:
-          ${conversationHistory}
-        `;
-
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt
-        });
-        
-        const dataText = response.text.trim();
+        if (!dataText || dataText.trim() === '') {
+            throw new Error(`Received empty response for ${type}.`);
+        }
 
         if (type === 'inventory') currentSession.inventory = dataText;
         else if (type === 'quests') currentSession.questLog = dataText;
@@ -1112,6 +1242,7 @@ async function updateLogbookData(type: 'sheet' | 'inventory' | 'quests' | 'npcs'
     }
 }
 
+/** Generates a unique character portrait using the conversation history. */
 async function generateCharacterImage() {
     const currentSession = chatHistory.find(s => s.id === currentChatId);
     if (!currentSession || isGeneratingData) return;
@@ -1126,26 +1257,23 @@ async function generateCharacterImage() {
         const conversationHistory = currentSession.messages.map(m => `${m.sender === 'user' ? 'Player' : 'DM'}: ${m.text}`).join('\n');
         const descriptionPrompt = `Based on the following D&D conversation, create a detailed visual description of the player character suitable for an AI image generator. Focus on physical appearance, race, class, clothing, equipment, and overall mood. Make it a rich, comma-separated list of keywords. Example: "elf ranger, long silver hair, green cloak, leather armor, holding a bow, standing in a dark forest, fantasy art, detailed". Conversation: ${conversationHistory}`;
 
-        const descriptionResponse = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: descriptionPrompt
-        });
-        const imagePrompt = descriptionResponse.text.trim();
+        const descriptionResponse = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: descriptionPrompt });
+        const imagePrompt = descriptionResponse.text;
+
+        if (!imagePrompt || imagePrompt.trim() === '') {
+            throw new Error("The AI failed to create a visual description for the image generator.");
+        }
 
         const loadingParagraph = characterImageLoading.querySelector('p');
         if (loadingParagraph) {
             loadingParagraph.textContent = 'Image prompt created. Generating portrait...';
         }
         
-        // Step 2: Generate the image using the description.
+        // Step 2: Generate the image using the created description.
         const imageResponse = await ai.models.generateImages({
             model: 'imagen-4.0-generate-001',
             prompt: imagePrompt,
-            config: {
-              numberOfImages: 1,
-              outputMimeType: 'image/png',
-              aspectRatio: '3:4',
-            }
+            config: { numberOfImages: 1, outputMimeType: 'image/png', aspectRatio: '3:4' }
         });
         
         const base64Image = imageResponse.generatedImages[0].image.imageBytes;
@@ -1170,9 +1298,12 @@ async function generateCharacterImage() {
     }
 }
 
+// =================================================================================
+// FEATURE: INVENTORY POPUP
+// =================================================================================
+// Logic for the quick-access inventory pouch above the chat input.
 
-// --- Inventory Popup Logic ---
-
+/** Fetches a concise list of inventory items and renders them in the popup. */
 async function fetchAndRenderInventoryPopup() {
     const currentSession = chatHistory.find(s => s.id === currentChatId);
     if (!currentSession || isGeneratingData) return;
@@ -1185,21 +1316,17 @@ async function fetchAndRenderInventoryPopup() {
             .map(m => `${m.sender === 'user' ? 'Player' : 'DM'}: ${m.text}`)
             .join('\n');
         
-        const prompt = `
-          Based on the following D&D conversation, list the player character's current inventory items as a simple comma-separated list.
-          Only include the item names. Example: Health Potion, Rope (50ft), Dagger, Gold (25gp)
-          
-          Conversation History:
-          ${conversationHistory}
-        `;
+        const prompt = `Based on the following D&D conversation, list the player character's current inventory items as a simple comma-separated list. Only include the item names. Example: Health Potion, Rope (50ft), Dagger, Gold (25gp). Conversation History: ${conversationHistory}`;
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-        });
+        const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
         
-        const itemsText = response.text.trim();
-        const items = itemsText ? itemsText.split(',').map(item => item.trim()).filter(Boolean) : [];
+        const itemsText = response.text;
+        if (!itemsText) {
+            inventoryPopupContent.innerHTML = `<div class="placeholder">Your pockets are empty.</div>`;
+            return;
+        }
+
+        const items = itemsText.split(',').map(item => item.trim()).filter(Boolean);
         
         if (items.length > 0) {
             const ul = document.createElement('ul');
@@ -1225,25 +1352,11 @@ async function fetchAndRenderInventoryPopup() {
     }
 }
 
+// =================================================================================
+// FEATURE: UI THEMEING
+// =================================================================================
+// Logic for applying and managing different visual themes.
 
-// --- Rename Modal Logic ---
-function openRenameModal(id: string) {
-    chatIdToRename = id;
-    const session = chatHistory.find(s => s.id === id);
-    if (session) {
-        renameInput.value = session.title;
-        openModal(renameModal);
-        renameInput.focus();
-        renameInput.select();
-    }
-}
-
-function closeRenameModal() {
-    closeModal(renameModal);
-    chatIdToRename = null;
-}
-
-// --- Themeing Logic ---
 const themes = [
     { id: 'high-fantasy-dark', name: 'High Fantasy (Dark)', colors: ['#131314', '#1e1f20', '#2a3a4a', '#c5b358'] },
     { id: 'high-fantasy-light', name: 'High Fantasy (Light)', colors: ['#fdf6e3', '#f4ecd9', '#eee8d5', '#b58900'] },
@@ -1265,6 +1378,7 @@ const themes = [
     { id: 'pirate-grog', name: 'Pirates (Grog Tavern)', colors: ['#5c4b3f', '#6c5a4f', '#826e60', '#daa520'] },
 ];
 
+/** Renders the theme selection cards in the theme modal. */
 function renderThemeCards() {
     themeGrid.innerHTML = '';
     themes.forEach(theme => {
@@ -1281,12 +1395,19 @@ function renderThemeCards() {
     });
 }
 
+/**
+ * Applies a theme to the application and saves the choice to localStorage.
+ * @param themeId The ID of the theme to apply.
+ */
 function applyTheme(themeId: string) {
     document.body.dataset.theme = themeId;
     localStorage.setItem('dm-os-theme', themeId);
 }
 
-// --- File Handling Logic ---
+// =================================================================================
+// FILE HANDLING & IMPORT/EXPORT
+// =================================================================================
+// Logic for handling file attachments, and importing/exporting chat sessions.
 
 /** Converts a File object to a base64 encoded string. */
 function fileToBase64(file: File): Promise<string> {
@@ -1302,7 +1423,7 @@ function fileToBase64(file: File): Promise<string> {
     });
 }
 
-/** Renders the previews for the selected files. */
+/** Renders the previews for any files selected for upload. */
 function renderFilePreviews() {
     filePreviewContainer.innerHTML = '';
     if (selectedFiles.length === 0) {
@@ -1313,7 +1434,6 @@ function renderFilePreviews() {
     selectedFiles.forEach((file, index) => {
         const previewElement = document.createElement('div');
         previewElement.className = 'file-preview-item';
-        // Using a proper times symbol for the remove button
         previewElement.innerHTML = `
             <span>${file.name}</span>
             <button class="remove-file-btn" data-index="${index}" aria-label="Remove ${file.name}">&times;</button>
@@ -1322,38 +1442,10 @@ function renderFilePreviews() {
     });
 }
 
-// --- Chat Options Menu Logic ---
-function openChatOptionsMenu(sessionId: string, buttonEl: HTMLElement) {
-    if (chatOptionsMenu.style.display === 'block' && chatOptionsMenu.dataset.sessionId === sessionId) {
-        closeChatOptionsMenu();
-        return;
-    }
-
-    const session = chatHistory.find(s => s.id === sessionId);
-    if (!session) return;
-    
-    chatOptionsMenu.dataset.sessionId = sessionId;
-    chatOptionsMenu.innerHTML = `
-        <li role="menuitem" data-action="pin">${session.isPinned ? 'Unpin Chat' : 'Pin Chat'}</li>
-        <li role="menuitem" data-action="rename">Rename</li>
-        <li role="menuitem" data-action="export">Export Chat</li>
-    `;
-    
-    const rect = buttonEl.getBoundingClientRect();
-    chatOptionsMenu.style.top = `${rect.bottom + 4}px`;
-    chatOptionsMenu.style.left = `${rect.left}px`;
-    chatOptionsMenu.style.display = 'block';
-
-    setTimeout(() => document.addEventListener('click', closeChatOptionsMenu, { once: true }), 0);
-}
-
-function closeChatOptionsMenu() {
-    chatOptionsMenu.style.display = 'none';
-    chatOptionsMenu.removeAttribute('data-session-id');
-}
-
-
-// --- Import / Export Logic ---
+/**
+ * Exports a chat session to a JSON file and triggers a download.
+ * @param sessionId The ID of the session to export.
+ */
 function exportChatToLocal(sessionId: string) {
     const session = chatHistory.find(s => s.id === sessionId);
     if (!session) return;
@@ -1371,6 +1463,10 @@ function exportChatToLocal(sessionId: string) {
     URL.revokeObjectURL(url);
 }
 
+/**
+ * Handles the file import process when a user selects a file.
+ * @param event The file input change event.
+ */
 function handleImportFile(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -1382,9 +1478,9 @@ function handleImportFile(event: Event) {
             const result = e.target?.result as string;
             const importedSession = JSON.parse(result) as ChatSession;
             
-            // Basic validation
+            // Basic validation of the imported file
             if (importedSession.id && importedSession.title && Array.isArray(importedSession.messages)) {
-                // Prevent ID conflicts
+                // Assign a new ID to prevent conflicts
                 const newId = `chat-${Date.now()}`;
                 importedSession.id = newId;
                 importedSession.createdAt = Date.now();
@@ -1402,12 +1498,14 @@ function handleImportFile(event: Event) {
         }
     };
     reader.readAsText(file);
-    // Reset input value to allow importing the same file again
-    input.value = '';
+    input.value = ''; // Reset input to allow re-importing the same file
 }
 
 
-// --- Main Execution ---
+// =================================================================================
+// MAIN CHAT FORM SUBMISSION
+// =================================================================================
+// The primary function for handling user input and AI interaction.
 
 async function handleFormSubmit(e: Event) {
   e.preventDefault();
@@ -1427,7 +1525,8 @@ async function handleFormSubmit(e: Event) {
     
     const lowerCaseInput = userInput.toLowerCase().replace(/[?]/g, '');
 
-    // Handle local dice roll command
+    // --- Local Command Handling (Client-Side) ---
+    // Check for local dice roll command (e.g., "roll 2d6") to handle it instantly.
     const rollCommandRegex = /^(roll|r)\s+\d+d\d+(?:\s*[+-]\s*\d+)?/i;
     if (rollCommandRegex.test(lowerCaseInput)) {
         const userMessage: Message = { sender: 'user', text: userInput };
@@ -1446,12 +1545,12 @@ async function handleFormSubmit(e: Event) {
         saveChatHistoryToStorage();
         return;
     }
-
-    // State: New Game Setup
+    
+    // --- State: New Game Setup Flow ---
     if (currentSession.creationPhase) {
         stopTTS();
 
-        // Capture password on the first *real* user turn of the session
+        // Capture the admin password on the first user message of the setup
         const userMessages = currentSession.messages.filter(m => m.sender === 'user');
         if (userMessages.length === 1 && userMessages[0].hidden) {
             currentSession.adminPassword = userInput;
@@ -1469,34 +1568,29 @@ async function handleFormSubmit(e: Event) {
         loadingMessage.textContent = '...';
 
         try {
-            if (!geminiChat) {
-                console.error("Setup AI Error: chat is not initialized.");
-                loadingContainer.remove();
-                appendMessage({ sender: 'error', text: 'The setup guide seems to have gotten lost. Please try starting a new game.' });
-                return;
-            }
+            if (!geminiChat) throw new Error("Setup AI Error: chat is not initialized.");
+            
             const result = await geminiChat.sendMessageStream({ message: userInput });
             let responseText = '';
             loadingMessage.classList.remove('loading');
             loadingMessage.textContent = '';
+            // Stream the response
             for await (const chunk of result) {
-                responseText += chunk.text;
+                responseText += chunk.text || '';
                 loadingMessage.textContent = responseText;
                 chatContainer.scrollTop = chatContainer.scrollHeight;
             }
             loadingContainer.remove();
 
+            // Check for the signal that setup is complete
             const setupCompleteSignal = '[SETUP_COMPLETE]';
             if (responseText.includes(setupCompleteSignal)) {
-                // --- TRANSITION TO MAIN GAME ---
+                // --- Transition from Setup to Main Game ---
                 currentSession.creationPhase = false;
 
+                // Extract the adventure title suggested by the AI
                 const titleMatch = responseText.match(/Title:\s*(.*)/);
-                if (titleMatch && titleMatch[1]) {
-                    currentSession.title = titleMatch[1].trim();
-                } else {
-                    currentSession.title = "New Adventure";
-                }
+                currentSession.title = titleMatch?.[1]?.trim() || "New Adventure";
 
                 const finalSetupText = responseText.replace(setupCompleteSignal, '').trim();
                 const finalSetupMessage: Message = { sender: 'model', text: finalSetupText };
@@ -1505,7 +1599,7 @@ async function handleFormSubmit(e: Event) {
                 saveChatHistoryToStorage();
                 renderChatHistory();
 
-                // --- INITIALIZE MAIN DM AI ---
+                // --- Initialize the Main DM AI and get the opening scene ---
                 const gameLoadingContainer = appendMessage({ sender: 'model', text: '' });
                 const gameLoadingMessage = gameLoadingContainer.querySelector('.message') as HTMLElement;
                 gameLoadingMessage.classList.add('loading');
@@ -1514,10 +1608,7 @@ async function handleFormSubmit(e: Event) {
                 const instruction = getSystemInstruction(currentSession.adminPassword || '');
                 const geminiHistory = currentSession.messages
                     .filter(m => m.sender !== 'error' && m.sender !== 'system')
-                    .map(m => ({
-                        role: m.sender as 'user' | 'model',
-                        parts: [{ text: m.text }]
-                    }));
+                    .map(m => ({ role: m.sender as 'user' | 'model', parts: [{ text: m.text }] }));
                 
                 geminiChat = createNewChatInstance(geminiHistory, instruction);
 
@@ -1527,7 +1618,7 @@ async function handleFormSubmit(e: Event) {
                 gameLoadingMessage.classList.remove('loading');
                 gameLoadingMessage.textContent = '';
                 for await (const chunk of kickoffResult) {
-                    openingSceneText += chunk.text;
+                    openingSceneText += chunk.text || '';
                     gameLoadingMessage.textContent = openingSceneText;
                     chatContainer.scrollTop = chatContainer.scrollHeight;
                 }
@@ -1539,13 +1630,12 @@ async function handleFormSubmit(e: Event) {
                 saveChatHistoryToStorage();
                 
             } else {
-                 // --- CONTINUE SETUP CONVERSATION ---
+                 // --- Continue Setup Conversation ---
                 const setupMessage: Message = { sender: 'model', text: responseText };
                 appendMessage(setupMessage);
                 currentSession.messages.push(setupMessage);
                 saveChatHistoryToStorage();
             }
-
         } catch (error) {
             console.error("Setup AI Error:", error);
             loadingContainer.remove();
@@ -1554,37 +1644,28 @@ async function handleFormSubmit(e: Event) {
         return;
     }
 
-
+    // --- Easter Egg ---
     if (lowerCaseInput === 'who is the architect') {
-      chatInput.value = '';
-      chatInput.style.height = 'auto';
-
-      const easterEggMessage: Message = {
-        sender: 'model',
-        text: "The simulation flickers for a moment, and the world goes silent. A single line of plain text hangs in the void before you:\n\n'This world was built by Justin Brisson.'"
-      };
+      chatInput.value = ''; chatInput.style.height = 'auto';
+      const easterEggMessage: Message = { sender: 'model', text: "The simulation flickers for a moment, and the world goes silent. A single line of plain text hangs in the void before you:\n\n'This world was built by Justin Brisson.'" };
       const messageContainer = appendMessage(easterEggMessage);
       messageContainer.querySelector('.message')?.classList.add('easter-egg');
-      const ttsControls = messageContainer.querySelector('.tts-controls');
-      if (ttsControls) ttsControls.remove();
-
+      messageContainer.querySelector('.tts-controls')?.remove();
       return;
     }
 
+    // --- Help command ---
     if (lowerCaseInput === 'help') {
-      openModal(helpModal);
-      chatInput.value = '';
-      chatInput.style.height = 'auto';
+      openModal(helpModal); chatInput.value = ''; chatInput.style.height = 'auto';
       return;
     }
 
+    // --- Default Chat Interaction ---
     if (!geminiChat) return;
-
     stopTTS();
 
     const userMessage: Message = { sender: 'user', text: userInput };
     currentSession.messages.push(userMessage);
-
     appendMessage(userMessage);
     chatInput.value = '';
     chatInput.style.height = 'auto';
@@ -1600,14 +1681,15 @@ async function handleFormSubmit(e: Event) {
       let responseText = '';
       loadingMessage.classList.remove('loading');
       loadingMessage.textContent = '';
+      // Stream the response to the UI
       for await (const chunk of result) {
-        responseText += chunk.text;
+        responseText += chunk.text || '';
         loadingMessage.textContent = responseText;
         chatContainer.scrollTop = chatContainer.scrollHeight;
       }
-
       loadingContainer.remove();
 
+      // Save the final, complete message
       const finalMessage: Message = { sender: 'model', text: responseText };
       appendMessage(finalMessage);
       currentSession.messages.push(finalMessage);
@@ -1619,308 +1701,248 @@ async function handleFormSubmit(e: Event) {
       appendMessage({ sender: 'error', text: 'The DM seems to be pondering deeply ... and has gone quiet. Please try again.' });
     }
   } finally {
-    isSending = false;
+    isSending = false; // Re-enable the send button
   }
 }
 
-// Event Listeners
-fileUploadBtn.addEventListener('click', () => fileInput.click());
+// =================================================================================
+// EVENT LISTENERS
+// =================================================================================
+// Centralized location for all event listener registrations.
 
-fileInput.addEventListener('change', () => {
-    if (fileInput.files) {
-        selectedFiles.push(...Array.from(fileInput.files));
-        renderFilePreviews();
-        fileInput.value = ''; // Allow selecting the same file again
-    }
-});
-
-filePreviewContainer.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    const removeBtn = target.closest('.remove-file-btn');
-    if (removeBtn) {
-        const index = parseInt(removeBtn.getAttribute('data-index')!, 10);
-        if (!isNaN(index)) {
-            selectedFiles.splice(index, 1);
+function setupEventListeners() {
+    // --- File Handling ---
+    fileUploadBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files) {
+            selectedFiles.push(...Array.from(fileInput.files));
             renderFilePreviews();
+            fileInput.value = ''; // Allow selecting the same file again
         }
-    }
-});
+    });
+    filePreviewContainer.addEventListener('click', (e) => {
+        const removeBtn = (e.target as HTMLElement).closest('.remove-file-btn');
+        if (removeBtn) {
+            const index = parseInt(removeBtn.getAttribute('data-index')!, 10);
+            if (!isNaN(index)) {
+                selectedFiles.splice(index, 1);
+                renderFilePreviews();
+            }
+        }
+    });
 
-chatForm.addEventListener('submit', handleFormSubmit);
-sendButton.addEventListener('click', handleFormSubmit);
+    // --- Chat Form ---
+    chatForm.addEventListener('submit', handleFormSubmit);
+    sendButton.addEventListener('click', handleFormSubmit);
+    chatInput.addEventListener('input', () => {
+        chatInput.style.height = 'auto';
+        chatInput.style.height = `${chatInput.scrollHeight}px`;
+    });
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            chatForm.requestSubmit();
+        }
+    });
 
-chatInput.addEventListener('input', () => {
-    chatInput.style.height = 'auto';
-    chatInput.style.height = `${chatInput.scrollHeight}px`;
-});
+    // --- Sidebar & Top Header ---
+    menuBtn.addEventListener('click', toggleSidebar);
+    overlay.addEventListener('click', closeSidebar);
+    newChatBtn.addEventListener('click', startNewChat);
 
-chatInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // --- Modals ---
+    helpBtn.addEventListener('click', () => openModal(helpModal));
+    closeHelpBtn.addEventListener('click', () => closeModal(helpModal));
+    dndHelpBtn.addEventListener('click', () => openModal(dndHelpModal));
+    closeDndHelpBtn.addEventListener('click', () => closeModal(dndHelpModal));
+    logbookBtn.addEventListener('click', () => openModal(logbookModal));
+    closeLogbookBtn.addEventListener('click', () => closeModal(logbookModal));
+    diceRollerBtn.addEventListener('click', () => openModal(diceModal));
+    closeDiceBtn.addEventListener('click', () => closeModal(diceModal));
+    renameForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        chatForm.requestSubmit();
-    }
-});
+        if (chatIdToRename) {
+            const session = chatHistory.find(s => s.id === chatIdToRename);
+            if (session) {
+                session.title = renameInput.value;
+                saveChatHistoryToStorage();
+                renderChatHistory();
+            }
+        }
+        closeRenameModal();
+    });
+    closeRenameBtn.addEventListener('click', closeRenameModal);
 
-menuBtn.addEventListener('click', toggleSidebar);
-overlay.addEventListener('click', closeSidebar);
-newChatBtn.addEventListener('click', startNewChat);
+    // --- User Context ---
+    contextForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = contextInput.value.trim();
+        if (text) { addUserContext(text); contextInput.value = ''; }
+    });
+    contextList.addEventListener('click', (e) => {
+        const deleteBtn = (e.target as HTMLElement).closest('.delete-context-btn');
+        if (deleteBtn) {
+            const index = parseInt(deleteBtn.getAttribute('data-index')!, 10);
+            if (!isNaN(index)) { deleteUserContext(index); }
+        }
+    });
 
-// Modal Listeners
-helpBtn.addEventListener('click', () => openModal(helpModal));
-closeHelpBtn.addEventListener('click', () => closeModal(helpModal));
-dndHelpBtn.addEventListener('click', () => openModal(dndHelpModal));
-closeDndHelpBtn.addEventListener('click', () => closeModal(dndHelpModal));
-logbookBtn.addEventListener('click', () => openModal(logbookModal));
-closeLogbookBtn.addEventListener('click', () => closeModal(logbookModal));
-diceRollerBtn.addEventListener('click', () => openModal(diceModal));
-closeDiceBtn.addEventListener('click', () => closeModal(diceModal));
+    // --- Logbook ---
+    logbookNav.addEventListener('click', (e) => {
+        const button = (e.target as HTMLElement).closest<HTMLElement>('.logbook-nav-btn');
+        if (button && button.dataset.tab) {
+            const tab = button.dataset.tab;
+            logbookNav.querySelectorAll('.logbook-nav-btn').forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            logbookPanes.forEach(pane => {
+                pane.classList.toggle('active', pane.id === `${tab}-content`);
+            });
+        }
+    });
+    updateSheetBtn.addEventListener('click', () => updateLogbookData('sheet'));
+    updateInventoryBtn.addEventListener('click', () => updateLogbookData('inventory'));
+    updateQuestsBtn.addEventListener('click', () => updateLogbookData('quests'));
+    updateNpcsBtn.addEventListener('click', () => updateLogbookData('npcs'));
+    generateImageBtn.addEventListener('click', generateCharacterImage);
 
-renameForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    if (chatIdToRename) {
-        const session = chatHistory.find(s => s.id === chatIdToRename);
-        if (session) {
-            session.title = renameInput.value;
+    // --- Logbook Game Settings ---
+    const handleSettingChange = (key: keyof GameSettings, value: string) => {
+        const currentSession = chatHistory.find(s => s.id === currentChatId);
+        if(currentSession?.settings) {
+            // FIX: Type 'any' is not assignable to type 'never'.
+            // Cast the object to `any` to allow assignment using a key that is a union of string literals.
+            (currentSession.settings as any)[key] = value;
             saveChatHistoryToStorage();
-            renderChatHistory();
         }
-    }
-    closeRenameModal();
-});
-closeRenameBtn.addEventListener('click', closeRenameModal);
-
-// Context Listeners
-contextForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const text = contextInput.value.trim();
-    if (text) {
-        addUserContext(text);
-        contextInput.value = '';
-    }
-});
-
-contextList.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    const deleteBtn = target.closest('.delete-context-btn');
-    if (deleteBtn) {
-        const index = parseInt(deleteBtn.getAttribute('data-index')!, 10);
-        if (!isNaN(index)) {
-            deleteUserContext(index);
-        }
-    }
-});
-
-
-// Logbook Listeners
-logbookNav.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    // FIX: Cast the result of closest to HTMLElement to access the dataset property.
-    const button = target.closest<HTMLElement>('.logbook-nav-btn');
-    if (button) {
-        const tab = button.dataset.tab;
-        
-        logbookNav.querySelectorAll('.logbook-nav-btn').forEach(btn => btn.classList.remove('active'));
-        button.classList.add('active');
-        
-        logbookPanes.forEach(pane => {
-            if (pane.id === `${tab}-content`) {
-                pane.classList.add('active');
-            } else {
-                pane.classList.remove('active');
-            }
-        });
-    }
-});
-
-updateSheetBtn.addEventListener('click', () => updateLogbookData('sheet'));
-updateInventoryBtn.addEventListener('click', () => updateLogbookData('inventory'));
-updateQuestsBtn.addEventListener('click', () => updateLogbookData('quests'));
-updateNpcsBtn.addEventListener('click', () => updateLogbookData('npcs'));
-generateImageBtn.addEventListener('click', generateCharacterImage);
-
-// Settings Listeners
-settingDifficulty.addEventListener('change', () => {
-    const currentSession = chatHistory.find(s => s.id === currentChatId);
-    if(currentSession && currentSession.settings) {
-        currentSession.settings.difficulty = settingDifficulty.value as GameSettings['difficulty'];
-        saveChatHistoryToStorage();
-    }
-});
-settingTone.addEventListener('change', () => {
-    const currentSession = chatHistory.find(s => s.id === currentChatId);
-    if(currentSession && currentSession.settings) {
-        currentSession.settings.tone = settingTone.value as GameSettings['tone'];
-        saveChatHistoryToStorage();
-    }
-});
-settingNarration.addEventListener('change', () => {
-    const currentSession = chatHistory.find(s => s.id === currentChatId);
-    if(currentSession && currentSession.settings) {
-        currentSession.settings.narration = settingNarration.value as GameSettings['narration'];
-        saveChatHistoryToStorage();
-    }
-});
-
-// Themeing Listeners
-changeUiBtn.addEventListener('click', () => openModal(themeModal));
-closeThemeBtn.addEventListener('click', () => closeModal(themeModal));
-themeGrid.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    // FIX: Cast the result of closest to HTMLElement to access the dataset property.
-    const card = target.closest<HTMLElement>('.theme-card');
-    if (card && card.dataset.theme) {
-        applyTheme(card.dataset.theme);
-        closeModal(themeModal);
-    }
-});
-
-// Dice Roller Listeners
-clearResultsBtn.addEventListener('click', clearDiceResults);
-
-diceGrid.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    const dieItem = target.closest('.die-item') as HTMLElement;
-    if (!dieItem) return;
-
-    if (target.closest('.die-visual')) {
-        handleDieRoll(dieItem);
-    }
-
-    const quantityInput = dieItem.querySelector('.quantity-input') as HTMLInputElement;
-    let value = parseInt(quantityInput.value, 10);
-
-    if (target.classList.contains('plus')) {
-        value = Math.min(99, value + 1);
-        quantityInput.value = value.toString();
-    } else if (target.classList.contains('minus')) {
-        value = Math.max(1, value - 1);
-        quantityInput.value = value.toString();
-    }
-});
-
-// Quick Actions Listener
-quickActionsBar.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    const button = target.closest<HTMLButtonElement>('.quick-action-btn');
-
-    if (button && button.dataset.command) {
-        const command = button.dataset.command;
-        chatInput.value = command;
-        chatInput.focus();
-
-        // Special case for "say" to place cursor between quotes
-        if (command === 'I say ""') {
-            chatInput.setSelectionRange(7, 7);
-        } else {
-            // Place cursor at the end for other commands
-            chatInput.setSelectionRange(command.length, command.length);
-        }
-        
-        // Trigger input event to resize textarea if needed
-        chatInput.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-});
-
-// Chat Options Menu Listener
-chatOptionsMenu.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    const action = target.dataset.action;
-    const sessionId = chatOptionsMenu.dataset.sessionId;
-
-    if (!action || !sessionId) return;
+    };
+    settingDifficulty.addEventListener('change', () => handleSettingChange('difficulty', settingDifficulty.value));
+    settingTone.addEventListener('change', () => handleSettingChange('tone', settingTone.value));
+    settingNarration.addEventListener('change', () => handleSettingChange('narration', settingNarration.value));
     
-    closeChatOptionsMenu();
+    // --- Themeing ---
+    changeUiBtn.addEventListener('click', () => openModal(themeModal));
+    closeThemeBtn.addEventListener('click', () => closeModal(themeModal));
+    themeGrid.addEventListener('click', (e) => {
+        const card = (e.target as HTMLElement).closest<HTMLElement>('.theme-card');
+        if (card?.dataset.theme) {
+            applyTheme(card.dataset.theme);
+            closeModal(themeModal);
+        }
+    });
 
-    switch (action) {
-        case 'pin':
-            togglePinChat(sessionId);
-            break;
-        case 'rename':
-            openRenameModal(sessionId);
-            break;
-        case 'export':
-            ioAction = { type: 'export', sessionId: sessionId };
-            ioModalTitle.textContent = 'Export To';
-            openModal(ioModal);
-            break;
-    }
-});
+    // --- Dice Roller ---
+    clearResultsBtn.addEventListener('click', clearDiceResults);
+    diceGrid.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        const dieItem = target.closest('.die-item') as HTMLElement;
+        if (!dieItem) return;
+        if (target.closest('.die-visual')) { handleDieRoll(dieItem); }
+        const quantityInput = dieItem.querySelector('.quantity-input') as HTMLInputElement;
+        let value = parseInt(quantityInput.value, 10);
+        if (target.classList.contains('plus')) {
+            quantityInput.value = Math.min(99, value + 1).toString();
+        } else if (target.classList.contains('minus')) {
+            quantityInput.value = Math.max(1, value - 1).toString();
+        }
+    });
 
-// Import/Export Listeners
-importChatBtn.addEventListener('click', () => {
-    ioAction = { type: 'import' };
-    ioModalTitle.textContent = 'Import From';
-    openModal(ioModal);
-});
+    // --- Quick Actions ---
+    quickActionsBar.addEventListener('click', (e) => {
+        const button = (e.target as HTMLElement).closest<HTMLButtonElement>('.quick-action-btn');
+        if (button?.dataset.command) {
+            const command = button.dataset.command;
+            chatInput.value = command; chatInput.focus();
+            if (command === 'I say ""') chatInput.setSelectionRange(7, 7);
+            else chatInput.setSelectionRange(command.length, command.length);
+            chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    });
 
-importFileInput.addEventListener('change', handleImportFile);
+    // --- Chat Options Menu ---
+    chatOptionsMenu.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        const action = target.dataset.action;
+        const sessionId = chatOptionsMenu.dataset.sessionId;
+        if (!action || !sessionId) return;
+        closeChatOptionsMenu();
+        switch (action) {
+            case 'pin': togglePinChat(sessionId); break;
+            case 'rename': openRenameModal(sessionId); break;
+            case 'export':
+                ioAction = { type: 'export', sessionId: sessionId };
+                ioModalTitle.textContent = 'Export To';
+                openModal(ioModal);
+                break;
+        }
+    });
 
-ioModal.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    // FIX: Cast the result of closest to HTMLElement to access the dataset property.
-    const button = target.closest<HTMLElement>('.io-option-btn');
-    if (button) {
-        const source = button.dataset.source;
-        if (source === 'local') {
-            if (ioAction?.type === 'import') {
-                importFileInput.click();
-            } else if (ioAction?.type === 'export') {
-                exportChatToLocal(ioAction.sessionId);
+    // --- Import/Export ---
+    importChatBtn.addEventListener('click', () => {
+        ioAction = { type: 'import' };
+        ioModalTitle.textContent = 'Import From';
+        openModal(ioModal);
+    });
+    importFileInput.addEventListener('change', handleImportFile);
+    ioModal.addEventListener('click', (e) => {
+        const button = (e.target as HTMLElement).closest<HTMLElement>('.io-option-btn');
+        if (button?.dataset.source) {
+            const source = button.dataset.source;
+            if (source === 'local') {
+                if (ioAction?.type === 'import') importFileInput.click();
+                else if (ioAction?.type === 'export') exportChatToLocal(ioAction.sessionId);
+            } else if (source === 'gdrive') {
+                alert('Google Drive integration is coming soon!');
             }
-        } else if (source === 'gdrive') {
-            alert('Google Drive integration is coming soon!');
+            closeModal(ioModal);
         }
-        closeModal(ioModal);
-    }
-});
+    });
+    closeIoModalBtn.addEventListener('click', () => closeModal(ioModal));
 
-closeIoModalBtn.addEventListener('click', () => closeModal(ioModal));
-
-// Inventory Pouch Listeners
-inventoryBtn.addEventListener('click', () => {
-    const isVisible = inventoryPopup.classList.toggle('visible');
-    if (isVisible) {
-        fetchAndRenderInventoryPopup();
-    }
-});
-
-closeInventoryBtn.addEventListener('click', () => {
-    inventoryPopup.classList.remove('visible');
-});
-
-refreshInventoryBtn.addEventListener('click', fetchAndRenderInventoryPopup);
-
-inventoryPopupContent.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    const useButton = target.closest('.use-item-btn');
-    if (useButton) {
-        const itemName = useButton.getAttribute('data-item-name');
-        if (itemName) {
-            chatInput.value = `Use ${itemName}`;
-            chatInput.focus();
-            inventoryPopup.classList.remove('visible');
+    // --- Inventory Pouch ---
+    inventoryBtn.addEventListener('click', () => {
+        const isVisible = inventoryPopup.classList.toggle('visible');
+        if (isVisible) { fetchAndRenderInventoryPopup(); }
+    });
+    closeInventoryBtn.addEventListener('click', () => { inventoryPopup.classList.remove('visible'); });
+    refreshInventoryBtn.addEventListener('click', fetchAndRenderInventoryPopup);
+    inventoryPopupContent.addEventListener('click', (e) => {
+        const useButton = (e.target as HTMLElement).closest('.use-item-btn');
+        if (useButton) {
+            const itemName = useButton.getAttribute('data-item-name');
+            if (itemName) {
+                chatInput.value = `Use ${itemName}`;
+                chatInput.focus();
+                inventoryPopup.classList.remove('visible');
+            }
         }
-    }
-});
+    });
+}
 
+// =================================================================================
+// APPLICATION INITIALIZATION
+// =================================================================================
+// The main function that kicks everything off when the page loads.
 
-// --- Initialization ---
+/** Initializes the entire application on load. */
 function initializeApp() {
+  // Load data from storage
   loadChatHistoryFromStorage();
   loadUserContextFromStorage();
 
+  // Apply saved or default theme
   const savedTheme = localStorage.getItem('dm-os-theme');
-  if (savedTheme) {
-    applyTheme(savedTheme);
-  } else {
-    applyTheme('cyberpunk-neon'); // Default theme on first load
-  }
+  applyTheme(savedTheme || 'cyberpunk-neon');
 
+  // Initial UI render
   renderChatHistory();
   renderUserContext();
   renderThemeCards();
   renderDiceGrid();
   
+  // Set up all event listeners
+  setupEventListeners();
+
+  // Load the last session or start a new one
   if (chatHistory.length > 0) {
     const lastSession = chatHistory.sort((a,b) => b.createdAt - a.createdAt)[0];
     currentChatId = lastSession.id;
@@ -1930,4 +1952,5 @@ function initializeApp() {
   }
 }
 
+// Start the app
 initializeApp();

@@ -106,7 +106,7 @@ body[data-theme="hellscape-soul"] {
   --accent-hover-color: #99ff33;
 }
 
-body[data-t'hellscape-ash'] {
+body[data-theme="hellscape-ash"] {
   --background-color: #202020;
   --sidebar-color: #282828;
   --text-color: #cccccc;
