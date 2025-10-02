@@ -31,6 +31,12 @@
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M5 20h14v-2H5v2zm0-10h4v6h6v-6h4l-7-7-7 7z"/></svg>
           </button>
         </div>
+        <div id="persona-selector-container">
+            <label for="persona-selector">DM Persona</label>
+            <select id="persona-selector">
+                <!-- Options will be populated by JS -->
+            </select>
+        </div>
       </div>
       <div id="chat-history-container">
         <div id="pinned-chats">
@@ -267,6 +273,7 @@
                 <button class="logbook-nav-btn" data-tab="inventory">Inventory</button>
                 <button class="logbook-nav-btn" data-tab="quests">Quests</button>
                 <button class="logbook-nav-btn" data-tab="npcs">NPCs</button>
+                <button class="logbook-nav-btn" data-tab="achievements">Achievements</button>
                 <button class="logbook-nav-btn" data-tab="settings">Settings</button>
             </nav>
             <main class="logbook-content">
@@ -302,6 +309,14 @@
                         <p>No NPC data. Ask the DM for a list of characters you've met.</p>
                     </div>
                     <button id="update-npcs-btn" class="logbook-update-btn">Update NPC List</button>
+                </div>
+                
+                <div id="achievements-content" class="logbook-pane">
+                    <h3>Achievements</h3>
+                    <div class="logbook-data-container" id="achievements-display">
+                        <!-- Achievements will be rendered here -->
+                    </div>
+                    <button id="update-achievements-btn" class="logbook-update-btn">Generate Achievements</button>
                 </div>
 
                 <div id="settings-content" class="logbook-pane">

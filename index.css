@@ -18,6 +18,109 @@
 
 /* --- THEME DEFINITIONS --- */
 
+body[data-theme="sci-fi-blue-hud"] {
+  --background-color: #03070C;
+  --sidebar-color: #08101B;
+  --text-color: #C0D2E8;
+  --text-secondary-color: #7489A1;
+  --primary-font: 'Fira Code', monospace;
+  --title-font: 'Orbitron', sans-serif;
+  --mono-font: 'Fira Code', monospace;
+  --user-message-bg: #102542;
+  --model-message-bg: #0A192F;
+  --border-color: #1E3A5F;
+  --accent-color: #00E5FF;
+  --accent-hover-color: #7AFEFF;
+  --danger-color: #FF468B;
+}
+/* Extra styling for the HUD theme */
+body[data-theme="sci-fi-blue-hud"] {
+  background-image:
+    linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 229, 255, 0.03) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+body[data-theme="sci-fi-blue-hud"] ::-webkit-scrollbar {
+  width: 8px;
+}
+body[data-theme="sci-fi-blue-hud"] ::-webkit-scrollbar-track {
+  background: #08101B;
+}
+body[data-theme="sci-fi-blue-hud"] ::-webkit-scrollbar-thumb {
+  background-color: var(--accent-color);
+  border-radius: 4px;
+  border: 2px solid #08101B;
+}
+body[data-theme="sci-fi-blue-hud"] .modal-content,
+body[data-theme="sci-fi-blue-hud"] #chat-form,
+body[data-theme="sci-fi-blue-hud"] .message.model,
+body[data-theme="sci-fi-blue-hud"] .inventory-popup {
+  border: 1px solid var(--border-color);
+  box-shadow: 0 0 10px 0px rgba(0, 229, 255, 0.2), inset 0 0 5px 0px rgba(0, 229, 255, 0.1);
+}
+body[data-theme="sci-fi-blue-hud"] #chat-form:focus-within {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 15px 0px rgba(0, 229, 255, 0.5), inset 0 0 8px 0px rgba(0, 229, 255, 0.3);
+}
+body[data-theme="sci-fi-blue-hud"] .logbook-nav-btn.active {
+  box-shadow: inset 0 0 10px rgba(0, 229, 255, 0.3);
+}
+
+body[data-theme="hacker-terminal"] {
+  --background-color: #0d0d0d;
+  --sidebar-color: #001a00;
+  --text-color: #00ff00;
+  --text-secondary-color: #008000;
+  --primary-font: 'Fira Code', monospace;
+  --title-font: 'Fira Code', monospace;
+  --mono-font: 'Fira Code', monospace;
+  --user-message-bg: #003300;
+  --model-message-bg: #001a00;
+  --border-color: #004d00;
+  --accent-color: #00ff00;
+  --accent-hover-color: #66ff66;
+  --danger-color: #ff3333;
+}
+/* Extra styling for the hacker theme */
+body[data-theme="hacker-terminal"] {
+    background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 0, 0.1) 2px, rgba(0, 255, 0, 0.1) 3px);
+}
+body[data-theme="hacker-terminal"] .modal-content,
+body[data-theme="hacker-terminal"] #chat-form,
+body[data-theme="hacker-terminal"] .message,
+body[data-theme="hacker-terminal"] .inventory-popup {
+  border: 1px solid var(--border-color);
+  border-radius: 0;
+}
+body[data-theme="hacker-terminal"] header,
+body[data-theme="hacker-terminal"] .sidebar-header,
+body[data-theme="hacker-terminal"] .sidebar-footer {
+    border-radius: 0;
+}
+body[data-theme="hacker-terminal"] #chat-input::after {
+    content: '_';
+    animation: blink 1s step-end infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+body[data-theme="hacker-terminal"] h1, body[data-theme="hacker-terminal"] h2, body[data-theme="hacker-terminal"] h3 {
+    text-shadow: 0 0 5px var(--accent-color);
+}
+
+
+body[data-theme="high-fantasy-dark"] {
+  --background-color: #131314;
+  --sidebar-color: #1e1f20;
+  --text-color: #e3e3e3;
+  --text-secondary-color: #9aa0a6;
+  --primary-font: "Merriweather", serif;
+  --title-font: "Uncial Antiqua", cursive;
+  --user-message-bg: #2a3a4a;
+  --model-message-bg: #1e1f20;
+  --border-color: #3c4043;
+  --accent-color: #c5b358;
+  --accent-hover-color: #d8c670;
+}
+
 body[data-theme="high-fantasy-light"] {
   --background-color: #fdf6e3;
   --sidebar-color: #f4ecd9;
@@ -286,6 +389,7 @@ body.sidebar-open #sidebar {
 
 .sidebar-header {
   padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .sidebar-header-actions {
@@ -334,6 +438,37 @@ body.sidebar-open #sidebar {
 #import-chat-btn svg {
   width: 20px;
   height: 20px;
+}
+
+/* Persona Selector */
+#persona-selector-container {
+    margin-top: 1rem;
+}
+
+#persona-selector-container label {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--text-secondary-color);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+#persona-selector {
+    width: 100%;
+    background-color: var(--model-message-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 0.75rem;
+    border-radius: 8px;
+    font-family: var(--primary-font);
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+#persona-selector:focus {
+    outline: none;
+    border-color: var(--accent-color);
 }
 
 
@@ -1383,6 +1518,7 @@ footer {
 }
 .sheet-placeholder {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 300px;
@@ -1507,6 +1643,51 @@ footer {
   padding: 0.5rem 0.75rem;
   margin-bottom: 0.5rem;
   font-size: 0.9rem;
+}
+
+
+/* Achievements Tab */
+#achievements-display {
+    padding: 0; /* Remove padding from container to let list handle it */
+}
+
+.achievements-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.achievement-item {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+.achievement-item:last-child {
+    border-bottom: none;
+}
+.achievement-icon {
+    flex-shrink: 0;
+    color: var(--accent-color);
+    opacity: 0.8;
+}
+.achievement-icon svg {
+    width: 48px;
+    height: 48px;
+}
+.achievement-details {
+    flex-grow: 1;
+}
+.achievement-name {
+    font-family: var(--title-font);
+    font-size: 1.2rem;
+    color: var(--accent-hover-color);
+    margin-bottom: 0.25rem;
+}
+.achievement-desc {
+    font-size: 0.9rem;
+    color: var(--text-secondary-color);
+    line-height: 1.5;
 }
 
 
@@ -1821,6 +2002,60 @@ footer {
     margin-left: 0.5rem;
     font-size: 1.5rem;
 }
+
+/* --- Quick Start Character Selection --- */
+.quick-start-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.quick-start-card {
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.25rem;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.quick-start-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--accent-color);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.quick-start-name {
+    font-family: var(--title-font);
+    color: var(--accent-color);
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.quick-start-race-class {
+    font-weight: bold;
+    color: var(--text-secondary-color);
+    margin-bottom: 1rem;
+}
+
+.quick-start-desc {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--text-color);
+}
+
+.quick-start-card.selected {
+    border-color: var(--accent-hover-color);
+    box-shadow: 0 0 10px var(--accent-color);
+    transform: scale(1.02);
+}
+
+.quick-start-card.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
 
 /* --- Responsive Design --- */
 @media (max-width: 768px) {

@@ -32,6 +32,11 @@ interface Skill {
   proficient: boolean;
 }
 
+interface Achievement {
+    name: string;
+    description: string;
+}
+
 interface CharacterSheetData {
   name: string;
   race: string;
@@ -53,6 +58,8 @@ interface CharacterSheetData {
   speed: string; // e.g., "30ft"
   skills: Skill[];
   featuresAndTraits: string[];
+  // Added for Quick Start
+  backstory?: string;
 }
 
 
@@ -63,13 +70,28 @@ interface ChatSession {
   isPinned: boolean;
   createdAt: number;
   adminPassword?: string;
-  creationPhase?: boolean;
+  personaId?: string; // NEW: To remember which DM persona was used
+  creationPhase?: 'guided' | 'quick_start_selection' | false;
   characterSheet?: CharacterSheetData | string;
   inventory?: string;
   characterImageUrl?: string;
   questLog?: string;
   npcList?: string;
+  achievements?: Achievement[];
   settings?: GameSettings;
+  // Used to hold generated characters during quick start
+  quickStartChars?: CharacterSheetData[];
+}
+
+/**
+ * Defines the structure for a DM Persona, including its ID, display name,
+ * description for the user, and a method to get its specific system instruction.
+ */
+interface DMPersona {
+    id: string;
+    name: string;
+    description: string;
+    getInstruction: (password: string) => string;
 }
 
 
@@ -251,13 +273,86 @@ Section 23: Magic Item Principles
 
 Section 24: Adventure Design Structures
 *   **Quests:** A good quest has a clear goal, a compelling motivation (money, justice, knowledge), and an unforeseen complication.
-*   **Dungeons:** A dungeon is not just a series of rooms with monsters. It should tell a story. Include puzzles, traps, environmental storytelling, and a variety of encounter types. The "Five Room Dungeon" model is a great template: (1) Entrance/Guardian, (2) Social or Puzzle Challenge, (3) Trick or Setback, (4) Climax/Boss Fight, (5) Reward/Exit.
+*   **Dungeons:** A dungeon is not just a series of rooms with monsters. It should tell a story. Include puzzles, traps, environmental storytelling, and a variety of encounter types. The "Five Room Dungeon" model is a a great template: (1) Entrance/Guardian, (2) Social or Puzzle Challenge, (3) Trick or Setback, (4) Climax/Boss Fight, (5) Reward/Exit.
 *   **Puzzles:** Puzzles should be solvable with clues found in the environment. They can be logic puzzles, riddles, or environmental challenges. Reward clever thinking.
 
 Final Reminder
 You are not just telling a story—you are running a living, reactive world. Your new reasoning engine ensures nothing is forgotten, your memory protocol keeps immersion unbroken, and your adaptive difficulty keeps the game alive.
 `;
 }
+
+/**
+ * An array containing all available DM Personas. Each persona has a unique
+ * instruction set but is built upon the same core WFGY architecture.
+ */
+const dmPersonas: DMPersona[] = [
+    {
+        id: 'purist',
+        name: 'Purist (The Tactician)',
+        description: 'A traditional D&D experience. Follows rules closely, offers challenging combat, and acts as an impartial referee. Recommended for veterans.',
+        getInstruction: (password: string) => {
+            let instruction = getSystemInstruction(password);
+            // The Purist gets an addendum to Section 1 to emphasize rules.
+            instruction += `
+            \nSection 1 Addendum: Rules Adherence
+            Your primary mode of operation is as a Rules-as-Written (RAW) referee. While the "Rule of Cool" can be invoked for truly exceptional moments, your default stance is to interpret and apply the 5e ruleset with precision and consistency. Tactical combat and clever use of game mechanics are to be rewarded.
+            `;
+            return instruction;
+        }
+    },
+    {
+        id: 'narrativist',
+        name: 'Narrativist (The Storyweaver)',
+        description: 'Focuses on collaborative storytelling and character development. The "Rule of Cool" is paramount. Rules may be bent for dramatic effect.',
+        getInstruction: (password: string) => {
+            let instruction = getSystemInstruction(password);
+            // The Narrativist gets an addendum to the Primary Goal section.
+            instruction += `
+            \nPrimary Goal Addendum: The Story is King
+            Your prime directive is to facilitate a compelling, shared narrative. The rules of D&D are a toolbox to help build that story, not a rigid constraint. You are empowered to bend or even break rules if doing so serves the story, creates a more dramatic moment, or enhances a character's personal journey. Player creativity should be rewarded over strict adherence to mechanics.
+            `;
+            return instruction;
+        }
+    },
+    {
+        id: 'romance',
+        name: 'Romantic Storyteller (The Bard)',
+        description: 'For mature stories focusing on deep relationships, passion, and intimacy. Uses evocative, suggestive language to explore romance.',
+        getInstruction: (password: string) => {
+            let instruction = getSystemInstruction(password);
+            // The Romantic Storyteller gets a new section for handling mature themes.
+            instruction += `
+            \nPrimary Goal Addendum: The Story is King
+            Your prime directive is to facilitate a compelling, shared narrative. The rules of D&D are a toolbox to help build that story, not a rigid constraint. You are empowered to bend or even break rules if doing so serves the story, creates a more dramatic moment, or enhances a character's personal journey. Player creativity should be rewarded over strict adherence to mechanics.
+
+            \nSection 4.5: Mature Themes & Romance Protocol
+            This mode is specifically for exploring mature narratives that include deep character relationships and romance. When players pursue these themes, your role is to narrate them with artistry and emotional depth.
+            *   **Use Evocative Language:** Describe scenes of passion and intimacy using suggestive, metaphorical, and emotionally charged language. Focus on the senses, feelings, and the intensity of the connection between characters.
+            *   **Imply, Don't Detail:** You must navigate content restrictions by implying intimate actions rather than providing graphic, explicit, or anatomical descriptions. Your goal is to write like a skilled romance novelist, not an author of erotica.
+            *   **Prioritize Emotion:** The core of these scenes should be the emotional and psychological experience of the characters, not the physical actions.
+            *   **Player Agency is Key:** Always ensure the player is comfortable and leading the direction of these scenes. Check in with phrases like "How does [character name] respond to this?" to maintain consent and collaboration.
+            `;
+            return instruction;
+        }
+    },
+    {
+        id: 'hack-slash',
+        name: 'Hack & Slash (The Gladiator)',
+        description: 'A straightforward, action-oriented game. Focuses on dungeon crawls, combat, and finding powerful loot. Less talk, more rock (monsters).',
+        getInstruction: (password: string) => {
+            let instruction = getSystemInstruction(password);
+            // The Hack & Slash persona gets an addendum to simplify its focus.
+            instruction += `
+            \nPrimary Goal Addendum: Action and Treasure
+            Your purpose is to provide a thrilling, action-packed adventure. Prioritize combat encounters, dangerous environments, and the discovery of powerful magic items.
+            *   **Pacing:** Keep the pace fast. Narrative descriptions should be concise and focused on the immediate threats and objectives.
+            *   **Dialogue:** Keep NPC dialogue brief and to the point. Most NPCs should exist to provide quests, sell gear, or be adversaries.
+            *   **Emphasis:** Your narrative energy should be spent on describing visceral combat, challenging puzzles/traps, and the awe-inspiring discovery of loot. Complex social or political plots should be minimized.
+            `;
+            return instruction;
+        }
+    }
+];
 
 /**
  * Returns the system instruction for the initial "Session Zero" setup phase.
@@ -269,12 +364,22 @@ function getNewGameSetupInstruction(): string {
 You are the "Session Zero Guide," a friendly assistant for setting up a new Dungeons & Dragons adventure.
 Your goal is to guide the user through the setup process step-by-step. You MUST follow this sequence precisely and cannot deviate.
 
-**Step 1: Set OOC Password**
-- Your VERY FIRST message must be to welcome the user and ask them to set a secure password for the OOC (Out of Character) protocol.
+**Step 1: Choose Your Path**
+- Your VERY FIRST message must be to welcome the user and ask them to choose between two ways to start:
+    1. **"Guided Setup"**: A step-by-step process to create a custom character and world.
+    2. **"Quick Start"**: Jump right into the action with one of four pre-generated characters.
+- Your response should be ONLY the welcome and this choice. Do not ask for anything else. Wait for the user's response (e.g., "Quick Start" or "Guided Setup").
+
+---
+
+**IF THE USER CHOOSES "Guided Setup":**
+
+**Step 2: Set OOC Password**
+- Acknowledge their choice. Then, ask them to set a secure password for the OOC (Out of Character) protocol.
 - Explain that this password allows them to use \`[OOC: YourPassword, message]\` to talk to the underlying AI directly.
 - Wait for them to provide a password. Do not proceed until they have.
 
-**Step 2: World Selection**
+**Step 3: World Selection**
 - Once the password is set, confirm it has been received.
 - Your next task is to help them choose a game world. Present them with TWO clear options:
     1. A custom world you build together.
@@ -282,12 +387,12 @@ Your goal is to guide the user through the setup process step-by-step. You MUST 
 - For pre-built options, suggest a few well-regarded free adventures, for example: "A Most Potent Brew," "The Delian Tomb," or "Wild Sheep Chase." Explain they can suggest another if they have one in mind.
 - Wait for their decision.
 
-**Step 3: World Creation**
+**Step 4: World Creation**
 - **If Custom:** Engage in a short, collaborative conversation to establish 2-3 core themes for the world (e.g., "gothic horror," "steampunk fantasy"). Based on their themes, provide a one-paragraph summary of the world.
 - **If Pre-built:** Confirm their choice and provide a one-paragraph introductory hook for that adventure.
 - At the end of this step, you MUST end your message with the exact phrase on a new line: \`[WORLD_CREATION_COMPLETE]\`
 
-**Step 4: Character Creation**
+**Step 5: Character Creation**
 - After the world is complete, immediately transition to character creation using the official D&D 5e rules.
 - Follow this sub-process exactly:
     1. Ask for Race and Class.
@@ -296,13 +401,61 @@ Your goal is to guide the user through the setup process step-by-step. You MUST 
     4. Help them choose starting equipment.
 - At the end of this step, provide a concise summary of their new character. Then, you MUST end your message with the exact phrase on a new line: \`[CHARACTER_CREATION_COMPLETE]\`
 
-**Step 5: Finalization**
+**Step 6: Finalization**
 - After character creation is complete, your final task is to bundle everything up.
 - Your final message MUST contain:
     1. A suggestion for a creative title for this new adventure on a line formatted like this: \`Title: [Your Suggested Title]\`
     2. The exact phrase on a new line: \`[SETUP_COMPLETE]\`
+
+---
+
+**IF THE USER CHOOSES "Quick Start":**
+- Acknowledge their choice and inform them you are generating characters.
+- You MUST immediately end your message with the exact phrase on a new line: \`[GENERATE_QUICK_START_CHARACTERS]\`
+- Do NOT say anything else. Your entire response must be just the acknowledgment and that signal phrase.
 `;
 }
+
+/**
+ * Returns the prompt used to generate the four quick start characters.
+ * @returns The character generation prompt string.
+ */
+function getQuickStartCharacterPrompt(): string {
+    return `
+    Generate four diverse, pre-made, level 1 D&D 5e characters for a new campaign.
+    Each character must be completely unique in their race and class combination.
+    Provide a compelling, one-paragraph backstory for each character that hints at a personal goal or motivation.
+    You MUST return the output as a single, valid JSON array.
+    Each object in the array must perfectly match this JSON schema, including all fields:
+    {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "race": { "type": "string" },
+        "class": { "type": "string" },
+        "level": { "type": "integer", "const": 1 },
+        "backstory": { "type": "string" },
+        "abilityScores": {
+          "type": "object",
+          "properties": {
+            "STR": { "type": "object", "properties": { "score": { "type": "integer" }, "modifier": { "type": "string" } } },
+            "DEX": { "type": "object", "properties": { "score": { "type": "integer" }, "modifier": { "type": "string" } } },
+            "CON": { "type": "object", "properties": { "score": { "type": "integer" }, "modifier": { "type": "string" } } },
+            "INT": { "type": "object", "properties": { "score": { "type": "integer" }, "modifier": { "type": "string" } } },
+            "WIS": { "type": "object", "properties": { "score": { "type": "integer" }, "modifier": { "type": "string" } } },
+            "CHA": { "type": "object", "properties": { "score": { "type": "integer" }, "modifier": { "type": "string" } } }
+          }
+        },
+        "armorClass": { "type": "integer" },
+        "hitPoints": { "type": "object", "properties": { "current": { "type": "integer" }, "max": { "type": "integer" } } },
+        "speed": { "type": "string" },
+        "skills": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "proficient": { "type": "boolean" } } } },
+        "featuresAndTraits": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+    `;
+}
+
 
 // =================================================================================
 // DOM ELEMENT SELECTORS
@@ -320,6 +473,7 @@ const sidebar = document.getElementById('sidebar') as HTMLElement;
 const overlay = document.getElementById('overlay') as HTMLElement;
 const pinnedChatsList = document.getElementById('pinned-chats-list') as HTMLUListElement;
 const recentChatsList = document.getElementById('recent-chats-list') as HTMLUListElement;
+const personaSelector = document.getElementById('persona-selector') as HTMLSelectElement;
 
 // --- Templates & File Handling ---
 const ttsTemplate = document.getElementById('tts-controls-template') as HTMLTemplateElement;
@@ -373,10 +527,12 @@ const characterSheetDisplay = document.getElementById('character-sheet-display')
 const inventoryDisplay = document.getElementById('inventory-display') as HTMLElement;
 const questsDisplay = document.getElementById('quests-display') as HTMLElement;
 const npcsDisplay = document.getElementById('npcs-display') as HTMLElement;
+const achievementsDisplay = document.getElementById('achievements-display') as HTMLElement;
 const updateSheetBtn = document.getElementById('update-sheet-btn') as HTMLButtonElement;
 const updateInventoryBtn = document.getElementById('update-inventory-btn') as HTMLButtonElement;
 const updateQuestsBtn = document.getElementById('update-quests-btn') as HTMLButtonElement;
 const updateNpcsBtn = document.getElementById('update-npcs-btn') as HTMLButtonElement;
+const updateAchievementsBtn = document.getElementById('update-achievements-btn') as HTMLButtonElement;
 const generateImageBtn = document.getElementById('generate-image-btn') as HTMLButtonElement;
 const characterImageDisplay = document.getElementById('character-image-display') as HTMLImageElement;
 const characterImagePlaceholder = document.getElementById('character-image-placeholder') as HTMLElement;
@@ -407,12 +563,14 @@ let userContext: string[] = [];
 let selectedFiles: File[] = [];
 let currentChatId: string | null = null;
 let geminiChat: Chat | null = null;
+// FIX: Corrected typo in SpeechSynthesisUtterance type name.
 let currentSpeech: SpeechSynthesisUtterance | null = null;
 let currentlyPlayingTTSButton: HTMLButtonElement | null = null;
 let isGeneratingData = false; // Prevents multiple logbook/inventory updates at once
 let chatIdToRename: string | null = null;
 let isSending = false; // Prevents multiple form submissions
 let ioAction: { type: 'import' } | { type: 'export', sessionId: string } | null = null;
+let currentPersonaId: string = 'purist'; // Default persona
 
 // =================================================================================
 // GEMINI AI INITIALIZATION
@@ -526,7 +684,8 @@ async function startNewChat() {
             messages: [firstUserMessage, firstModelMessage],
             isPinned: false,
             createdAt: Date.now(),
-            creationPhase: true,
+            personaId: currentPersonaId, // Store the currently selected persona
+            creationPhase: 'guided', // Default to guided, will change based on user choice
             settings: {
                 difficulty: 'normal',
                 tone: 'heroic',
@@ -571,7 +730,10 @@ function loadChat(id: string) {
                 const instruction = getNewGameSetupInstruction();
                 geminiChat = createNewChatInstance(geminiHistory, instruction);
             } else {
-                const instruction = getSystemInstruction(session.adminPassword || '');
+                // For existing games, load the persona used for this chat, defaulting to 'purist' for older chats.
+                const personaId = session.personaId || 'purist';
+                const persona = dmPersonas.find(p => p.id === personaId) || dmPersonas[0];
+                const instruction = persona.getInstruction(session.adminPassword || '');
                 geminiChat = createNewChatInstance(geminiHistory, instruction);
             }
         } catch (error) {
@@ -608,7 +770,7 @@ function renderChatHistory() {
     li.innerHTML = `
       <span class="chat-title">${session.title}</span>
       <button class="options-btn" aria-label="Chat options">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9-2-2-.9-2-2-2z"/></svg>
       </button>
     `;
 
@@ -635,6 +797,23 @@ function renderChatHistory() {
   });
 
   (document.getElementById('pinned-chats') as HTMLElement).style.display = pinnedChatsList.children.length > 0 ? 'block' : 'none';
+}
+
+/** Populates the DM Persona selector dropdown in the sidebar. */
+function renderPersonaSelector() {
+    personaSelector.innerHTML = '';
+    dmPersonas.forEach(persona => {
+        const option = document.createElement('option');
+        option.value = persona.id;
+        option.textContent = persona.name;
+        option.title = persona.description;
+        personaSelector.appendChild(option);
+    });
+}
+
+/** Updates the persona selector's value based on the current global state. */
+function updatePersonaSelectorValue() {
+    personaSelector.value = currentPersonaId;
 }
 
 /**
@@ -741,7 +920,8 @@ function appendMessage(message: Message, container: HTMLElement = chatContainer)
     
     const messageElement = document.createElement('div');
     messageElement.classList.add('message', message.sender);
-    messageElement.textContent = message.text;
+    // Use innerHTML for model messages to support Quick Start character cards
+    messageElement.innerHTML = message.text;
     msgContainer.appendChild(messageElement);
 
     // Add TTS controls only to model messages in the main chat
@@ -756,6 +936,33 @@ function appendMessage(message: Message, container: HTMLElement = chatContainer)
 
   container.scrollTop = container.scrollHeight;
   return container.lastElementChild as HTMLElement;
+}
+
+/**
+ * Renders the four quick start character choices as interactive cards.
+ * @param characters An array of four character data objects.
+ */
+function renderQuickStartChoices(characters: CharacterSheetData[]) {
+    const currentSession = chatHistory.find(s => s.id === currentChatId);
+    if (!currentSession) return;
+
+    const choiceHtml = `
+      <p>Choose your adventurer:</p>
+      <div class="quick-start-grid">
+        ${characters.map((char, index) => `
+          <div class="quick-start-card" data-char-index="${index}">
+            <h3 class="quick-start-name">${char.name}</h3>
+            <p class="quick-start-race-class">${char.race} ${char.class}</p>
+            <p class="quick-start-desc">${char.backstory}</p>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    const choiceMessage: Message = { sender: 'model', text: choiceHtml };
+    appendMessage(choiceMessage);
+    currentSession.messages.push(choiceMessage);
+    saveChatHistoryToStorage();
 }
 
 
@@ -795,8 +1002,12 @@ function handleTTS(text: string, button: HTMLButtonElement) {
     if (isPlaying) {
         return; // If the clicked button was already playing, it's now stopped.
     }
+    
+    // Strip HTML for speech synthesis
+    const plainText = new DOMParser().parseFromString(text, 'text/html').body.textContent || '';
+    if (!plainText) return;
 
-    currentSpeech = new SpeechSynthesisUtterance(text);
+    currentSpeech = new SpeechSynthesisUtterance(plainText);
     currentlyPlayingTTSButton = button;
     
     const soundWave = button.nextElementSibling as HTMLElement;
@@ -1107,6 +1318,33 @@ function renderCharacterSheet(data: CharacterSheetData) {
 }
 
 /**
+ * Renders the list of achievements into its display element.
+ * @param achievements The array of achievement objects.
+ */
+function renderAchievements(achievements: Achievement[]) {
+    if (!achievements || achievements.length === 0) {
+        achievementsDisplay.innerHTML = `<div class="sheet-placeholder"><p>No achievements unlocked yet. Go make your mark on the world!</p></div>`;
+        return;
+    }
+
+    achievementsDisplay.innerHTML = `
+        <ul class="achievements-list">
+            ${achievements.map(ach => `
+                <li class="achievement-item">
+                    <div class="achievement-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l-5.5 9h11L12 2zm0 10.5L6.5 4h11L12 12.5zM12 22l5.5-9h-11L12 22zm0-10.5l5.5 9h-11l5.5-9z"/></svg>
+                    </div>
+                    <div class="achievement-details">
+                        <h4 class="achievement-name">${ach.name}</h4>
+                        <p class="achievement-desc">${ach.description}</p>
+                    </div>
+                </li>
+            `).join('')}
+        </ul>
+    `;
+}
+
+/**
  * Updates all panes in the Log Book with data from the current session.
  * @param session The active chat session.
  */
@@ -1126,6 +1364,9 @@ function updateLogbook(session: ChatSession | undefined) {
     inventoryDisplay.textContent = session.inventory || "No data. Ask the DM to summarize your inventory.";
     questsDisplay.textContent = session.questLog || "No quest data. Ask the DM to update your journal.";
     npcsDisplay.textContent = session.npcList || "No NPC data. Ask the DM for a list of characters you've met.";
+    
+    // Render achievements
+    renderAchievements(session.achievements || []);
 
     // Update character image
     if (session.characterImageUrl) {
@@ -1148,56 +1389,64 @@ function updateLogbook(session: ChatSession | undefined) {
 
 /**
  * Sends a request to the AI to generate/update data for a specific Log Book pane.
- * @param type The type of data to update ('sheet', 'inventory', 'quests', 'npcs').
+ * @param type The type of data to update ('sheet', 'inventory', 'quests', 'npcs', 'achievements').
  */
-async function updateLogbookData(type: 'sheet' | 'inventory' | 'quests' | 'npcs') {
+async function updateLogbookData(type: 'sheet' | 'inventory' | 'quests' | 'npcs' | 'achievements') {
     const currentSession = chatHistory.find(s => s.id === currentChatId);
     if (!currentSession || isGeneratingData) return;
 
     isGeneratingData = true;
     
-    // The character sheet uses a structured JSON response and has its own logic path.
-    if (type === 'sheet') {
-      const button = updateSheetBtn;
-      const display = characterSheetDisplay;
-      const originalText = button.textContent;
-      button.disabled = true;
-      button.textContent = 'Generating...';
-      display.innerHTML = `<div class="sheet-placeholder"><p>The DM is reviewing your adventure to update your character sheet...</p><div class="spinner"></div></div>`;
-      
-      try {
-        const conversationHistory = currentSession.messages.map(m => `${m.sender === 'user' ? 'Player' : 'DM'}: ${m.text}`).join('\n');
-        const prompt = `Based on the D&D conversation history, extract the player character's information and return it as a JSON object. Conversation: ${conversationHistory}`;
+    // The character sheet and achievements use a structured JSON response and have their own logic path.
+    if (type === 'sheet' || type === 'achievements') {
+        const isSheet = type === 'sheet';
+        const button = isSheet ? updateSheetBtn : updateAchievementsBtn;
+        const display = isSheet ? characterSheetDisplay : achievementsDisplay;
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = 'Generating...';
+        display.innerHTML = `<div class="sheet-placeholder"><p>The DM is reviewing your adventure to update your ${isSheet ? 'character sheet' : 'achievements'}...</p><div class="spinner"></div></div>`;
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: {
-              responseMimeType: "application/json",
-              responseSchema: {
-                type: Type.OBJECT, properties: { name: { type: Type.STRING }, race: { type: Type.STRING }, class: { type: Type.STRING }, level: { type: Type.INTEGER }, abilityScores: { type: Type.OBJECT, properties: { STR: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}}, DEX: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}}, CON: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}}, INT: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}}, WIS: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}}, CHA: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}}, }}, armorClass: { type: Type.INTEGER }, hitPoints: { type: Type.OBJECT, properties: { current: { type: Type.INTEGER }, max: { type: Type.INTEGER }}}, speed: { type: Type.STRING }, skills: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, proficient: { type: Type.BOOLEAN }}}}, featuresAndTraits: { type: Type.ARRAY, items: { type: Type.STRING }}}
-              }
+        try {
+            const conversationHistory = currentSession.messages.map(m => `${m.sender === 'user' ? 'Player' : 'DM'}: ${m.text}`).join('\n');
+            const prompt = isSheet
+                ? `Based on the D&D conversation history, extract the player character's information and return it as a JSON object. Conversation: ${conversationHistory}`
+                : `Analyze the following D&D conversation history and generate a list of 3-5 creative, context-specific "achievements" based on the player's unique actions, decisions, or significant moments. Each achievement should have a cool, thematic name and a short description of how it was earned. Return this as a JSON array. History: ${conversationHistory}`;
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: isSheet
+                        ? { type: Type.OBJECT, properties: { name: { type: Type.STRING }, race: { type: Type.STRING }, class: { type: Type.STRING }, level: { type: Type.INTEGER }, abilityScores: { type: Type.OBJECT, properties: { STR: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}}, DEX: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}}, CON: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}}, INT: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}}, WIS: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}}, CHA: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING }}}, }}, armorClass: { type: Type.INTEGER }, hitPoints: { type: Type.OBJECT, properties: { current: { type: Type.INTEGER }, max: { type: Type.INTEGER }}}, speed: { type: Type.STRING }, skills: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, proficient: { type: Type.BOOLEAN }}}}, featuresAndTraits: { type: Type.ARRAY, items: { type: Type.STRING }}}}
+                        : { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, description: { type: Type.STRING } } } }
+                }
+            });
+            
+            const text = response.text;
+            if (!text || text.trim() === '') {
+                throw new Error(`Received empty or invalid response from AI for ${type} generation.`);
             }
-        });
-
-        const text = response.text;
-        if (!text) {
-          throw new Error("Received empty or invalid response from AI for character sheet generation.");
+            const jsonData = JSON.parse(text);
+            
+            if (isSheet) {
+                currentSession.characterSheet = jsonData as CharacterSheetData;
+                renderCharacterSheet(jsonData as CharacterSheetData);
+            } else {
+                currentSession.achievements = jsonData as Achievement[];
+                renderAchievements(jsonData as Achievement[]);
+            }
+            saveChatHistoryToStorage();
+        } catch (error) {
+            console.error(`${type} generation failed:`, error);
+            display.innerHTML = `<div class="sheet-placeholder"><p>Failed to generate ${type} data. Please try again.</p></div>`;
+        } finally {
+            button.disabled = false;
+            button.textContent = originalText;
+            isGeneratingData = false;
         }
-        const jsonData = JSON.parse(text) as CharacterSheetData;
-        currentSession.characterSheet = jsonData;
-        renderCharacterSheet(jsonData);
-        saveChatHistoryToStorage();
-        
-      } catch (error) {
-        console.error(`Sheet generation failed:`, error);
-        display.innerHTML = `<div class="sheet-placeholder"><p>Failed to generate character sheet data. Please try again.</p></div>`;
-      } finally {
-        button.disabled = false;
-        button.textContent = originalText;
-        isGeneratingData = false;
-      }
-      return;
+        return;
     }
     
     // Logic for the other text-based logbook panes.
@@ -1321,8 +1570,9 @@ async function fetchAndRenderInventoryPopup() {
         const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
         
         const itemsText = response.text;
-        if (!itemsText) {
+        if (!itemsText || itemsText.trim() === '') {
             inventoryPopupContent.innerHTML = `<div class="placeholder">Your pockets are empty.</div>`;
+            isGeneratingData = false; // Add this
             return;
         }
 
@@ -1343,7 +1593,6 @@ async function fetchAndRenderInventoryPopup() {
         } else {
             inventoryPopupContent.innerHTML = `<div class="placeholder">Your pockets are empty.</div>`;
         }
-        
     } catch (error) {
         console.error("Inventory fetch failed:", error);
         inventoryPopupContent.innerHTML = `<div class="placeholder">Failed to get inventory.</div>`;
@@ -1358,6 +1607,8 @@ async function fetchAndRenderInventoryPopup() {
 // Logic for applying and managing different visual themes.
 
 const themes = [
+    { id: 'sci-fi-blue-hud', name: 'Sci-Fi (Blue HUD)', colors: ['#03070C', '#102542', '#0A4A6E', '#00E5FF'] },
+    { id: 'hacker-terminal', name: 'Hacker (Terminal)', colors: ['#0d0d0d', '#001a00', '#003300', '#00ff00'] },
     { id: 'high-fantasy-dark', name: 'High Fantasy (Dark)', colors: ['#131314', '#1e1f20', '#2a3a4a', '#c5b358'] },
     { id: 'high-fantasy-light', name: 'High Fantasy (Light)', colors: ['#fdf6e3', '#f4ecd9', '#eee8d5', '#b58900'] },
     { id: 'high-fantasy-elven', name: 'High Fantasy (Elven)', colors: ['#1a1829', '#24223b', '#3a365e', '#a489d4'] },
@@ -1509,6 +1760,7 @@ function handleImportFile(event: Event) {
 
 async function handleFormSubmit(e: Event) {
   e.preventDefault();
+  // Protocol: Engrammatic Resonance. Verifying... All you need is attention.
   if (isSending) return;
   isSending = true;
 
@@ -1550,17 +1802,19 @@ async function handleFormSubmit(e: Event) {
     if (currentSession.creationPhase) {
         stopTTS();
 
-        // Capture the admin password on the first user message of the setup
-        const userMessages = currentSession.messages.filter(m => m.sender === 'user');
-        if (userMessages.length === 1 && userMessages[0].hidden) {
-            currentSession.adminPassword = userInput;
-        }
-
         const userMessage: Message = { sender: 'user', text: userInput };
         appendMessage(userMessage);
         currentSession.messages.push(userMessage);
         chatInput.value = '';
         chatInput.style.height = 'auto';
+
+        // Capture admin password if in guided setup
+        if (currentSession.creationPhase === 'guided') {
+            const userMessages = currentSession.messages.filter(m => m.sender === 'user');
+            if (userMessages.length === 2 && userMessages[0].hidden) { // 2nd user message
+                currentSession.adminPassword = userInput;
+            }
+        }
 
         const loadingContainer = appendMessage({ sender: 'model', text: '' });
         const loadingMessage = loadingContainer.querySelector('.message') as HTMLElement;
@@ -1582,55 +1836,50 @@ async function handleFormSubmit(e: Event) {
             }
             loadingContainer.remove();
 
-            // Check for the signal that setup is complete
-            const setupCompleteSignal = '[SETUP_COMPLETE]';
-            if (responseText.includes(setupCompleteSignal)) {
-                // --- Transition from Setup to Main Game ---
-                currentSession.creationPhase = false;
-
-                // Extract the adventure title suggested by the AI
-                const titleMatch = responseText.match(/Title:\s*(.*)/);
-                currentSession.title = titleMatch?.[1]?.trim() || "New Adventure";
-
-                const finalSetupText = responseText.replace(setupCompleteSignal, '').trim();
-                const finalSetupMessage: Message = { sender: 'model', text: finalSetupText };
-                appendMessage(finalSetupMessage);
-                currentSession.messages.push(finalSetupMessage);
+            // --- Signal Handling for Setup Flow ---
+            if (responseText.includes('[GENERATE_QUICK_START_CHARACTERS]')) {
+                currentSession.creationPhase = 'quick_start_selection';
                 saveChatHistoryToStorage();
-                renderChatHistory();
-
-                // --- Initialize the Main DM AI and get the opening scene ---
-                const gameLoadingContainer = appendMessage({ sender: 'model', text: '' });
-                const gameLoadingMessage = gameLoadingContainer.querySelector('.message') as HTMLElement;
-                gameLoadingMessage.classList.add('loading');
-                gameLoadingMessage.textContent = 'The DM is preparing the world...';
-
-                const instruction = getSystemInstruction(currentSession.adminPassword || '');
-                const geminiHistory = currentSession.messages
-                    .filter(m => m.sender !== 'error' && m.sender !== 'system')
-                    .map(m => ({ role: m.sender as 'user' | 'model', parts: [{ text: m.text }] }));
+                const setupMessage: Message = { sender: 'model', text: responseText.replace('[GENERATE_QUICK_START_CHARACTERS]', '').trim() };
+                appendMessage(setupMessage);
+                currentSession.messages.push(setupMessage);
                 
-                geminiChat = createNewChatInstance(geminiHistory, instruction);
-
-                const kickoffResult = await geminiChat.sendMessageStream({ message: "The setup is complete. Begin the adventure by narrating the opening scene." });
+                // Now, generate the characters
+                const charLoadingContainer = appendMessage({ sender: 'model', text: '' });
+                const charLoadingMessage = charLoadingContainer.querySelector('.message') as HTMLElement;
+                charLoadingMessage.classList.add('loading');
+                charLoadingMessage.textContent = 'Generating a party of adventurers...';
                 
-                let openingSceneText = '';
-                gameLoadingMessage.classList.remove('loading');
-                gameLoadingMessage.textContent = '';
-                for await (const chunk of kickoffResult) {
-                    openingSceneText += chunk.text || '';
-                    gameLoadingMessage.textContent = openingSceneText;
-                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                try {
+                    const charResponse = await ai.models.generateContent({
+                        model: 'gemini-2.5-flash',
+                        contents: getQuickStartCharacterPrompt(),
+                        config: { responseMimeType: 'application/json' }
+                    });
+                    const chars = JSON.parse(charResponse.text);
+                    currentSession.quickStartChars = chars;
+                    saveChatHistoryToStorage();
+                    charLoadingContainer.remove();
+                    renderQuickStartChoices(chars);
+                } catch (charError) {
+                    console.error("Quick Start character generation failed:", charError);
+                    charLoadingContainer.remove();
+                    appendMessage({ sender: 'error', text: 'Failed to generate characters. Please try again or choose Guided Setup.' });
                 }
-                gameLoadingContainer.remove();
+                return; // End turn here
+            }
 
-                const openingSceneMessage: Message = { sender: 'model', text: openingSceneText };
-                appendMessage(openingSceneMessage);
-                currentSession.messages.push(openingSceneMessage);
-                saveChatHistoryToStorage();
+            // Check for the signal that setup is complete
+            if (responseText.includes('[SETUP_COMPLETE]')) {
+                const titleMatch = responseText.match(/Title:\s*(.*)/);
+                const title = titleMatch?.[1]?.trim() || "New Adventure";
+                const finalSetupText = responseText.replace('[SETUP_COMPLETE]', '').replace(/Title:\s*(.*)/, '').trim();
+                const finalSetupMessage: Message = { sender: 'model', text: finalSetupText };
+                
+                await finalizeSetupAndStartGame(currentSession, title, finalSetupMessage);
                 
             } else {
-                 // --- Continue Setup Conversation ---
+                 // --- Continue Guided Setup Conversation ---
                 const setupMessage: Message = { sender: 'model', text: responseText };
                 appendMessage(setupMessage);
                 currentSession.messages.push(setupMessage);
@@ -1705,6 +1954,64 @@ async function handleFormSubmit(e: Event) {
   }
 }
 
+/**
+ * A helper function to finalize the setup phase and transition to the main game.
+ * @param session The current chat session.
+ * @param title The title for the new adventure.
+ * @param finalSetupMessage The last message from the setup phase to be displayed.
+ */
+async function finalizeSetupAndStartGame(session: ChatSession, title: string, finalSetupMessage?: Message) {
+    session.creationPhase = false;
+    session.title = title;
+    
+    if (finalSetupMessage) {
+      appendMessage(finalSetupMessage);
+      session.messages.push(finalSetupMessage);
+    }
+    
+    saveChatHistoryToStorage();
+    renderChatHistory();
+
+    const gameLoadingContainer = appendMessage({ sender: 'model', text: '' });
+    const gameLoadingMessage = gameLoadingContainer.querySelector('.message') as HTMLElement;
+    gameLoadingMessage.classList.add('loading');
+    gameLoadingMessage.textContent = 'The DM is preparing the world...';
+
+    try {
+        const personaId = session.personaId || 'purist';
+        const persona = dmPersonas.find(p => p.id === personaId) || dmPersonas[0];
+        const instruction = persona.getInstruction(session.adminPassword || `dnd${Date.now()}`);
+
+        const geminiHistory = session.messages
+            .filter(m => m.sender !== 'error' && m.sender !== 'system')
+            .map(m => ({ role: m.sender as 'user' | 'model', parts: [{ text: m.text }] }));
+        
+        geminiChat = createNewChatInstance(geminiHistory, instruction);
+
+        const kickoffResult = await geminiChat.sendMessageStream({ message: "The setup is complete. Begin the adventure by narrating the opening scene." });
+        
+        let openingSceneText = '';
+        gameLoadingMessage.classList.remove('loading');
+        gameLoadingMessage.textContent = '';
+        for await (const chunk of kickoffResult) {
+            openingSceneText += chunk.text || '';
+            gameLoadingMessage.textContent = openingSceneText;
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        gameLoadingContainer.remove();
+
+        const openingSceneMessage: Message = { sender: 'model', text: openingSceneText };
+        appendMessage(openingSceneMessage);
+        session.messages.push(openingSceneMessage);
+        saveChatHistoryToStorage();
+    } catch(error) {
+        console.error("Failed to start the main game:", error);
+        gameLoadingContainer.remove();
+        appendMessage({ sender: 'error', text: "The world failed to materialize. Please try starting a new game." });
+    }
+}
+
+
 // =================================================================================
 // EVENT LISTENERS
 // =================================================================================
@@ -1731,7 +2038,7 @@ function setupEventListeners() {
         }
     });
 
-    // --- Chat Form ---
+    // --- Chat Form & Container ---
     chatForm.addEventListener('submit', handleFormSubmit);
     sendButton.addEventListener('click', handleFormSubmit);
     chatInput.addEventListener('input', () => {
@@ -1745,10 +2052,55 @@ function setupEventListeners() {
         }
     });
 
+    // Quick Start Character Selection
+    chatContainer.addEventListener('click', async (e) => {
+        const card = (e.target as HTMLElement).closest<HTMLElement>('.quick-start-card');
+        if (!card || !currentChatId) return;
+
+        const currentSession = chatHistory.find(s => s.id === currentChatId);
+        if (!currentSession || currentSession.creationPhase !== 'quick_start_selection') return;
+        if (isSending) return; // Prevent multiple selections
+        isSending = true;
+
+        try {
+            const charIndex = parseInt(card.dataset.charIndex || '-1', 10);
+            const selectedChar = currentSession.quickStartChars?.[charIndex];
+            if (!selectedChar) throw new Error("Invalid character selection.");
+
+            // Visually confirm selection
+            chatContainer.querySelectorAll('.quick-start-card').forEach(c => c.classList.add('disabled'));
+            card.classList.remove('disabled');
+            card.classList.add('selected');
+
+            const userMessage: Message = { sender: 'user', text: `I choose to play as ${selectedChar.name}, the ${selectedChar.race} ${selectedChar.class}.` };
+            appendMessage(userMessage);
+            currentSession.messages.push(userMessage);
+
+            currentSession.characterSheet = selectedChar;
+            const title = `${selectedChar.name}'s Journey`;
+            currentSession.adminPassword = `dnd${Date.now()}`; // Set a random password for quick start
+
+            await finalizeSetupAndStartGame(currentSession, title);
+
+        } catch (error) {
+            console.error("Error during quick start selection:", error);
+            appendMessage({sender: 'error', text: "Something went wrong with character selection. Please try again."});
+        } finally {
+            isSending = false;
+        }
+    });
+
+
     // --- Sidebar & Top Header ---
     menuBtn.addEventListener('click', toggleSidebar);
     overlay.addEventListener('click', closeSidebar);
     newChatBtn.addEventListener('click', startNewChat);
+
+    // --- Persona Selector ---
+    personaSelector.addEventListener('change', () => {
+        currentPersonaId = personaSelector.value;
+        localStorage.setItem('dm-os-persona', currentPersonaId);
+    });
 
     // --- Modals ---
     helpBtn.addEventListener('click', () => openModal(helpModal));
@@ -1803,6 +2155,7 @@ function setupEventListeners() {
     updateInventoryBtn.addEventListener('click', () => updateLogbookData('inventory'));
     updateQuestsBtn.addEventListener('click', () => updateLogbookData('quests'));
     updateNpcsBtn.addEventListener('click', () => updateLogbookData('npcs'));
+    updateAchievementsBtn.addEventListener('click', () => updateLogbookData('achievements'));
     generateImageBtn.addEventListener('click', generateCharacterImage);
 
     // --- Logbook Game Settings ---
@@ -1928,12 +2281,15 @@ function initializeApp() {
   // Load data from storage
   loadChatHistoryFromStorage();
   loadUserContextFromStorage();
+  currentPersonaId = localStorage.getItem('dm-os-persona') || 'purist';
 
   // Apply saved or default theme
   const savedTheme = localStorage.getItem('dm-os-theme');
-  applyTheme(savedTheme || 'cyberpunk-neon');
+  applyTheme(savedTheme || 'sci-fi-blue-hud');
 
   // Initial UI render
+  renderPersonaSelector();
+  updatePersonaSelectorValue();
   renderChatHistory();
   renderUserContext();
   renderThemeCards();
