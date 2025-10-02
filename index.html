@@ -27,9 +27,6 @@
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
             <span>New Chat</span>
           </button>
-          <button id="import-chat-btn" aria-label="Import Chat" class="header-icon-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M5 20h14v-2H5v2zm0-10h4v6h6v-6h4l-7-7-7 7z"/></svg>
-          </button>
         </div>
         <div id="persona-selector-container">
             <label for="persona-selector">DM Persona</label>
@@ -60,6 +57,14 @@
             <ul id="context-list">
                 <!-- Context items will be rendered here by JS -->
             </ul>
+          </div>
+          <div id="data-management">
+            <h2>Data Management</h2>
+            <div class="data-buttons">
+                <button id="export-all-btn" class="sidebar-footer-btn">Export All</button>
+                <button id="import-all-btn" class="sidebar-footer-btn">Import All</button>
+            </div>
+            <input type="file" id="import-all-file-input" accept=".json" hidden />
           </div>
        </div>
     </nav>

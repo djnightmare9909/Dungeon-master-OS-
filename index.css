@@ -422,24 +422,6 @@ body.sidebar-open #sidebar {
   height: 20px;
 }
 
-#import-chat-btn {
-  background-color: var(--model-message-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 50%;
-  color: var(--text-color);
-  width: 44px;
-  height: 44px;
-  flex-shrink: 0;
-  padding: 0;
-}
-#import-chat-btn:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-#import-chat-btn svg {
-  width: 20px;
-  height: 20px;
-}
-
 /* Persona Selector */
 #persona-selector-container {
     margin-top: 1rem;
@@ -1086,8 +1068,12 @@ footer {
   padding: 1rem;
   border-top: 1px solid var(--border-color);
   margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
+#data-management h2,
 #context-manager h2 {
     font-family: var(--primary-font);
     font-weight: normal;
@@ -1097,6 +1083,30 @@ footer {
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
+
+.data-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.sidebar-footer-btn {
+    flex-grow: 1;
+    background-color: var(--model-message-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary-color);
+    padding: 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: var(--primary-font);
+    font-size: 0.9rem;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.sidebar-footer-btn:hover {
+    background-color: var(--user-message-bg);
+    color: var(--text-color);
+}
+
 
 #context-form {
     display: flex;

@@ -480,8 +480,12 @@ const ttsTemplate = document.getElementById('tts-controls-template') as HTMLTemp
 const fileUploadBtn = document.getElementById('file-upload-btn') as HTMLButtonElement;
 const fileInput = document.getElementById('file-input') as HTMLInputElement;
 const filePreviewContainer = document.getElementById('file-preview-container') as HTMLElement;
-const importChatBtn = document.getElementById('import-chat-btn') as HTMLButtonElement;
 const importFileInput = document.getElementById('import-file-input') as HTMLInputElement;
+
+// --- Data Management ---
+const exportAllBtn = document.getElementById('export-all-btn') as HTMLButtonElement;
+const importAllBtn = document.getElementById('import-all-btn') as HTMLButtonElement;
+const importAllFileInput = document.getElementById('import-all-file-input') as HTMLInputElement;
 
 // --- User Context ---
 const contextForm = document.getElementById('context-form') as HTMLFormElement;
@@ -579,6 +583,78 @@ let currentPersonaId: string = 'purist'; // Default persona
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // =================================================================================
+// DATABASE (INDEXEDDB) HELPERS
+// =================================================================================
+// Using IndexedDB for robust, persistent client-side storage.
+
+let db: IDBDatabase;
+
+function initDB(): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('DM-OS-DB', 1);
+
+    request.onerror = () => {
+      console.error('Error opening IndexedDB');
+      reject(false);
+    };
+
+    request.onsuccess = () => {
+      db = request.result;
+      resolve(true);
+    };
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains('KeyValueStore')) {
+        db.createObjectStore('KeyValueStore', { keyPath: 'key' });
+      }
+    };
+  });
+}
+
+function dbGet<T>(key: string): Promise<T | undefined> {
+  return new Promise((resolve) => {
+    if (!db) {
+        console.error("DB not initialized!");
+        return resolve(undefined);
+    }
+    const transaction = db.transaction(['KeyValueStore'], 'readonly');
+    const store = transaction.objectStore('KeyValueStore');
+    const request = store.get(key);
+
+    request.onsuccess = () => {
+      resolve(request.result?.value);
+    };
+    
+    request.onerror = () => {
+        console.error(`Error getting key ${key} from DB`);
+        resolve(undefined);
+    }
+  });
+}
+
+function dbSet(key: string, value: any): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (!db) {
+        console.error("DB not initialized!");
+        return reject();
+    }
+    const transaction = db.transaction(['KeyValueStore'], 'readwrite');
+    const store = transaction.objectStore('KeyValueStore');
+    const request = store.put({ key, value });
+
+    request.onsuccess = () => {
+      resolve();
+    };
+    
+    request.onerror = () => {
+        console.error(`Error setting key ${key} in DB`);
+        reject();
+    }
+  });
+}
+
+// =================================================================================
 // UI & MODAL MANAGEMENT
 // =================================================================================
 // General helper functions for controlling UI elements like the sidebar and modals.
@@ -629,20 +705,17 @@ function createNewChatInstance(history: { role: 'user' | 'model'; parts: { text:
   });
 }
 
-/** Loads chat history from localStorage into the global state. */
-function loadChatHistoryFromStorage() {
-  const storedHistory = localStorage.getItem('dm-os-chat-history');
-  if (storedHistory) {
-    chatHistory = JSON.parse(storedHistory);
-  } else {
-    chatHistory = [];
-  }
+/** Loads chat history from IndexedDB into the global state. */
+async function loadChatHistoryFromDB() {
+  const storedHistory = await dbGet<ChatSession[]>('dm-os-chat-history');
+  chatHistory = storedHistory || [];
 }
 
-/** Saves the current chat history from global state to localStorage. */
-function saveChatHistoryToStorage() {
-  localStorage.setItem('dm-os-chat-history', JSON.stringify(chatHistory));
+/** Saves the current chat history from global state to IndexedDB. */
+function saveChatHistoryToDB() {
+  dbSet('dm-os-chat-history', chatHistory);
 }
+
 
 /**
  * Starts a brand new chat session, guiding the user through the setup process.
@@ -694,7 +767,7 @@ async function startNewChat() {
         };
 
         chatHistory.push(newSession);
-        saveChatHistoryToStorage();
+        saveChatHistoryToDB();
         loadChat(newId); // Load the newly created chat
     } catch (error) {
         console.error("New game setup failed:", error);
@@ -824,7 +897,7 @@ function togglePinChat(id: string) {
     const session = chatHistory.find(s => s.id === id);
     if (session) {
         session.isPinned = !session.isPinned;
-        saveChatHistoryToStorage();
+        saveChatHistoryToDB();
         renderChatHistory();
     }
 }
@@ -962,7 +1035,7 @@ function renderQuickStartChoices(characters: CharacterSheetData[]) {
     const choiceMessage: Message = { sender: 'model', text: choiceHtml };
     appendMessage(choiceMessage);
     currentSession.messages.push(choiceMessage);
-    saveChatHistoryToStorage();
+    saveChatHistoryToDB();
 }
 
 
@@ -1039,20 +1112,17 @@ function handleTTS(text: string, button: HTMLButtonElement) {
 // =================================================================================
 // Allows the user to provide persistent facts for the AI to remember.
 
-/** Loads the user context list from localStorage. */
-function loadUserContextFromStorage() {
-    const storedContext = localStorage.getItem('dm-os-user-context');
-    if (storedContext) {
-        userContext = JSON.parse(storedContext);
-    } else {
-        userContext = [];
-    }
+/** Loads the user context list from IndexedDB. */
+async function loadUserContextFromDB() {
+    const storedContext = await dbGet<string[]>('dm-os-user-context');
+    userContext = storedContext || [];
 }
 
-/** Saves the user context list to localStorage. */
-function saveUserContextToStorage() {
-    localStorage.setItem('dm-os-user-context', JSON.stringify(userContext));
+/** Saves the user context list to IndexedDB. */
+function saveUserContextToDB() {
+    dbSet('dm-os-user-context', userContext);
 }
+
 
 /** Renders the list of user context items in the sidebar. */
 function renderUserContext() {
@@ -1073,14 +1143,14 @@ function renderUserContext() {
 /** Adds a new item to the user context. */
 function addUserContext(text: string) {
     userContext.push(text);
-    saveUserContextToStorage();
+    saveUserContextToDB();
     renderUserContext();
 }
 
 /** Deletes an item from the user context by its index. */
 function deleteUserContext(index: number) {
     userContext.splice(index, 1);
-    saveUserContextToStorage();
+    saveUserContextToDB();
     renderUserContext();
 }
 
@@ -1437,7 +1507,7 @@ async function updateLogbookData(type: 'sheet' | 'inventory' | 'quests' | 'npcs'
                 currentSession.achievements = jsonData as Achievement[];
                 renderAchievements(jsonData as Achievement[]);
             }
-            saveChatHistoryToStorage();
+            saveChatHistoryToDB();
         } catch (error) {
             console.error(`${type} generation failed:`, error);
             display.innerHTML = `<div class="sheet-placeholder"><p>Failed to generate ${type} data. Please try again.</p></div>`;
@@ -1479,7 +1549,7 @@ async function updateLogbookData(type: 'sheet' | 'inventory' | 'quests' | 'npcs'
         else if (type === 'npcs') currentSession.npcList = dataText;
 
         display.textContent = dataText;
-        saveChatHistoryToStorage();
+        saveChatHistoryToDB();
         
     } catch (error) {
         console.error(`${type} generation failed:`, error);
@@ -1531,7 +1601,7 @@ async function generateCharacterImage() {
         currentSession.characterImageUrl = imageUrl;
         characterImageDisplay.src = imageUrl;
         characterImageDisplay.classList.remove('hidden');
-        saveChatHistoryToStorage();
+        saveChatHistoryToDB();
         
     } catch (error) {
         console.error("Image generation failed:", error);
@@ -1647,12 +1717,12 @@ function renderThemeCards() {
 }
 
 /**
- * Applies a theme to the application and saves the choice to localStorage.
+ * Applies a theme to the application and saves the choice to IndexedDB.
  * @param themeId The ID of the theme to apply.
  */
 function applyTheme(themeId: string) {
     document.body.dataset.theme = themeId;
-    localStorage.setItem('dm-os-theme', themeId);
+    dbSet('dm-os-theme', themeId);
 }
 
 // =================================================================================
@@ -1694,7 +1764,7 @@ function renderFilePreviews() {
 }
 
 /**
- * Exports a chat session to a JSON file and triggers a download.
+ * Exports a single chat session to a JSON file.
  * @param sessionId The ID of the session to export.
  */
 function exportChatToLocal(sessionId: string) {
@@ -1714,44 +1784,66 @@ function exportChatToLocal(sessionId: string) {
     URL.revokeObjectURL(url);
 }
 
-/**
- * Handles the file import process when a user selects a file.
- * @param event The file input change event.
- */
-function handleImportFile(event: Event) {
+/** Exports all chat sessions to a single JSON file. */
+function exportAllChats() {
+    if (chatHistory.length === 0) {
+        alert("No chats to export.");
+        return;
+    }
+    const historyJson = JSON.stringify(chatHistory, null, 2);
+    const blob = new Blob([historyJson], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const date = new Date().toISOString().slice(0, 10);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dm_os_all_chats_backup_${date}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+/** Handles the file import process for a full chat history backup. */
+function handleImportAll(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
 
+    if (!confirm("This will overwrite all current chats in the app. Are you sure you want to proceed? This action cannot be undone.")) {
+        input.value = '';
+        return;
+    }
+
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
         try {
             const result = e.target?.result as string;
-            const importedSession = JSON.parse(result) as ChatSession;
+            const importedHistory = JSON.parse(result) as ChatSession[];
             
-            // Basic validation of the imported file
-            if (importedSession.id && importedSession.title && Array.isArray(importedSession.messages)) {
-                // Assign a new ID to prevent conflicts
-                const newId = `chat-${Date.now()}`;
-                importedSession.id = newId;
-                importedSession.createdAt = Date.now();
-                
-                chatHistory.push(importedSession);
-                saveChatHistoryToStorage();
+            // Basic validation
+            if (Array.isArray(importedHistory) && importedHistory.every(s => s.id && s.title && Array.isArray(s.messages))) {
+                chatHistory = importedHistory;
+                await saveChatHistoryToDB();
                 renderChatHistory();
-                loadChat(newId);
+                if (chatHistory.length > 0) {
+                    const lastSession = chatHistory.sort((a,b) => b.createdAt - a.createdAt)[0];
+                    loadChat(lastSession.id);
+                } else {
+                    await startNewChat();
+                }
+                alert(`Successfully imported ${importedHistory.length} chats.`);
             } else {
-                alert('Invalid chat file format.');
+                alert('Invalid backup file format.');
             }
         } catch (error) {
-            console.error('Failed to import chat:', error);
-            alert('Failed to read or parse the chat file.');
+            console.error('Failed to import chats:', error);
+            alert('Failed to read or parse the chat backup file.');
         }
     };
     reader.readAsText(file);
     input.value = ''; // Reset input to allow re-importing the same file
 }
-
 
 // =================================================================================
 // MAIN CHAT FORM SUBMISSION
@@ -1794,7 +1886,7 @@ async function handleFormSubmit(e: Event) {
         
         chatInput.value = '';
         chatInput.style.height = 'auto';
-        saveChatHistoryToStorage();
+        saveChatHistoryToDB();
         return;
     }
     
@@ -1839,7 +1931,7 @@ async function handleFormSubmit(e: Event) {
             // --- Signal Handling for Setup Flow ---
             if (responseText.includes('[GENERATE_QUICK_START_CHARACTERS]')) {
                 currentSession.creationPhase = 'quick_start_selection';
-                saveChatHistoryToStorage();
+                saveChatHistoryToDB();
                 const setupMessage: Message = { sender: 'model', text: responseText.replace('[GENERATE_QUICK_START_CHARACTERS]', '').trim() };
                 appendMessage(setupMessage);
                 currentSession.messages.push(setupMessage);
@@ -1858,7 +1950,7 @@ async function handleFormSubmit(e: Event) {
                     });
                     const chars = JSON.parse(charResponse.text);
                     currentSession.quickStartChars = chars;
-                    saveChatHistoryToStorage();
+                    saveChatHistoryToDB();
                     charLoadingContainer.remove();
                     renderQuickStartChoices(chars);
                 } catch (charError) {
@@ -1883,7 +1975,7 @@ async function handleFormSubmit(e: Event) {
                 const setupMessage: Message = { sender: 'model', text: responseText };
                 appendMessage(setupMessage);
                 currentSession.messages.push(setupMessage);
-                saveChatHistoryToStorage();
+                saveChatHistoryToDB();
             }
         } catch (error) {
             console.error("Setup AI Error:", error);
@@ -1942,7 +2034,7 @@ async function handleFormSubmit(e: Event) {
       const finalMessage: Message = { sender: 'model', text: responseText };
       appendMessage(finalMessage);
       currentSession.messages.push(finalMessage);
-      saveChatHistoryToStorage();
+      saveChatHistoryToDB();
 
     } catch (error) {
       console.error("Gemini API Error:", error);
@@ -1969,7 +2061,7 @@ async function finalizeSetupAndStartGame(session: ChatSession, title: string, fi
       session.messages.push(finalSetupMessage);
     }
     
-    saveChatHistoryToStorage();
+    saveChatHistoryToDB();
     renderChatHistory();
 
     const gameLoadingContainer = appendMessage({ sender: 'model', text: '' });
@@ -2003,7 +2095,7 @@ async function finalizeSetupAndStartGame(session: ChatSession, title: string, fi
         const openingSceneMessage: Message = { sender: 'model', text: openingSceneText };
         appendMessage(openingSceneMessage);
         session.messages.push(openingSceneMessage);
-        saveChatHistoryToStorage();
+        saveChatHistoryToDB();
     } catch(error) {
         console.error("Failed to start the main game:", error);
         gameLoadingContainer.remove();
@@ -2099,7 +2191,7 @@ function setupEventListeners() {
     // --- Persona Selector ---
     personaSelector.addEventListener('change', () => {
         currentPersonaId = personaSelector.value;
-        localStorage.setItem('dm-os-persona', currentPersonaId);
+        dbSet('dm-os-persona', currentPersonaId);
     });
 
     // --- Modals ---
@@ -2117,7 +2209,7 @@ function setupEventListeners() {
             const session = chatHistory.find(s => s.id === chatIdToRename);
             if (session) {
                 session.title = renameInput.value;
-                saveChatHistoryToStorage();
+                saveChatHistoryToDB();
                 renderChatHistory();
             }
         }
@@ -2165,7 +2257,7 @@ function setupEventListeners() {
             // FIX: Type 'any' is not assignable to type 'never'.
             // Cast the object to `any` to allow assignment using a key that is a union of string literals.
             (currentSession.settings as any)[key] = value;
-            saveChatHistoryToStorage();
+            saveChatHistoryToDB();
         }
     };
     settingDifficulty.addEventListener('change', () => handleSettingChange('difficulty', settingDifficulty.value));
@@ -2221,21 +2313,14 @@ function setupEventListeners() {
         switch (action) {
             case 'pin': togglePinChat(sessionId); break;
             case 'rename': openRenameModal(sessionId); break;
-            case 'export':
-                ioAction = { type: 'export', sessionId: sessionId };
-                ioModalTitle.textContent = 'Export To';
-                openModal(ioModal);
-                break;
+            case 'export': exportChatToLocal(sessionId); break;
         }
     });
 
     // --- Import/Export ---
-    importChatBtn.addEventListener('click', () => {
-        ioAction = { type: 'import' };
-        ioModalTitle.textContent = 'Import From';
-        openModal(ioModal);
-    });
-    importFileInput.addEventListener('change', handleImportFile);
+    exportAllBtn.addEventListener('click', exportAllChats);
+    importAllBtn.addEventListener('click', () => importAllFileInput.click());
+    importAllFileInput.addEventListener('change', handleImportAll);
     ioModal.addEventListener('click', (e) => {
         const button = (e.target as HTMLElement).closest<HTMLElement>('.io-option-btn');
         if (button?.dataset.source) {
@@ -2276,15 +2361,58 @@ function setupEventListeners() {
 // =================================================================================
 // The main function that kicks everything off when the page loads.
 
+/** Migrates data from localStorage to IndexedDB if it exists. */
+async function migrateFromLocalStorage() {
+  const migrationCompleted = localStorage.getItem('dm-os-migration-complete');
+  if (migrationCompleted) {
+    return;
+  }
+
+  console.log("Checking for data to migrate from localStorage to IndexedDB...");
+
+  const oldHistory = localStorage.getItem('dm-os-chat-history');
+  const oldContext = localStorage.getItem('dm-os-user-context');
+  const oldPersona = localStorage.getItem('dm-os-persona');
+  const oldTheme = localStorage.getItem('dm-os-theme');
+
+  // Only proceed if there's actually old data
+  if (!oldHistory && !oldContext && !oldPersona && !oldTheme) {
+    localStorage.setItem('dm-os-migration-complete', 'true');
+    return;
+  }
+
+  try {
+    if (oldHistory) await dbSet('dm-os-chat-history', JSON.parse(oldHistory));
+    if (oldContext) await dbSet('dm-os-user-context', JSON.parse(oldContext));
+    if (oldPersona) await dbSet('dm-os-persona', oldPersona);
+    if (oldTheme) await dbSet('dm-os-theme', oldTheme);
+
+    // If migration is successful, clear old data
+    localStorage.removeItem('dm-os-chat-history');
+    localStorage.removeItem('dm-os-user-context');
+    localStorage.removeItem('dm-os-persona');
+    localStorage.removeItem('dm-os-theme');
+    
+    localStorage.setItem('dm-os-migration-complete', 'true');
+    console.log("Migration successful.");
+  } catch (error) {
+    console.error("Migration from localStorage failed:", error);
+  }
+}
+
+
 /** Initializes the entire application on load. */
-function initializeApp() {
+async function initializeApp() {
+  await initDB();
+  await migrateFromLocalStorage();
+  
   // Load data from storage
-  loadChatHistoryFromStorage();
-  loadUserContextFromStorage();
-  currentPersonaId = localStorage.getItem('dm-os-persona') || 'purist';
+  await loadChatHistoryFromDB();
+  await loadUserContextFromDB();
+  currentPersonaId = await dbGet<string>('dm-os-persona') || 'purist';
 
   // Apply saved or default theme
-  const savedTheme = localStorage.getItem('dm-os-theme');
+  const savedTheme = await dbGet<string>('dm-os-theme');
   applyTheme(savedTheme || 'sci-fi-blue-hud');
 
   // Initial UI render
