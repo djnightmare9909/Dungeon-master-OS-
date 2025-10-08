@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -92,6 +93,92 @@ interface DMPersona {
     name: string;
     description: string;
     getInstruction: (password: string) => string;
+}
+
+/**
+ * Takes any object and safely migrates it into a valid ChatSession object.
+ * This is the core of the app's backwards compatibility and data integrity strategy.
+ * It provides default values for any missing fields and attempts to coerce incorrect data types.
+ * @param session An object of unknown structure, potentially an old or incomplete chat session.
+ * @returns A fully-formed, valid ChatSession object.
+ */
+function migrateAndValidateSession(session: any): ChatSession {
+    const newSession: Partial<ChatSession> = {};
+
+    // Ensure basic fields exist and have the correct type, providing defaults if necessary.
+    newSession.id = typeof session.id === 'string' ? session.id : `chat-${Date.now()}-${Math.random()}`;
+    newSession.title = typeof session.title === 'string' && session.title.trim() !== '' ? session.title : 'Untitled Adventure';
+    newSession.createdAt = typeof session.createdAt === 'number' ? session.createdAt : Date.now();
+    newSession.isPinned = typeof session.isPinned === 'boolean' ? session.isPinned : false;
+
+    // Validate and clean the messages array.
+    if (Array.isArray(session.messages)) {
+        newSession.messages = session.messages.filter(m =>
+            typeof m === 'object' && m !== null &&
+            typeof m.sender === 'string' &&
+            typeof m.text === 'string'
+        ) as Message[];
+    } else {
+        newSession.messages = [];
+    }
+
+    // Handle optional fields.
+    newSession.adminPassword = typeof session.adminPassword === 'string' ? session.adminPassword : undefined;
+    newSession.personaId = typeof session.personaId === 'string' ? session.personaId : 'purist';
+    
+    // Validate the creationPhase state.
+    if (session.creationPhase === 'guided' || session.creationPhase === 'quick_start_selection') {
+        newSession.creationPhase = session.creationPhase;
+    } else {
+        newSession.creationPhase = false;
+    }
+
+    // Handle character sheet (which could be an object or an old string format).
+    if (typeof session.characterSheet === 'object' && session.characterSheet !== null) {
+        newSession.characterSheet = session.characterSheet as CharacterSheetData;
+    } else if (typeof session.characterSheet === 'string') {
+        newSession.characterSheet = session.characterSheet;
+    } else {
+        newSession.characterSheet = undefined;
+    }
+
+    // Ensure text-based logbook fields are strings.
+    newSession.inventory = typeof session.inventory === 'string' ? session.inventory : '';
+    newSession.characterImageUrl = typeof session.characterImageUrl === 'string' ? session.characterImageUrl : '';
+    newSession.questLog = typeof session.questLog === 'string' ? session.questLog : '';
+    newSession.npcList = typeof session.npcList === 'string' ? session.npcList : '';
+
+    // Validate the achievements array.
+    if (Array.isArray(session.achievements)) {
+        newSession.achievements = session.achievements.filter(a =>
+            typeof a === 'object' && a !== null &&
+            typeof a.name === 'string' &&
+            typeof a.description === 'string'
+        ) as Achievement[];
+    } else {
+        newSession.achievements = [];
+    }
+    
+    // Perform a deep merge for game settings to ensure all keys are present.
+    const defaultSettings: GameSettings = {
+        difficulty: 'normal',
+        tone: 'heroic',
+        narration: 'descriptive',
+    };
+    if (typeof session.settings === 'object' && session.settings !== null) {
+        newSession.settings = { ...defaultSettings, ...session.settings };
+    } else {
+        newSession.settings = defaultSettings;
+    }
+    
+    // Handle optional quick start characters array.
+    if (Array.isArray(session.quickStartChars)) {
+        newSession.quickStartChars = session.quickStartChars as CharacterSheetData[];
+    } else {
+        newSession.quickStartChars = undefined;
+    }
+
+    return newSession as ChatSession;
 }
 
 
@@ -475,12 +562,8 @@ const pinnedChatsList = document.getElementById('pinned-chats-list') as HTMLULis
 const recentChatsList = document.getElementById('recent-chats-list') as HTMLUListElement;
 const personaSelector = document.getElementById('persona-selector') as HTMLSelectElement;
 
-// --- Templates & File Handling ---
+// --- Templates ---
 const ttsTemplate = document.getElementById('tts-controls-template') as HTMLTemplateElement;
-const fileUploadBtn = document.getElementById('file-upload-btn') as HTMLButtonElement;
-const fileInput = document.getElementById('file-input') as HTMLInputElement;
-const filePreviewContainer = document.getElementById('file-preview-container') as HTMLElement;
-const importFileInput = document.getElementById('import-file-input') as HTMLInputElement;
 
 // --- Data Management ---
 const exportAllBtn = document.getElementById('export-all-btn') as HTMLButtonElement;
@@ -551,11 +634,8 @@ const themeModal = document.getElementById('theme-modal') as HTMLElement;
 const closeThemeBtn = document.getElementById('close-theme-btn') as HTMLButtonElement;
 const themeGrid = document.getElementById('theme-grid') as HTMLElement;
 
-// --- Chat & I/O Modals ---
+// --- Chat Menu ---
 const chatOptionsMenu = document.getElementById('chat-options-menu') as HTMLUListElement;
-const ioModal = document.getElementById('io-modal') as HTMLElement;
-const ioModalTitle = document.getElementById('io-modal-title') as HTMLElement;
-const closeIoModalBtn = document.getElementById('close-io-modal-btn') as HTMLButtonElement;
 
 // =================================================================================
 // GLOBAL STATE MANAGEMENT
@@ -564,7 +644,6 @@ const closeIoModalBtn = document.getElementById('close-io-modal-btn') as HTMLBut
 
 let chatHistory: ChatSession[] = [];
 let userContext: string[] = [];
-let selectedFiles: File[] = [];
 let currentChatId: string | null = null;
 let geminiChat: Chat | null = null;
 // FIX: Corrected typo in SpeechSynthesisUtterance type name.
@@ -573,7 +652,6 @@ let currentlyPlayingTTSButton: HTMLButtonElement | null = null;
 let isGeneratingData = false; // Prevents multiple logbook/inventory updates at once
 let chatIdToRename: string | null = null;
 let isSending = false; // Prevents multiple form submissions
-let ioAction: { type: 'import' } | { type: 'export', sessionId: string } | null = null;
 let currentPersonaId: string = 'purist'; // Default persona
 
 // =================================================================================
@@ -705,11 +783,15 @@ function createNewChatInstance(history: { role: 'user' | 'model'; parts: { text:
   });
 }
 
-/** Loads chat history from IndexedDB into the global state. */
+/** Loads chat history from IndexedDB, migrating any old formats to be compatible. */
 async function loadChatHistoryFromDB() {
-  const storedHistory = await dbGet<ChatSession[]>('dm-os-chat-history');
-  chatHistory = storedHistory || [];
+    // Get raw data which might be in an old/inconsistent format.
+    const storedHistory = await dbGet<any[]>('dm-os-chat-history');
+    const history = storedHistory || [];
+    // Run every stored session through the robust migration function to ensure full compatibility.
+    chatHistory = history.map(migrateAndValidateSession);
 }
+
 
 /** Saves the current chat history from global state to IndexedDB. */
 function saveChatHistoryToDB() {
@@ -1730,39 +1812,6 @@ function applyTheme(themeId: string) {
 // =================================================================================
 // Logic for handling file attachments, and importing/exporting chat sessions.
 
-/** Converts a File object to a base64 encoded string. */
-function fileToBase64(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => {
-            const result = reader.result as string;
-            // remove "data:mime/type;base64," prefix
-            resolve(result.split(',')[1]);
-        };
-        reader.onerror = (error) => reject(error);
-    });
-}
-
-/** Renders the previews for any files selected for upload. */
-function renderFilePreviews() {
-    filePreviewContainer.innerHTML = '';
-    if (selectedFiles.length === 0) {
-        filePreviewContainer.style.display = 'none';
-        return;
-    }
-    filePreviewContainer.style.display = 'flex';
-    selectedFiles.forEach((file, index) => {
-        const previewElement = document.createElement('div');
-        previewElement.className = 'file-preview-item';
-        previewElement.innerHTML = `
-            <span>${file.name}</span>
-            <button class="remove-file-btn" data-index="${index}" aria-label="Remove ${file.name}">&times;</button>
-        `;
-        filePreviewContainer.appendChild(previewElement);
-    });
-}
-
 /**
  * Exports a single chat session to a JSON file.
  * @param sessionId The ID of the session to export.
@@ -1804,45 +1853,89 @@ function exportAllChats() {
     URL.revokeObjectURL(url);
 }
 
-/** Handles the file import process for a full chat history backup. */
+/** 
+ * Handles file import for both single chats and full backups.
+ * It intelligently detects the file type and performs the correct action.
+ */
 function handleImportAll(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
 
-    if (!confirm("This will overwrite all current chats in the app. Are you sure you want to proceed? This action cannot be undone.")) {
-        input.value = '';
-        return;
-    }
-
     const reader = new FileReader();
+
+    reader.onerror = () => {
+        alert('Error reading file. Please try again.');
+        input.value = '';
+    };
+
     reader.onload = async (e) => {
         try {
-            const result = e.target?.result as string;
-            const importedHistory = JSON.parse(result) as ChatSession[];
+            const result = e.target?.result;
+            if (typeof result !== 'string' || result.trim() === '') {
+                throw new Error('File is empty or could not be read as text.');
+            }
+
+            const importedData = JSON.parse(result);
             
-            // Basic validation
-            if (Array.isArray(importedHistory) && importedHistory.every(s => s.id && s.title && Array.isArray(s.messages))) {
-                chatHistory = importedHistory;
-                await saveChatHistoryToDB();
+            // Case 1: Importing a full backup (array of sessions)
+            if (Array.isArray(importedData)) {
+                if (!confirm("This will import a full backup and overwrite all current chats. This cannot be undone. Are you sure you want to proceed?")) {
+                    input.value = ''; // Reset file input if user cancels
+                    return;
+                }
+
+                const migratedHistory = importedData.map(migrateAndValidateSession);
+                chatHistory = migratedHistory;
+                await dbSet('dm-os-chat-history', chatHistory);
+                
                 renderChatHistory();
+                
                 if (chatHistory.length > 0) {
                     const lastSession = chatHistory.sort((a,b) => b.createdAt - a.createdAt)[0];
                     loadChat(lastSession.id);
                 } else {
                     await startNewChat();
                 }
-                alert(`Successfully imported ${importedHistory.length} chats.`);
+                
+                alert(`Successfully imported and validated ${chatHistory.length} chats.`);
+
+            // Case 2: Importing a single chat session (object)
+            } else if (typeof importedData === 'object' && importedData !== null) {
+                const newSession = migrateAndValidateSession(importedData);
+
+                // Prevent ID conflicts. If an imported chat has the same ID as an existing one, assign a new unique ID.
+                if (chatHistory.some(s => s.id === newSession.id)) {
+                    console.warn(`ID conflict detected for ${newSession.id}. Assigning a new ID.`);
+                    newSession.id = `chat-${Date.now()}-${Math.random()}`;
+                }
+
+                // Add the new session to the existing history
+                chatHistory.push(newSession);
+                await dbSet('dm-os-chat-history', chatHistory);
+
+                // Update UI
+                renderChatHistory();
+                loadChat(newSession.id); // Switch to the newly imported chat
+                
+                alert(`Successfully imported adventure: "${newSession.title}"`);
+
+            // Case 3: Invalid file format
             } else {
-                alert('Invalid backup file format.');
+                throw new Error('Invalid file format. The file must be a full backup (an array) or a single exported chat (an object).');
             }
+
         } catch (error) {
             console.error('Failed to import chats:', error);
-            alert('Failed to read or parse the chat backup file.');
+            const errorMessage = error instanceof Error ? error.message : 'The file content is not valid JSON or has an incorrect structure.';
+            alert(`Import failed: ${errorMessage}`);
+        } finally {
+            // Reset file input in all cases to allow re-importing the same file if needed.
+            input.value = '';
         }
     };
+
     reader.readAsText(file);
-    input.value = ''; // Reset input to allow re-importing the same file
 }
 
 // =================================================================================
@@ -1858,7 +1951,7 @@ async function handleFormSubmit(e: Event) {
 
   try {
     const userInput = chatInput.value.trim();
-    if ((!userInput && selectedFiles.length === 0) || !currentChatId) {
+    if (!userInput || !currentChatId) {
       return;
     }
 
@@ -2110,26 +2203,6 @@ async function finalizeSetupAndStartGame(session: ChatSession, title: string, fi
 // Centralized location for all event listener registrations.
 
 function setupEventListeners() {
-    // --- File Handling ---
-    fileUploadBtn.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', () => {
-        if (fileInput.files) {
-            selectedFiles.push(...Array.from(fileInput.files));
-            renderFilePreviews();
-            fileInput.value = ''; // Allow selecting the same file again
-        }
-    });
-    filePreviewContainer.addEventListener('click', (e) => {
-        const removeBtn = (e.target as HTMLElement).closest('.remove-file-btn');
-        if (removeBtn) {
-            const index = parseInt(removeBtn.getAttribute('data-index')!, 10);
-            if (!isNaN(index)) {
-                selectedFiles.splice(index, 1);
-                renderFilePreviews();
-            }
-        }
-    });
-
     // --- Chat Form & Container ---
     chatForm.addEventListener('submit', handleFormSubmit);
     sendButton.addEventListener('click', handleFormSubmit);
@@ -2321,20 +2394,6 @@ function setupEventListeners() {
     exportAllBtn.addEventListener('click', exportAllChats);
     importAllBtn.addEventListener('click', () => importAllFileInput.click());
     importAllFileInput.addEventListener('change', handleImportAll);
-    ioModal.addEventListener('click', (e) => {
-        const button = (e.target as HTMLElement).closest<HTMLElement>('.io-option-btn');
-        if (button?.dataset.source) {
-            const source = button.dataset.source;
-            if (source === 'local') {
-                if (ioAction?.type === 'import') importFileInput.click();
-                else if (ioAction?.type === 'export') exportChatToLocal(ioAction.sessionId);
-            } else if (source === 'gdrive') {
-                alert('Google Drive integration is coming soon!');
-            }
-            closeModal(ioModal);
-        }
-    });
-    closeIoModalBtn.addEventListener('click', () => closeModal(ioModal));
 
     // --- Inventory Pouch ---
     inventoryBtn.addEventListener('click', () => {
