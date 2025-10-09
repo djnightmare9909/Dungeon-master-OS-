@@ -350,7 +350,7 @@ body {
   background-color: var(--background-color);
   color: var(--text-color);
   display: flex;
-  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   transition: background-color 0.3s, color 0.3s;
 }
@@ -548,7 +548,7 @@ body.sidebar-open #overlay {
   flex-grow: 1;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100dvh;
   transition: margin-left 0.3s ease-in-out;
 }
 
@@ -617,6 +617,7 @@ main {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  min-height: 0;
 }
 
 /* --- Messages --- */
