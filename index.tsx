@@ -594,6 +594,12 @@ const renameModal = document.getElementById('rename-modal') as HTMLElement;
 const renameForm = document.getElementById('rename-form') as HTMLFormElement;
 const renameInput = document.getElementById('rename-input') as HTMLInputElement;
 const closeRenameBtn = document.getElementById('close-rename-btn') as HTMLButtonElement;
+const deleteConfirmModal = document.getElementById('delete-confirm-modal') as HTMLElement;
+const closeDeleteConfirmBtn = document.getElementById('close-delete-confirm-btn') as HTMLButtonElement;
+const cancelDeleteBtn = document.getElementById('cancel-delete-btn') as HTMLButtonElement;
+const confirmDeleteBtn = document.getElementById('confirm-delete-btn') as HTMLButtonElement;
+const deleteChatName = document.getElementById('delete-chat-name') as HTMLElement;
+
 
 // --- Dice Roller Modal ---
 const diceRollerBtn = document.getElementById('dice-roller-btn') as HTMLButtonElement;
@@ -651,6 +657,7 @@ let currentSpeech: SpeechSynthesisUtterance | null = null;
 let currentlyPlayingTTSButton: HTMLButtonElement | null = null;
 let isGeneratingData = false; // Prevents multiple logbook/inventory updates at once
 let chatIdToRename: string | null = null;
+let chatIdToDelete: string | null = null;
 let isSending = false; // Prevents multiple form submissions
 let currentPersonaId: string = 'purist'; // Default persona
 
@@ -999,6 +1006,7 @@ function openChatOptionsMenu(sessionId: string, buttonEl: HTMLElement) {
         <li role="menuitem" data-action="pin">${session.isPinned ? 'Unpin Chat' : 'Pin Chat'}</li>
         <li role="menuitem" data-action="rename">Rename</li>
         <li role="menuitem" data-action="export">Export Chat</li>
+        <li role="menuitem" data-action="delete" class="danger-action">Delete Chat</li>
     `;
     
     const rect = buttonEl.getBoundingClientRect();
@@ -1031,6 +1039,46 @@ function openRenameModal(id: string) {
 function closeRenameModal() {
     closeModal(renameModal);
     chatIdToRename = null;
+}
+
+/** Opens the modal to confirm deleting a chat session. */
+function openDeleteConfirmModal(id: string) {
+    chatIdToDelete = id;
+    const session = chatHistory.find(s => s.id === id);
+    if (session) {
+        deleteChatName.textContent = session.title;
+        openModal(deleteConfirmModal);
+    }
+}
+
+/** Closes the delete confirmation modal. */
+function closeDeleteConfirmModal() {
+    closeModal(deleteConfirmModal);
+    chatIdToDelete = null;
+}
+
+/** Deletes a chat session after confirmation. */
+async function deleteChat() {
+    if (!chatIdToDelete) return;
+
+    const chatIndex = chatHistory.findIndex(s => s.id === chatIdToDelete);
+    if (chatIndex > -1) {
+        const wasCurrentChat = currentChatId === chatIdToDelete;
+        chatHistory.splice(chatIndex, 1);
+        saveChatHistoryToDB();
+        renderChatHistory();
+        
+        if (wasCurrentChat) {
+            // If the deleted chat was active, load the most recent one or start a new chat
+            if (chatHistory.length > 0) {
+                const mostRecent = [...chatHistory].sort((a, b) => b.createdAt - a.createdAt)[0];
+                loadChat(mostRecent.id);
+            } else {
+                await startNewChat();
+            }
+        }
+    }
+    closeDeleteConfirmModal();
 }
 
 // =================================================================================
@@ -2289,6 +2337,9 @@ function setupEventListeners() {
         closeRenameModal();
     });
     closeRenameBtn.addEventListener('click', closeRenameModal);
+    closeDeleteConfirmBtn.addEventListener('click', closeDeleteConfirmModal);
+    cancelDeleteBtn.addEventListener('click', closeDeleteConfirmModal);
+    confirmDeleteBtn.addEventListener('click', deleteChat);
 
     // --- User Context ---
     contextForm.addEventListener('submit', (e) => {
@@ -2387,6 +2438,7 @@ function setupEventListeners() {
             case 'pin': togglePinChat(sessionId); break;
             case 'rename': openRenameModal(sessionId); break;
             case 'export': exportChatToLocal(sessionId); break;
+            case 'delete': openDeleteConfirmModal(sessionId); break;
         }
     });
 

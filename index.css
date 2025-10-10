@@ -1288,7 +1288,36 @@ footer {
     border-top: 1px solid var(--border-color);
     display: flex;
     justify-content: flex-end;
+    gap: 0.75rem;
 }
+
+.modal-footer-btn {
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    font-family: var(--primary-font);
+    font-size: 0.9rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s, opacity 0.2s;
+}
+.btn-secondary {
+    background-color: var(--model-message-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+.btn-secondary:hover {
+    background-color: var(--user-message-bg);
+}
+
+.btn-danger {
+    background-color: var(--danger-color);
+    color: #fff;
+}
+.btn-danger:hover {
+    opacity: 0.85;
+}
+
 
 /* --- Chat Options Menu --- */
 .chat-options-menu {
@@ -1310,6 +1339,14 @@ footer {
 .chat-options-menu li:hover {
     background-color: var(--user-message-bg);
 }
+.chat-options-menu li.danger-action {
+    color: var(--danger-color);
+}
+.chat-options-menu li.danger-action:hover {
+    background-color: var(--danger-color);
+    color: #fff;
+}
+
 
 /* --- Log Book & Shared Button Styles --- */
 .logbook-update-btn {
