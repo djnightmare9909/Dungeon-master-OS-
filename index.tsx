@@ -102,6 +102,7 @@ import {
   quickActionsBar,
   inventoryPopupContent,
   renderUserContext,
+  chatHistoryContainer,
 } from './ui';
 import {
   stopTTS,
@@ -629,6 +630,22 @@ function setupEventListeners() {
   overlay.addEventListener('click', closeSidebar);
   newChatBtn.addEventListener('click', startNewChat);
 
+  // Delegated event listener for chat history items
+  chatHistoryContainer.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const chatHistoryItem = target.closest<HTMLElement>('.chat-history-item');
+
+    // Check if a chat item was clicked, but not the options button within it
+    if (chatHistoryItem && !target.closest('.options-btn')) {
+      const sessionId = chatHistoryItem.dataset.id;
+      if (sessionId) {
+        closeChatOptionsMenu();
+        loadChat(sessionId);
+      }
+    }
+  });
+
+
   personaSelector.addEventListener('change', () => {
     setCurrentPersonaId(personaSelector.value);
     // Fix: Cannot find name 'dbSet'.
@@ -680,28 +697,50 @@ function setupEventListeners() {
   exportAllBtn.addEventListener('click', exportAllChats);
   
   chatOptionsMenu.addEventListener('click', (e) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'LI') {
-          const sessionId = chatOptionsMenu.dataset.sessionId;
-          if (!sessionId) return;
-          const action = target.dataset.action;
+    const target = e.target as HTMLElement;
+    const menuItem = target.closest('li');
+    if (menuItem) {
+        const sessionId = chatOptionsMenu.dataset.sessionId;
+        if (!sessionId) return;
+        const action = menuItem.dataset.action;
 
-          if (action === 'pin') togglePinChat(sessionId);
-          if (action === 'rename') openRenameModal(sessionId);
-          if (action === 'export') exportChatToLocal(sessionId);
-          if (action === 'delete') openDeleteConfirmModal(sessionId);
-      }
+        switch (action) {
+            case 'pin':
+                togglePinChat(sessionId);
+                break;
+            case 'rename':
+                openRenameModal(sessionId);
+                break;
+            case 'export':
+                exportChatToLocal(sessionId);
+                break;
+            case 'delete':
+                openDeleteConfirmModal(sessionId);
+                break;
+        }
+        // The menu will be closed by a separate document-level click listener,
+        // which is set when the menu is opened. This handles all cases gracefully.
+    }
   });
 
   logbookNav.addEventListener('click', (e) => {
     const button = (e.target as HTMLElement).closest<HTMLElement>('.logbook-nav-btn');
     if (button?.dataset.tab) {
       const tab = button.dataset.tab;
+      // Update active state for buttons
       logbookNav.querySelectorAll('.logbook-nav-btn').forEach(btn => btn.classList.remove('active'));
       button.classList.add('active');
+
+      // Show the correct content pane
       logbookPanes.forEach(pane => {
         pane.classList.toggle('active', pane.id === `${tab}-content`);
       });
+
+      // Jump to the top of the content pane when switching tabs.
+      const logbookContent = logbookNav.nextElementSibling as HTMLElement;
+      if (logbookContent) {
+        logbookContent.scrollTop = 0;
+      }
     }
   });
 

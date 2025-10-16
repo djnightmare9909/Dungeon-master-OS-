@@ -18,6 +18,7 @@ export const menuBtn = document.getElementById('menu-btn') as HTMLButtonElement;
 export const newChatBtn = document.getElementById('new-chat-btn') as HTMLButtonElement;
 export const sidebar = document.getElementById('sidebar') as HTMLElement;
 export const overlay = document.getElementById('overlay') as HTMLElement;
+export const chatHistoryContainer = document.getElementById('chat-history-container') as HTMLElement;
 export const pinnedChatsList = document.getElementById('pinned-chats-list') as HTMLUListElement;
 export const recentChatsList = document.getElementById('recent-chats-list') as HTMLUListElement;
 export const personaSelector = document.getElementById('persona-selector') as HTMLSelectElement;
@@ -151,12 +152,6 @@ export function renderChatHistory() {
     if (session.id === currentChatId) {
       li.classList.add('active');
     }
-
-    li.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).closest('.options-btn')) return;
-      closeChatOptionsMenu();
-      // This event is handled by the main controller, which will call loadChat
-    });
 
     li.querySelector('.options-btn')?.addEventListener('click', (e) => {
       e.stopPropagation();
