@@ -1,4 +1,5 @@
 
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -2254,6 +2255,16 @@ function setupEventListeners() {
     // --- Chat Form & Container ---
     chatForm.addEventListener('submit', handleFormSubmit);
     sendButton.addEventListener('click', handleFormSubmit);
+
+    chatInput.addEventListener('focus', () => {
+        // This is a common fix for mobile browsers where the virtual keyboard
+        // covers the input field. We wait a moment for the keyboard to appear,
+        // then scroll the form into view so the input is visible.
+        setTimeout(() => {
+            chatForm.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }, 300);
+    });
+
     chatInput.addEventListener('input', () => {
         chatInput.style.height = 'auto';
         chatInput.style.height = `${chatInput.scrollHeight}px`;
