@@ -14,6 +14,7 @@
   --accent-hover-color: #d8c670;
   --danger-color: #e57373;
   --sidebar-width: 280px;
+  --base-font-size: 16px;
 }
 
 /* --- THEME DEFINITIONS --- */
@@ -341,6 +342,7 @@ body[data-theme="pirate-grog"] {
 }
 
 html {
+  font-size: var(--base-font-size);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -354,6 +356,10 @@ body {
   overflow: hidden;
   transition: background-color 0.3s, color 0.3s;
 }
+
+body.font-size-small { --base-font-size: 14px; }
+body.font-size-medium { --base-font-size: 16px; }
+body.font-size-large { --base-font-size: 18px; }
 
 .sr-only {
   position: absolute;
@@ -630,6 +636,7 @@ main {
   opacity: 0;
   transform: translateY(20px);
   animation: fadeIn 0.5s forwards;
+  font-size: 1rem;
 }
 
 @keyframes fadeIn {
@@ -1727,6 +1734,80 @@ footer {
     height: 1px;
     background-color: var(--border-color);
     margin: 2rem 0;
+}
+
+/* --- Interface Settings --- */
+.setting-button-group {
+    display: flex;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.setting-button-group button {
+    flex-grow: 1;
+    background: none;
+    border: none;
+    color: var(--text-secondary-color);
+    padding: 0.5rem;
+    cursor: pointer;
+    border-right: 1px solid var(--border-color);
+    transition: background-color 0.2s;
+    font-family: var(--primary-font);
+}
+.setting-button-group button:last-child {
+    border-right: none;
+}
+.setting-button-group button:hover {
+    background-color: var(--background-color);
+}
+.setting-button-group button.active {
+    background-color: var(--user-message-bg);
+    color: var(--text-color);
+}
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 28px;
+}
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--background-color);
+  border: 1px solid var(--border-color);
+  transition: .4s;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: var(--text-secondary-color);
+  transition: .4s;
+}
+input:checked + .slider {
+  background-color: var(--accent-color);
+}
+input:checked + .slider:before {
+  transform: translateX(22px);
+  background-color: var(--background-color);
+}
+.slider.round {
+  border-radius: 34px;
+}
+.slider.round:before {
+  border-radius: 50%;
 }
 
 /* --- Theme Chooser Modal --- */

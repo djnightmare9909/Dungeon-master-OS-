@@ -1,5 +1,6 @@
 
 
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -23,6 +24,12 @@ interface GameSettings {
   tone: 'heroic' | 'gritty' | 'comedic';
   narration: 'concise' | 'descriptive' | 'cinematic';
 }
+
+interface UISettings {
+    enterToSend: boolean;
+    fontSize: 'small' | 'medium' | 'large';
+}
+
 
 interface AbilityScore {
   score: number;
@@ -73,7 +80,7 @@ interface ChatSession {
   createdAt: number;
   adminPassword?: string;
   personaId?: string; // NEW: To remember which DM persona was used
-  creationPhase?: 'guided' | 'quick_start_selection' | false;
+  creationPhase?: 'guided' | 'quick_start_selection' | 'quick_start_password' | false;
   characterSheet?: CharacterSheetData | string;
   inventory?: string;
   characterImageUrl?: string;
@@ -128,7 +135,7 @@ function migrateAndValidateSession(session: any): ChatSession {
     newSession.personaId = typeof session.personaId === 'string' ? session.personaId : 'purist';
     
     // Validate the creationPhase state.
-    if (session.creationPhase === 'guided' || session.creationPhase === 'quick_start_selection') {
+    if (session.creationPhase === 'guided' || session.creationPhase === 'quick_start_selection' || session.creationPhase === 'quick_start_password') {
         newSession.creationPhase = session.creationPhase;
     } else {
         newSession.creationPhase = false;
@@ -634,6 +641,9 @@ const characterImageLoading = document.getElementById('character-image-loading')
 const settingDifficulty = document.getElementById('setting-difficulty') as HTMLSelectElement;
 const settingTone = document.getElementById('setting-tone') as HTMLSelectElement;
 const settingNarration = document.getElementById('setting-narration') as HTMLSelectElement;
+const fontSizeControls = document.getElementById('font-size-controls') as HTMLElement;
+const enterToSendToggle = document.getElementById('setting-enter-send') as HTMLInputElement;
+
 
 // --- Theme Modal ---
 const changeUiBtn = document.getElementById('change-ui-btn') as HTMLButtonElement;
@@ -661,6 +671,10 @@ let chatIdToRename: string | null = null;
 let chatIdToDelete: string | null = null;
 let isSending = false; // Prevents multiple form submissions
 let currentPersonaId: string = 'purist'; // Default persona
+let uiSettings: UISettings = {
+    enterToSend: true,
+    fontSize: 'medium',
+};
 
 // =================================================================================
 // GEMINI AI INITIALIZATION
@@ -763,6 +777,22 @@ function openModal(modal: HTMLElement) {
 /** Hides a given modal element. */
 function closeModal(modal: HTMLElement) {
     modal.style.display = 'none';
+}
+
+/** Applies UI settings for font size and updates controls to match state. */
+function applyUISettings() {
+    // Font size
+    document.body.classList.remove('font-size-small', 'font-size-medium', 'font-size-large');
+    document.body.classList.add(`font-size-${uiSettings.fontSize}`);
+
+    // Update controls in modal to reflect the current state
+    if (fontSizeControls) {
+        (fontSizeControls.querySelector('.active') as HTMLElement)?.classList.remove('active');
+        (fontSizeControls.querySelector(`[data-size="${uiSettings.fontSize}"]`) as HTMLElement)?.classList.add('active');
+    }
+    if (enterToSendToggle) {
+        enterToSendToggle.checked = uiSettings.enterToSend;
+    }
 }
 
 // =================================================================================
@@ -2036,6 +2066,23 @@ async function handleFormSubmit(e: Event) {
     if (currentSession.creationPhase) {
         stopTTS();
 
+        // Handle Quick Start password entry
+        if (currentSession.creationPhase === 'quick_start_password') {
+            const userMessage: Message = { sender: 'user', text: userInput };
+            appendMessage(userMessage);
+            currentSession.messages.push(userMessage);
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
+
+            currentSession.adminPassword = userInput; // Save the password
+            saveChatHistoryToDB(); // Save before starting the game
+            
+            await finalizeSetupAndStartGame(currentSession, currentSession.title);
+
+            return; // Stop processing this submit event
+        }
+
+
         const userMessage: Message = { sender: 'user', text: userInput };
         appendMessage(userMessage);
         currentSession.messages.push(userMessage);
@@ -2055,18 +2102,22 @@ async function handleFormSubmit(e: Event) {
         loadingMessage.classList.add('loading');
         loadingMessage.textContent = '...';
 
+        const shouldScroll = chatContainer.scrollHeight - chatContainer.clientHeight <= chatContainer.scrollTop + 10;
+
         try {
             if (!geminiChat) throw new Error("Setup AI Error: chat is not initialized.");
             
             const result = await geminiChat.sendMessageStream({ message: userInput });
             let responseText = '';
             loadingMessage.classList.remove('loading');
-            loadingMessage.textContent = '';
+            loadingMessage.innerHTML = '';
             // Stream the response
             for await (const chunk of result) {
                 responseText += chunk.text || '';
-                loadingMessage.textContent = responseText;
-                chatContainer.scrollTop = chatContainer.scrollHeight;
+                loadingMessage.innerHTML = responseText;
+                if (shouldScroll) {
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
             }
             loadingContainer.remove();
 
@@ -2158,17 +2209,21 @@ async function handleFormSubmit(e: Event) {
     loadingMessage.classList.add('loading');
     loadingMessage.textContent = '...';
 
+    const shouldScroll = chatContainer.scrollHeight - chatContainer.clientHeight <= chatContainer.scrollTop + 10;
+
     try {
       const result = await geminiChat.sendMessageStream({ message: userInput });
 
       let responseText = '';
       loadingMessage.classList.remove('loading');
-      loadingMessage.textContent = '';
+      loadingMessage.innerHTML = '';
       // Stream the response to the UI
       for await (const chunk of result) {
         responseText += chunk.text || '';
-        loadingMessage.textContent = responseText;
-        chatContainer.scrollTop = chatContainer.scrollHeight;
+        loadingMessage.innerHTML = responseText;
+        if (shouldScroll) {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
       }
       loadingContainer.remove();
 
@@ -2211,6 +2266,8 @@ async function finalizeSetupAndStartGame(session: ChatSession, title: string, fi
     gameLoadingMessage.classList.add('loading');
     gameLoadingMessage.textContent = 'The DM is preparing the world...';
 
+    const shouldScroll = chatContainer.scrollHeight - chatContainer.clientHeight <= chatContainer.scrollTop + 10;
+
     try {
         const personaId = session.personaId || 'purist';
         const persona = dmPersonas.find(p => p.id === personaId) || dmPersonas[0];
@@ -2226,11 +2283,13 @@ async function finalizeSetupAndStartGame(session: ChatSession, title: string, fi
         
         let openingSceneText = '';
         gameLoadingMessage.classList.remove('loading');
-        gameLoadingMessage.textContent = '';
+        gameLoadingMessage.innerHTML = '';
         for await (const chunk of kickoffResult) {
             openingSceneText += chunk.text || '';
-            gameLoadingMessage.textContent = openingSceneText;
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            gameLoadingMessage.innerHTML = openingSceneText;
+            if (shouldScroll) {
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
         }
         gameLoadingContainer.remove();
 
@@ -2270,7 +2329,7 @@ function setupEventListeners() {
         chatInput.style.height = `${chatInput.scrollHeight}px`;
     });
     chatInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        if (uiSettings.enterToSend && e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             chatForm.requestSubmit();
         }
@@ -2302,9 +2361,14 @@ function setupEventListeners() {
 
             currentSession.characterSheet = selectedChar;
             const title = `${selectedChar.name}'s Journey`;
-            currentSession.adminPassword = `dnd${Date.now()}`; // Set a random password for quick start
+            currentSession.title = title;
+            currentSession.creationPhase = 'quick_start_password';
 
-            await finalizeSetupAndStartGame(currentSession, title);
+            const passwordMessage: Message = { sender: 'model', text: `You have chosen to play as ${selectedChar.name}. Excellent choice.\n\nBefore we begin, please set a secure password for the OOC (Out of Character) protocol. This allows you to speak directly to the underlying AI if you need to make corrections or ask meta-questions.`};
+            appendMessage(passwordMessage);
+            currentSession.messages.push(passwordMessage);
+
+            saveChatHistoryToDB();
 
         } catch (error) {
             console.error("Error during quick start selection:", error);
@@ -2399,6 +2463,20 @@ function setupEventListeners() {
     settingTone.addEventListener('change', () => handleSettingChange('tone', settingTone.value));
     settingNarration.addEventListener('change', () => handleSettingChange('narration', settingNarration.value));
     
+    // --- Interface Settings ---
+    fontSizeControls.addEventListener('click', (e) => {
+        const button = (e.target as HTMLElement).closest('button');
+        if (button?.dataset.size) {
+            uiSettings.fontSize = button.dataset.size as 'small' | 'medium' | 'large';
+            dbSet('dm-os-ui-settings', uiSettings);
+            applyUISettings();
+        }
+    });
+    enterToSendToggle.addEventListener('change', () => {
+        uiSettings.enterToSend = enterToSendToggle.checked;
+        dbSet('dm-os-ui-settings', uiSettings);
+    });
+
     // --- Themeing ---
     changeUiBtn.addEventListener('click', () => openModal(themeModal));
     closeThemeBtn.addEventListener('click', () => closeModal(themeModal));
@@ -2420,143 +2498,79 @@ function setupEventListeners() {
         const quantityInput = dieItem.querySelector('.quantity-input') as HTMLInputElement;
         let value = parseInt(quantityInput.value, 10);
         if (target.classList.contains('plus')) {
-            quantityInput.value = Math.min(99, value + 1).toString();
+            // FIX: The value of an input element must be a string. `Math.min` returns a number, which causes a type error. The result is converted to a string.
+            quantityInput.value = String(Math.min(99, value + 1));
         } else if (target.classList.contains('minus')) {
-            quantityInput.value = Math.max(1, value - 1).toString();
-        }
-    });
-
-    // --- Quick Actions ---
-    quickActionsBar.addEventListener('click', (e) => {
-        const button = (e.target as HTMLElement).closest<HTMLButtonElement>('.quick-action-btn');
-        if (button?.dataset.command) {
-            const command = button.dataset.command;
-            chatInput.value = command; chatInput.focus();
-            if (command === 'I say ""') chatInput.setSelectionRange(7, 7);
-            else chatInput.setSelectionRange(command.length, command.length);
-            chatInput.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-    });
-
-    // --- Chat Options Menu ---
-    chatOptionsMenu.addEventListener('click', (e) => {
-        const target = e.target as HTMLElement;
-        const action = target.dataset.action;
-        const sessionId = chatOptionsMenu.dataset.sessionId;
-        if (!action || !sessionId) return;
-        closeChatOptionsMenu();
-        switch (action) {
-            case 'pin': togglePinChat(sessionId); break;
-            case 'rename': openRenameModal(sessionId); break;
-            case 'export': exportChatToLocal(sessionId); break;
-            case 'delete': openDeleteConfirmModal(sessionId); break;
-        }
-    });
-
-    // --- Import/Export ---
-    exportAllBtn.addEventListener('click', exportAllChats);
-    importAllBtn.addEventListener('click', () => importAllFileInput.click());
-    importAllFileInput.addEventListener('change', handleImportAll);
-
-    // --- Inventory Pouch ---
-    inventoryBtn.addEventListener('click', () => {
-        const isVisible = inventoryPopup.classList.toggle('visible');
-        if (isVisible) { fetchAndRenderInventoryPopup(); }
-    });
-    closeInventoryBtn.addEventListener('click', () => { inventoryPopup.classList.remove('visible'); });
-    refreshInventoryBtn.addEventListener('click', fetchAndRenderInventoryPopup);
-    inventoryPopupContent.addEventListener('click', (e) => {
-        const useButton = (e.target as HTMLElement).closest('.use-item-btn');
-        if (useButton) {
-            const itemName = useButton.getAttribute('data-item-name');
-            if (itemName) {
-                chatInput.value = `Use ${itemName}`;
-                chatInput.focus();
-                inventoryPopup.classList.remove('visible');
-            }
+            quantityInput.value = String(Math.max(1, value - 1));
         }
     });
 }
 
-// =================================================================================
-// APPLICATION INITIALIZATION
-// =================================================================================
-// The main function that kicks everything off when the page loads.
 
-/** Migrates data from localStorage to IndexedDB if it exists. */
-async function migrateFromLocalStorage() {
-  const migrationCompleted = localStorage.getItem('dm-os-migration-complete');
-  if (migrationCompleted) {
-    return;
-  }
+/**
+ * Initializes the application by setting up the database, loading data,
+ * rendering the initial UI state, and attaching event listeners.
+ */
+async function initApp() {
+    await initDB();
 
-  console.log("Checking for data to migrate from localStorage to IndexedDB...");
+    // Concurrently load all necessary data from the database
+    const [
+        themeId,
+        savedUiSettings,
+        savedPersonaId
+    ] = await Promise.all([
+        dbGet<string>('dm-os-theme'),
+        dbGet<UISettings>('dm-os-ui-settings'),
+        dbGet<string>('dm-os-persona'),
+        loadChatHistoryFromDB(),
+        loadUserContextFromDB()
+    ]);
 
-  const oldHistory = localStorage.getItem('dm-os-chat-history');
-  const oldContext = localStorage.getItem('dm-os-user-context');
-  const oldPersona = localStorage.getItem('dm-os-persona');
-  const oldTheme = localStorage.getItem('dm-os-theme');
+    // Apply saved theme or default
+    if (themeId) {
+        applyTheme(themeId);
+    } else {
+        applyTheme('high-fantasy-dark'); // Default theme
+    }
 
-  // Only proceed if there's actually old data
-  if (!oldHistory && !oldContext && !oldPersona && !oldTheme) {
-    localStorage.setItem('dm-os-migration-complete', 'true');
-    return;
-  }
+    // Apply saved UI settings
+    if (savedUiSettings) {
+        uiSettings = { ...uiSettings, ...savedUiSettings };
+    }
+    applyUISettings();
 
-  try {
-    if (oldHistory) await dbSet('dm-os-chat-history', JSON.parse(oldHistory));
-    if (oldContext) await dbSet('dm-os-user-context', JSON.parse(oldContext));
-    if (oldPersona) await dbSet('dm-os-persona', oldPersona);
-    if (oldTheme) await dbSet('dm-os-theme', oldTheme);
+    // Apply saved persona
+    if (savedPersonaId && dmPersonas.some(p => p.id === savedPersonaId)) {
+        currentPersonaId = savedPersonaId;
+    }
 
-    // If migration is successful, clear old data
-    localStorage.removeItem('dm-os-chat-history');
-    localStorage.removeItem('dm-os-user-context');
-    localStorage.removeItem('dm-os-persona');
-    localStorage.removeItem('dm-os-theme');
-    
-    localStorage.setItem('dm-os-migration-complete', 'true');
-    console.log("Migration successful.");
-  } catch (error) {
-    console.error("Migration from localStorage failed:", error);
-  }
+    // Render all initial UI components
+    renderDiceGrid();
+    renderThemeCards();
+    renderPersonaSelector();
+    updatePersonaSelectorValue(); // Set dropdown to correct value
+    renderUserContext();
+    renderChatHistory(); // This will show all saved chats
+
+    // Decide which chat to load or if a new one is needed
+    if (chatHistory.length > 0) {
+        const mostRecentChat = [...chatHistory].sort((a, b) => b.createdAt - a.createdAt)[0];
+        loadChat(mostRecentChat.id);
+    } else {
+        await startNewChat();
+    }
+
+    // Finally, attach all event listeners to the now-rendered DOM
+    setupEventListeners();
 }
 
-
-/** Initializes the entire application on load. */
-async function initializeApp() {
-  await initDB();
-  await migrateFromLocalStorage();
-  
-  // Load data from storage
-  await loadChatHistoryFromDB();
-  await loadUserContextFromDB();
-  currentPersonaId = await dbGet<string>('dm-os-persona') || 'purist';
-
-  // Apply saved or default theme
-  const savedTheme = await dbGet<string>('dm-os-theme');
-  applyTheme(savedTheme || 'sci-fi-blue-hud');
-
-  // Initial UI render
-  renderPersonaSelector();
-  updatePersonaSelectorValue();
-  renderChatHistory();
-  renderUserContext();
-  renderThemeCards();
-  renderDiceGrid();
-  
-  // Set up all event listeners
-  setupEventListeners();
-
-  // Load the last session or start a new one
-  if (chatHistory.length > 0) {
-    const lastSession = chatHistory.sort((a,b) => b.createdAt - a.createdAt)[0];
-    currentChatId = lastSession.id;
-    loadChat(lastSession.id);
-  } else {
-    startNewChat();
-  }
-}
-
-// Start the app
-initializeApp();
+// Start the application
+initApp().catch(err => {
+    console.error("Fatal error during application initialization:", err);
+    // Display a user-friendly error message on the page
+    document.body.innerHTML = `<div style="color: white; padding: 2rem; text-align: center;">
+        <h1>Oops! Something went wrong.</h1>
+        <p>DM OS could not start. Please try refreshing the page. If the problem persists, you may need to clear your browser's site data for this page.</p>
+    </div>`;
+});
