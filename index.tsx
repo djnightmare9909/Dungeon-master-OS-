@@ -315,7 +315,8 @@ async function finalizeSetupAndStartGame(session: ChatSession, title: string, fi
   session.title = title;
 
   if (finalSetupMessage) {
-    appendMessage(finalSetupMessage);
+    // The message is already in the DOM from the streaming function.
+    // We just need to ensure it's in the state.
     session.messages.push(finalSetupMessage);
   }
 
@@ -431,11 +432,10 @@ async function handleFormSubmit(e: Event) {
         }
       }
 
-      const loadingContainer = appendMessage({ sender: 'model', text: '' });
-      const loadingMessage = loadingContainer.querySelector('.message') as HTMLElement;
-      loadingMessage.classList.add('loading');
-      loadingMessage.textContent = '...';
-
+      const modelMessageContainer = appendMessage({ sender: 'model', text: '' });
+      const modelMessageEl = modelMessageContainer.querySelector('.message') as HTMLElement;
+      modelMessageEl.classList.add('loading');
+      modelMessageEl.textContent = '...';
       const shouldScroll = chatContainer.scrollHeight - chatContainer.clientHeight <= chatContainer.scrollTop + 10;
 
       try {
@@ -444,23 +444,24 @@ async function handleFormSubmit(e: Event) {
 
         const result = await geminiChat.sendMessageStream({ message: userInput });
         let responseText = '';
-        loadingMessage.classList.remove('loading');
-        loadingMessage.innerHTML = '';
+        modelMessageEl.classList.remove('loading');
+        modelMessageEl.innerHTML = '';
+
         for await (const chunk of result) {
           responseText += chunk.text || '';
-          loadingMessage.innerHTML = responseText;
+          modelMessageEl.innerHTML = responseText;
           if (shouldScroll) {
             chatContainer.scrollTop = chatContainer.scrollHeight;
           }
         }
-        loadingContainer.remove();
 
         if (responseText.includes('[GENERATE_QUICK_START_CHARACTERS]')) {
           currentSession.creationPhase = 'quick_start_selection';
-          saveChatHistoryToDB();
-          const setupMessage: Message = { sender: 'model', text: responseText.replace('[GENERATE_QUICK_START_CHARACTERS]', '').trim() };
-          appendMessage(setupMessage);
+          const setupMessageText = responseText.replace('[GENERATE_QUICK_START_CHARACTERS]', '').trim();
+          modelMessageEl.innerHTML = setupMessageText;
+          const setupMessage: Message = { sender: 'model', text: setupMessageText };
           currentSession.messages.push(setupMessage);
+          saveChatHistoryToDB();
 
           const charLoadingContainer = appendMessage({ sender: 'model', text: '' });
           const charLoadingMessage = charLoadingContainer.querySelector('.message') as HTMLElement;
@@ -490,19 +491,17 @@ async function handleFormSubmit(e: Event) {
           const titleMatch = responseText.match(/Title:\s*(.*)/);
           const title = titleMatch?.[1]?.trim() || "New Adventure";
           const finalSetupText = responseText.replace('[SETUP_COMPLETE]', '').replace(/Title:\s*(.*)/, '').trim();
+          modelMessageEl.innerHTML = finalSetupText;
           const finalSetupMessage: Message = { sender: 'model', text: finalSetupText };
-
           await finalizeSetupAndStartGame(currentSession, title, finalSetupMessage);
-
         } else {
           const setupMessage: Message = { sender: 'model', text: responseText };
-          appendMessage(setupMessage);
           currentSession.messages.push(setupMessage);
           saveChatHistoryToDB();
         }
       } catch (error) {
         console.error("Setup AI Error:", error);
-        loadingContainer.remove();
+        modelMessageContainer.remove();
         appendMessage({ sender: 'error', text: 'The setup guide seems to have gotten lost. Please try again.' });
       }
       return;
@@ -532,36 +531,32 @@ async function handleFormSubmit(e: Event) {
     chatInput.value = '';
     chatInput.style.height = 'auto';
 
-    const loadingContainer = appendMessage({ sender: 'model', text: '' });
-    const loadingMessage = loadingContainer.querySelector('.message') as HTMLElement;
-    loadingMessage.classList.add('loading');
-    loadingMessage.textContent = '...';
-
+    const modelMessageContainer = appendMessage({ sender: 'model', text: '' });
+    const modelMessageEl = modelMessageContainer.querySelector('.message') as HTMLElement;
+    modelMessageEl.classList.add('loading');
+    modelMessageEl.textContent = '...';
     const shouldScroll = chatContainer.scrollHeight - chatContainer.clientHeight <= chatContainer.scrollTop + 10;
 
     try {
       const result = await geminiChat.sendMessageStream({ message: userInput });
-
       let responseText = '';
-      loadingMessage.classList.remove('loading');
-      loadingMessage.innerHTML = '';
+      modelMessageEl.classList.remove('loading');
+      modelMessageEl.innerHTML = '';
+
       for await (const chunk of result) {
         responseText += chunk.text || '';
-        loadingMessage.innerHTML = responseText;
+        modelMessageEl.innerHTML = responseText;
         if (shouldScroll) {
           chatContainer.scrollTop = chatContainer.scrollHeight;
         }
       }
-      loadingContainer.remove();
 
       const finalMessage: Message = { sender: 'model', text: responseText };
-      appendMessage(finalMessage);
       currentSession.messages.push(finalMessage);
       saveChatHistoryToDB();
-
     } catch (error) {
       console.error("Gemini API Error:", error);
-      loadingContainer.remove();
+      modelMessageContainer.remove();
       appendMessage({ sender: 'error', text: 'The DM seems to be pondering deeply ... and has gone quiet. Please try again.' });
     }
   } finally {
