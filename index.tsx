@@ -2,6 +2,8 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
+// Fix: Improved the 'generateContent' call for creating quick start characters by adding a 'responseSchema' to ensure valid JSON output.
+import { Type } from '@google/genai';
 import {
   initDB,
   loadChatHistoryFromDB,
@@ -75,7 +77,6 @@ import {
   updateNpcsBtn,
   updateAchievementsBtn,
   generateImageBtn,
-  settingDifficulty,
   settingTone,
   settingNarration,
   fontSizeControls,
@@ -103,6 +104,8 @@ import {
   inventoryPopupContent,
   renderUserContext,
   chatHistoryContainer,
+  updateCombatTracker,
+  combatTracker,
 } from './ui';
 import {
   stopTTS,
@@ -133,6 +136,90 @@ import type { Message, ChatSession, UISettings } from './types';
 
 let chatIdToRename: string | null = null;
 let chatIdToDelete: string | null = null;
+
+const quickStartCharacterSchema = {
+  type: Type.OBJECT,
+  properties: {
+    name: { type: Type.STRING },
+    race: { type: Type.STRING },
+    class: { type: Type.STRING },
+    level: { type: Type.INTEGER },
+    backstory: { type: Type.STRING },
+    abilityScores: {
+      type: Type.OBJECT,
+      properties: {
+        STR: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } },
+        DEX: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } },
+        CON: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } },
+        INT: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } },
+        WIS: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } },
+        CHA: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } }
+      }
+    },
+    armorClass: { type: Type.INTEGER },
+    hitPoints: { type: Type.OBJECT, properties: { current: { type: Type.INTEGER }, max: { type: Type.INTEGER } } },
+    speed: { type: Type.STRING },
+    skills: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, proficient: { type: Type.BOOLEAN } } } },
+    featuresAndTraits: { type: Type.ARRAY, items: { type: Type.STRING } }
+  }
+};
+
+/**
+ * Displays a boot sequence animation on first load.
+ */
+function runBootSequence(): Promise<void> {
+  return new Promise((resolve) => {
+    const bootScreen = document.getElementById('boot-screen');
+    const bootTextContainer = document.getElementById('boot-text');
+    if (!bootScreen || !bootTextContainer) {
+      resolve();
+      return;
+    }
+
+    const lines = [
+      'DM OS v2.1 Initializing...',
+      'Connecting to WFGY Universal Unification Framework... OK',
+      'Loading Semantic Tree... 1.2TB nodes loaded.',
+      'Calibrating Collapse-Rebirth Cycle (BBCR)... STABLE',
+      'Waking Dungeon Master Persona...',
+      'Ready.',
+    ];
+
+    let lineIndex = 0;
+
+    const typeLine = () => {
+      if (lineIndex >= lines.length) {
+        // Finished typing
+        setTimeout(() => {
+          bootScreen.classList.add('fade-out');
+          bootScreen.addEventListener('transitionend', () => {
+            bootScreen.style.display = 'none';
+          }, { once: true });
+          document.body.classList.add('app-visible');
+          resolve();
+        }, 500);
+        return;
+      }
+
+      const p = document.createElement('p');
+      p.textContent = lines[lineIndex];
+      p.classList.add('cursor');
+      
+      const prevLine = bootTextContainer.querySelector('.cursor');
+      if (prevLine) {
+        prevLine.classList.remove('cursor');
+      }
+
+      bootTextContainer.appendChild(p);
+      lineIndex++;
+
+      setTimeout(typeLine, lineIndex === lines.length -1 ? 700 : Math.random() * 200 + 100);
+    };
+
+    setTimeout(typeLine, 500);
+  });
+}
+
 
 /**
  * Starts a brand new chat session, guiding the user through the setup process.
@@ -174,7 +261,6 @@ async function startNewChat() {
       personaId: getCurrentPersonaId(),
       creationPhase: 'guided',
       settings: {
-        difficulty: 'normal',
         tone: 'heroic',
         narration: 'descriptive',
       },
@@ -232,6 +318,7 @@ function loadChat(id: string) {
     updateLogbook(session);
     renderChatHistory();
     closeSidebar();
+    combatTracker.classList.add('hidden'); // Hide tracker on chat load
   }
 }
 
@@ -473,7 +560,13 @@ async function handleFormSubmit(e: Event) {
             const charResponse = await ai.models.generateContent({
               model: 'gemini-2.5-flash',
               contents: getQuickStartCharacterPrompt(),
-              config: { responseMimeType: 'application/json' }
+              config: {
+                responseMimeType: 'application/json',
+                responseSchema: {
+                  type: Type.ARRAY,
+                  items: quickStartCharacterSchema,
+                },
+              }
             });
             const chars = JSON.parse(charResponse.text);
             currentSession.quickStartChars = chars;
@@ -546,13 +639,29 @@ async function handleFormSubmit(e: Event) {
 
       for await (const chunk of result) {
         responseText += chunk.text || '';
-        modelMessageEl.innerHTML = responseText;
+        let displayHtml = responseText.replace(/\[COMBAT_STATUS:.*?\]/g, '').trim();
+        modelMessageEl.innerHTML = displayHtml;
         if (shouldScroll) {
           chatContainer.scrollTop = chatContainer.scrollHeight;
         }
       }
 
-      const finalMessage: Message = { sender: 'model', text: responseText };
+      // Handle Combat Tracker
+      const combatStatusRegex = /\[COMBAT_STATUS:\s*({.*?})\]/;
+      const match = responseText.match(combatStatusRegex);
+      if (match && match[1]) {
+        try {
+          const combatData = JSON.parse(match[1]);
+          updateCombatTracker(combatData.enemies);
+        } catch (jsonError) {
+          console.error("Failed to parse combat status JSON:", jsonError);
+          combatTracker.classList.add('hidden');
+        }
+      } else {
+        combatTracker.classList.add('hidden');
+      }
+
+      const finalMessage: Message = { sender: 'model', text: responseText.replace(combatStatusRegex, '').trim() };
       currentSession.messages.push(finalMessage);
       saveChatHistoryToDB();
     } catch (error) {
@@ -751,14 +860,13 @@ function setupEventListeners() {
   updateAchievementsBtn.addEventListener('click', () => updateLogbookData('achievements'));
   generateImageBtn.addEventListener('click', generateCharacterImage);
   
-  const handleSettingChange = (key: 'difficulty' | 'tone' | 'narration', value: string) => {
+  const handleSettingChange = (key: 'tone' | 'narration', value: string) => {
       const currentSession = getCurrentChat();
       if(currentSession?.settings) {
           (currentSession.settings as any)[key] = value;
           saveChatHistoryToDB();
       }
   };
-  settingDifficulty.addEventListener('change', () => handleSettingChange('difficulty', settingDifficulty.value));
   settingTone.addEventListener('change', () => handleSettingChange('tone', settingTone.value));
   settingNarration.addEventListener('change', () => handleSettingChange('narration', settingNarration.value));
 
@@ -836,6 +944,7 @@ function setupEventListeners() {
  * Initializes the application.
  */
 async function initApp() {
+  await runBootSequence();
   await initDB();
 
   const [themeId, savedUiSettings, savedPersonaId] = await Promise.all([

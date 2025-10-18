@@ -363,8 +363,19 @@ export async function fetchAndRenderInventoryPopup() {
 
   try {
     const conversationHistory = currentSession.messages.map(m => `${m.sender === 'user' ? 'Player' : 'DM'}: ${m.text}`).join('\n');
-    const prompt = `Based on the following D&D conversation, list the player character's current inventory items as a simple comma-separated list. Only include the item names. Example: Health Potion, Rope (50ft), Dagger, Gold (25gp). Conversation History: ${conversationHistory}`;
-    const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+    // Fix: Updated prompt to request JSON and added responseSchema for robust parsing.
+    const prompt = `Based on the following D&D conversation, list the player character's current inventory items as a JSON array of strings. Only include the item names. Example: ["Health Potion", "Rope (50ft)", "Dagger", "Gold (25gp)"]. Conversation History: ${conversationHistory}`;
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+        },
+      },
+    });
     const itemsText = response.text;
 
     if (!itemsText || itemsText.trim() === '') {
@@ -373,10 +384,10 @@ export async function fetchAndRenderInventoryPopup() {
       return;
     }
 
-    const items = itemsText.split(',').map(item => item.trim()).filter(Boolean);
+    const items = JSON.parse(itemsText);
     if (items.length > 0) {
       const ul = document.createElement('ul');
-      items.forEach(item => {
+      items.forEach((item: string) => {
         const li = document.createElement('li');
         li.innerHTML = `<span class="inventory-item-name">${item}</span><button class="use-item-btn" data-item-name="${item}">Use</button>`;
         ul.appendChild(li);

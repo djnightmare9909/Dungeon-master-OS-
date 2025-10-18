@@ -20,6 +20,9 @@
     <script type="module" src="index.tsx"></script>
   </head>
   <body>
+    <div id="boot-screen">
+      <div id="boot-text"></div>
+    </div>
     <nav id="sidebar">
       <div class="sidebar-header">
         <div class="sidebar-header-actions">
@@ -95,6 +98,10 @@
         </button>
       </header>
       <main id="chat-container"></main>
+      <div id="combat-tracker" class="hidden">
+        <h3>Combat Status</h3>
+        <ul id="combat-enemy-list"></ul>
+      </div>
       <footer>
         <div id="quick-actions-bar" class="quick-actions-bar">
           <button class="quick-action-btn" data-command="I do ">Do</button>
@@ -203,17 +210,24 @@
                     <p class="help-clue">Remember, every world has its Architect. Every simulation, a ghost in the machine.</p>
                 </section>
                 <section>
-                    <h3>The OOC Protocol (Debug Mode)</h3>
-                    <p>The Out-Of-Character (OOC) protocol is a powerful tool that allows you to speak directly to the underlying AI of the DM OS, temporarily bypassing the Dungeon Master persona. This is your primary method for fixing issues, clarifying rules, or adjusting the simulation "under the hood."</p>
+                    <h3>The OOC Protocol (Manual Override)</h3>
+                    <p>The Out-Of-Character (OOC) protocol is your ultimate tool for co-directing the game. It allows you to speak directly to the underlying AI, temporarily bypassing the Dungeon Master persona to manually change any aspect of the game world, plot, or characters. Your imagination is the only limit.</p>
                     <h4>How to Use OOC:</h4>
-                    <p>To activate the protocol, you must frame your message in a specific way, including the unique password you created at the start of the current chat session.</p>
-                    <p><strong>Format:</strong> <code>[OOC: YourPassword, your message here]</code></p>
-                    <p><strong>Example:</strong> <code>[OOC: DragonFire99, we visited this town three sessions ago. The mayor gave us the key to the city.]</code></p>
-                </section>
-                <section>
-                    <h3>The Collapse-Rebirth Cycle (BBCR)</h3>
-                    <p>The DM OS is built on an advanced cognitive architecture designed for long-term narrative consistency. At its core is a self-auditing and self-healing mechanism known as the Collapse-Rebirth Cycle (BBCR).</p>
-                    <p>The BBCR is a sign of a healthy simulation. It's the OS actively working to prevent the kind of plot holes and memory failures that can ruin a long campaign. If you notice a brief, unusual pause in the DM's response, it's likely the BBCR at work, ensuring your story remains coherent and immersive.</p>
+                    <p>To activate the protocol, you must frame your message in a specific three-part format, including the unique password you created for the current chat session.</p>
+                    <p><strong>Format:</strong> <code>[OOC: YourPassword, "Your Game Request", "Your Explanation"]</code></p>
+                    <ul>
+                        <li><strong>Part 1: The Request</strong> - A clear, direct command for what should happen, written in quotes.</li>
+                        <li><strong>Part 2: The Explanation</strong> - The reasoning for your request, also in quotes. This gives the AI context to seamlessly integrate your change.</li>
+                    </ul>
+                    <h4>Examples:</h4>
+                    <p><strong>Spawning an NPC:</strong></p>
+                    <code>[OOC: DragonFire99, "Spawn a retired adventurer NPC named 'Elara' in the tavern.", "I want a new NPC who can give the party a lead on the main quest."]</code>
+                    <p><strong>Changing the Environment:</strong></p>
+                    <code>[OOC: DragonFire99, "Change the weather to a sudden, dramatic thunderstorm.", "This will set a more tense mood for the upcoming confrontation."]</code>
+                    <p><strong>Retroactive Plot Changes (Retconning):</strong></p>
+                    <code>[OOC: DragonFire99, "Retroactively decide that the mayor we met earlier is secretly a member of the evil cult.", "This creates a personal betrayal and raises the stakes of the story."]</code>
+                    <p><strong>Loot Generation:</strong></p>
+                    <code>[OOC: DragonFire99, "The bandits we just defeated were carrying a magical shortsword.", "My rogue character needs an upgrade and this feels like a good reward for the fight."]</code>
                 </section>
                 <section>
                     <h3>Credits & Collaboration</h3>
@@ -336,14 +350,6 @@
                     <h3>Game Settings</h3>
                     <p>Adjust these settings to tailor the DM's behavior for this adventure. Changes will be saved automatically.</p>
                     <div class="settings-grid">
-                        <div class="setting-item">
-                            <label for="setting-difficulty">Difficulty</label>
-                            <select id="setting-difficulty">
-                                <option value="story">Story Mode</option>
-                                <option value="normal" selected>Normal</option>
-                                <option value="challenging">Challenging</option>
-                            </select>
-                        </div>
                         <div class="setting-item">
                             <label for="setting-tone">Game Tone</label>
                              <select id="setting-tone">

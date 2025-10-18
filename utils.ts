@@ -62,7 +62,7 @@ export function migrateAndValidateSession(session: any): ChatSession {
   }
 
   const defaultSettings: GameSettings = {
-    difficulty: 'normal',
+    // Fix: Removed 'difficulty' as it is not a known property in GameSettings type.
     tone: 'heroic',
     narration: 'descriptive',
   };

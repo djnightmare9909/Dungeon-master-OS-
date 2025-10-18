@@ -10,7 +10,6 @@ export interface Message {
 }
 
 export interface GameSettings {
-  difficulty: 'story' | 'normal' | 'challenging';
   tone: 'heroic' | 'gritty' | 'comedic';
   narration: 'concise' | 'descriptive' | 'cinematic';
 }

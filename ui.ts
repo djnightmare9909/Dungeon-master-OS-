@@ -82,7 +82,6 @@ export const generateImageBtn = document.getElementById('generate-image-btn') as
 export const characterImageDisplay = document.getElementById('character-image-display') as HTMLImageElement;
 export const characterImagePlaceholder = document.getElementById('character-image-placeholder') as HTMLElement;
 export const characterImageLoading = document.getElementById('character-image-loading') as HTMLElement;
-export const settingDifficulty = document.getElementById('setting-difficulty') as HTMLSelectElement;
 export const settingTone = document.getElementById('setting-tone') as HTMLSelectElement;
 export const settingNarration = document.getElementById('setting-narration') as HTMLSelectElement;
 export const fontSizeControls = document.getElementById('font-size-controls') as HTMLElement;
@@ -92,6 +91,8 @@ export const themeModal = document.getElementById('theme-modal') as HTMLElement;
 export const closeThemeBtn = document.getElementById('close-theme-btn') as HTMLButtonElement;
 export const themeGrid = document.getElementById('theme-grid') as HTMLElement;
 export const chatOptionsMenu = document.getElementById('chat-options-menu') as HTMLUListElement;
+export const combatTracker = document.getElementById('combat-tracker') as HTMLElement;
+export const combatEnemyList = document.getElementById('combat-enemy-list') as HTMLUListElement;
 
 // =================================================================================
 // UI & MODAL MANAGEMENT
@@ -365,7 +366,6 @@ export function updateLogbook(session: ChatSession | undefined) {
   }
 
   if (session.settings) {
-    settingDifficulty.value = session.settings.difficulty;
     settingTone.value = session.settings.tone;
     settingNarration.value = session.settings.narration;
   }
@@ -384,4 +384,24 @@ export function renderUserContext(userContext: string[]) {
         `;
         contextList.appendChild(li);
     });
+}
+
+export function updateCombatTracker(enemies: { name: string, status: string }[]) {
+  if (!enemies || enemies.length === 0) {
+    combatTracker.classList.add('hidden');
+    return;
+  }
+
+  combatEnemyList.innerHTML = '';
+  enemies.forEach(enemy => {
+    const li = document.createElement('li');
+    li.className = 'combat-enemy-item';
+    const statusClass = `status-${enemy.status.replace(' ', '-')}`;
+    li.innerHTML = `
+      <span class="name">${enemy.name}</span>
+      <span class="status ${statusClass}">${enemy.status}</span>
+    `;
+    combatEnemyList.appendChild(li);
+  });
+  combatTracker.classList.remove('hidden');
 }

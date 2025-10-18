@@ -357,6 +357,18 @@ body {
   transition: background-color 0.3s, color 0.3s;
 }
 
+#sidebar, .chat-view {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.5s ease-in-out;
+}
+
+body.app-visible #sidebar,
+body.app-visible .chat-view {
+  opacity: 1;
+  visibility: visible;
+}
+
 body.font-size-small { --base-font-size: 14px; }
 body.font-size-medium { --base-font-size: 16px; }
 body.font-size-large { --base-font-size: 18px; }
@@ -371,6 +383,43 @@ body.font-size-large { --base-font-size: 18px; }
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border-width: 0;
+}
+
+/* --- Boot Screen --- */
+#boot-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #0d0d0d;
+  color: #00ff00;
+  font-family: 'Fira Code', monospace;
+  z-index: 9999;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 2rem;
+  opacity: 1;
+  transition: opacity 0.5s ease-in-out;
+}
+#boot-screen.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+#boot-text p {
+  margin: 0;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.cursor::after {
+  content: '█';
+  animation: blink-cursor 1s step-end infinite;
+}
+@keyframes blink-cursor {
+  50% {
+    opacity: 0;
+  }
 }
 
 /* --- Sidebar & Overlay --- */
@@ -556,6 +605,7 @@ body.sidebar-open #overlay {
   flex-direction: column;
   height: 100dvh;
   transition: margin-left 0.3s ease-in-out;
+  position: relative;
 }
 
 header {
@@ -625,6 +675,51 @@ main {
   gap: 1rem;
   min-height: 0;
 }
+
+/* --- Combat Tracker --- */
+#combat-tracker {
+  position: absolute;
+  top: 80px;
+  right: 20px;
+  width: 250px;
+  background-color: rgba(var(--sidebar-color-rgb, 30 31 32) / 0.85);
+  backdrop-filter: blur(5px);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  z-index: 5;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+#combat-tracker h3 {
+  font-family: var(--title-font);
+  font-size: 1.2rem;
+  color: var(--accent-color);
+  margin-bottom: 0.75rem;
+  text-align: center;
+}
+#combat-enemy-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.combat-enemy-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+}
+.combat-enemy-item .status {
+  font-weight: bold;
+  padding: 0.1rem 0.5rem;
+  border-radius: 1rem;
+  font-size: 0.8rem;
+}
+.status-Healthy { color: #81C784; background-color: rgba(129, 199, 132, 0.1); }
+.status-Injured { color: #FFD54F; background-color: rgba(255, 213, 79, 0.1); }
+.status-Bloodied { color: #FFB74D; background-color: rgba(255, 183, 77, 0.1); }
+.status-Near.Death { color: #E57373; background-color: rgba(229, 115, 115, 0.1); }
+
 
 /* --- Messages --- */
 .message {
