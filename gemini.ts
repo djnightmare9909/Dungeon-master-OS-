@@ -16,6 +16,7 @@ export const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 export function createNewChatInstance(history: { role: 'user' | 'model'; parts: { text: string }[] }[] = [], instruction: string): Chat {
   const config: any = {
     systemInstruction: instruction,
+    temperature: 0.9,
   };
   if (instruction !== getNewGameSetupInstruction()) {
     config.tools = [{ googleSearch: {} }];
@@ -341,7 +342,7 @@ Your goal is to guide the user through the setup process step-by-step. You MUST 
 
 export function getQuickStartCharacterPrompt(): string {
   return `
-    Generate four diverse, pre-made, level 1 D&D 5e characters for a new campaign.
+    Generate four wildly diverse and creative, pre-made, level 1 D&D 5e characters for a new campaign. Ensure maximum randomness in names, backstories, and character concepts. Do not repeat character archetypes you may have generated before.
     Each character must be completely unique in their race and class combination.
     Provide a compelling, one-paragraph backstory for each character that hints at a personal goal or motivation.
     You MUST return the output as a single, valid JSON array.

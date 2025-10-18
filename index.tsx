@@ -566,6 +566,8 @@ async function handleFormSubmit(e: Event) {
                   type: Type.ARRAY,
                   items: quickStartCharacterSchema,
                 },
+                temperature: 1,
+                seed: Math.floor(Math.random() * Date.now()),
               }
             });
             const chars = JSON.parse(charResponse.text);
