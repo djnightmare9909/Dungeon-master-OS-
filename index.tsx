@@ -35,7 +35,6 @@ import {
   menuBtn,
   newChatBtn,
   overlay,
-  personaSelector,
   exportAllBtn,
   importAllBtn,
   importAllFileInput,
@@ -77,8 +76,6 @@ import {
   updateNpcsBtn,
   updateAchievementsBtn,
   generateImageBtn,
-  settingTone,
-  settingNarration,
   fontSizeControls,
   enterToSendToggle,
   changeUiBtn,
@@ -92,14 +89,13 @@ import {
   closeModal,
   applyUISettings,
   renderChatHistory,
-  renderPersonaSelector,
-  updatePersonaSelectorValue,
   openChatOptionsMenu,
   closeChatOptionsMenu,
   appendMessage,
   renderMessages,
   updateLogbook,
   renderQuickStartChoices,
+  renderSetupChoices,
   quickActionsBar,
   inventoryPopupContent,
   renderUserContext,
@@ -132,7 +128,7 @@ import {
   getQuickStartCharacterPrompt,
 } from './gemini';
 // Fix: import UISettings type
-import type { Message, ChatSession, UISettings } from './types';
+import type { Message, ChatSession, UISettings, GameSettings } from './types';
 
 let chatIdToRename: string | null = null;
 let chatIdToDelete: string | null = null;
@@ -258,7 +254,7 @@ async function startNewChat() {
       messages: [firstUserMessage, firstModelMessage],
       isPinned: false,
       createdAt: Date.now(),
-      personaId: getCurrentPersonaId(),
+      personaId: 'purist', // Default persona
       creationPhase: 'guided',
       settings: {
         tone: 'heroic',
@@ -491,33 +487,24 @@ async function handleFormSubmit(e: Event) {
 
     if (currentSession.creationPhase) {
       stopTTS();
-
-      if (currentSession.creationPhase === 'quick_start_password') {
-        const userMessage: Message = { sender: 'user', text: userInput };
-        appendMessage(userMessage);
-        currentSession.messages.push(userMessage);
-        chatInput.value = '';
-        chatInput.style.height = 'auto';
-
-        currentSession.adminPassword = userInput;
-        saveChatHistoryToDB();
-
-        await finalizeSetupAndStartGame(currentSession, currentSession.title);
-
-        return;
-      }
-
       const userMessage: Message = { sender: 'user', text: userInput };
       appendMessage(userMessage);
       currentSession.messages.push(userMessage);
       chatInput.value = '';
       chatInput.style.height = 'auto';
 
+      if (currentSession.creationPhase === 'quick_start_password') {
+        currentSession.adminPassword = userInput;
+        saveChatHistoryToDB();
+        await finalizeSetupAndStartGame(currentSession, currentSession.title);
+        return;
+      }
+
       if (currentSession.creationPhase === 'guided') {
-        const userMessages = currentSession.messages.filter(m => m.sender === 'user');
-        if (userMessages.length === 2 && userMessages[0].hidden) {
-          currentSession.adminPassword = userInput;
-        }
+        currentSession.adminPassword = userInput;
+        currentSession.creationPhase = 'character_creation';
+        saveChatHistoryToDB();
+        // Fall through to the generic setup message sending logic
       }
 
       const modelMessageContainer = appendMessage({ sender: 'model', text: '' });
@@ -529,8 +516,13 @@ async function handleFormSubmit(e: Event) {
       try {
         const geminiChat = getGeminiChat();
         if (!geminiChat) throw new Error("Setup AI Error: chat is not initialized.");
+        
+        // Use a different prompt to kick off character creation
+        const messageToSend = currentSession.creationPhase === 'character_creation' && currentSession.messages.filter(m => m.sender === 'user').length <= 2
+            ? "Let's create my character."
+            : userInput;
 
-        const result = await geminiChat.sendMessageStream({ message: userInput });
+        const result = await geminiChat.sendMessageStream({ message: messageToSend });
         let responseText = '';
         modelMessageEl.classList.remove('loading');
         modelMessageEl.innerHTML = '';
@@ -542,6 +534,18 @@ async function handleFormSubmit(e: Event) {
             chatContainer.scrollTop = chatContainer.scrollHeight;
           }
         }
+        
+        if (responseText.includes('[CHARACTER_CREATION_COMPLETE]')) {
+            currentSession.creationPhase = 'narrator_selection';
+            const setupMessageText = responseText.replace('[CHARACTER_CREATION_COMPLETE]', '').trim();
+            modelMessageEl.innerHTML = setupMessageText;
+            const setupMessage: Message = { sender: 'model', text: setupMessageText };
+            currentSession.messages.push(setupMessage);
+            saveChatHistoryToDB();
+            renderSetupChoices();
+            return;
+        }
+
 
         if (responseText.includes('[GENERATE_QUICK_START_CHARACTERS]')) {
           currentSession.creationPhase = 'quick_start_selection';
@@ -680,6 +684,8 @@ async function handleFormSubmit(e: Event) {
  * Initializes all event listeners for the application.
  */
 function setupEventListeners() {
+  let setupSettings: Partial<GameSettings & { personaId: string }> = {};
+  
   chatForm.addEventListener('submit', handleFormSubmit);
   // Fix: Cannot find name 'sendButton'.
   sendButton.addEventListener('click', handleFormSubmit);
@@ -702,38 +708,107 @@ function setupEventListeners() {
   });
 
   chatContainer.addEventListener('click', async (e) => {
-    const card = (e.target as HTMLElement).closest<HTMLElement>('.quick-start-card');
+    const target = e.target as HTMLElement;
     const currentSession = getCurrentChat();
-    if (!card || !currentSession || currentSession.creationPhase !== 'quick_start_selection' || isSending()) return;
-    setSending(true);
+    if (!currentSession || isSending()) return;
+    
+    const quickStartCard = target.closest<HTMLElement>('.quick-start-card');
+    if (quickStartCard && currentSession.creationPhase === 'quick_start_selection') {
+      setSending(true);
+      try {
+        const charIndex = parseInt(quickStartCard.dataset.charIndex || '-1', 10);
+        const selectedChar = currentSession.quickStartChars?.[charIndex];
+        if (!selectedChar) throw new Error("Invalid character selection.");
 
-    try {
-      const charIndex = parseInt(card.dataset.charIndex || '-1', 10);
-      const selectedChar = currentSession.quickStartChars?.[charIndex];
-      if (!selectedChar) throw new Error("Invalid character selection.");
+        chatContainer.querySelectorAll('.quick-start-card').forEach(c => c.classList.add('disabled'));
+        quickStartCard.classList.remove('disabled');
+        quickStartCard.classList.add('selected');
 
-      chatContainer.querySelectorAll('.quick-start-card').forEach(c => c.classList.add('disabled'));
-      card.classList.remove('disabled');
-      card.classList.add('selected');
+        const userMessage: Message = { sender: 'user', text: `I choose to play as ${selectedChar.name}, the ${selectedChar.race} ${selectedChar.class}.` };
+        appendMessage(userMessage);
+        currentSession.messages.push(userMessage);
 
-      const userMessage: Message = { sender: 'user', text: `I choose to play as ${selectedChar.name}, the ${selectedChar.race} ${selectedChar.class}.` };
-      appendMessage(userMessage);
-      currentSession.messages.push(userMessage);
+        currentSession.characterSheet = selectedChar;
+        const title = `${selectedChar.name}'s Journey`;
+        currentSession.title = title;
+        currentSession.creationPhase = 'quick_start_password';
 
-      currentSession.characterSheet = selectedChar;
-      const title = `${selectedChar.name}'s Journey`;
-      currentSession.title = title;
-      currentSession.creationPhase = 'quick_start_password';
+        const passwordMessage: Message = { sender: 'model', text: `You have chosen to play as ${selectedChar.name}. Excellent choice.\n\nBefore we begin, please set a secure password for the OOC (Out of Character) protocol. This allows you to speak directly to the underlying AI if you need to make corrections or ask meta-questions.` };
+        appendMessage(passwordMessage);
+        currentSession.messages.push(passwordMessage);
+        saveChatHistoryToDB();
+      } catch (error) {
+        console.error("Error during quick start selection:", error);
+        appendMessage({ sender: 'error', text: "Something went wrong with character selection. Please try again." });
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
 
-      const passwordMessage: Message = { sender: 'model', text: `You have chosen to play as ${selectedChar.name}. Excellent choice.\n\nBefore we begin, please set a secure password for the OOC (Out of Character) protocol. This allows you to speak directly to the underlying AI if you need to make corrections or ask meta-questions.` };
-      appendMessage(passwordMessage);
-      currentSession.messages.push(passwordMessage);
-      saveChatHistoryToDB();
-    } catch (error) {
-      console.error("Error during quick start selection:", error);
-      appendMessage({ sender: 'error', text: "Something went wrong with character selection. Please try again." });
-    } finally {
-      setSending(false);
+    const narratorChoiceBtn = target.closest<HTMLButtonElement>('.narrator-choice-btn');
+    if (narratorChoiceBtn && currentSession.creationPhase === 'narrator_selection') {
+      const type = narratorChoiceBtn.dataset.type;
+      const value = narratorChoiceBtn.dataset.value;
+      if (!type || !value) return;
+
+      if (type === 'tone') {
+        if (value === 'heroic' || value === 'gritty' || value === 'comedic') {
+          setupSettings.tone = value;
+        }
+      } else if (type === 'narration') {
+        if (value === 'concise' || value === 'descriptive' || value === 'cinematic') {
+          setupSettings.narration = value;
+        }
+      } else if (type === 'persona') {
+        setupSettings.personaId = value;
+      }
+      
+      const parentGroup = narratorChoiceBtn.closest('.narrator-choice-group');
+      parentGroup?.querySelectorAll('.narrator-choice-btn').forEach(btn => btn.classList.remove('selected'));
+      narratorChoiceBtn.classList.add('selected');
+
+      if (setupSettings.tone && setupSettings.narration && setupSettings.personaId) {
+        setSending(true);
+        try {
+          // Disable all buttons
+          document.querySelectorAll('.narrator-choice-btn').forEach(btn => (btn as HTMLButtonElement).disabled = true);
+          
+          currentSession.settings = { tone: setupSettings.tone, narration: setupSettings.narration };
+          currentSession.personaId = setupSettings.personaId;
+          currentSession.creationPhase = 'world_creation';
+
+          const geminiChat = getGeminiChat();
+          if (!geminiChat) throw new Error("Chat not initialized for narrator selection.");
+
+          const modelMessageContainer = appendMessage({ sender: 'model', text: '' });
+          const modelMessageEl = modelMessageContainer.querySelector('.message') as HTMLElement;
+          modelMessageEl.classList.add('loading');
+          
+          const personaName = dmPersonas.find(p => p.id === setupSettings.personaId)?.name || 'DM';
+          const userMessageText = `I've chosen the ${personaName} with a ${setupSettings.tone} tone and ${setupSettings.narration} narration. Now, let's create the world.`;
+          const result = await geminiChat.sendMessageStream({ message: userMessageText });
+          
+          let responseText = '';
+          modelMessageEl.classList.remove('loading');
+          for await (const chunk of result) {
+            responseText += chunk.text || '';
+            modelMessageEl.innerHTML = responseText;
+          }
+
+          const userMessage: Message = { sender: 'user', text: userMessageText, hidden: true };
+          const modelMessage: Message = { sender: 'model', text: responseText };
+          currentSession.messages.push(userMessage, modelMessage);
+          saveChatHistoryToDB();
+
+        } catch(error) {
+          console.error("Error after narrator selection:", error);
+          appendMessage({ sender: 'error', text: 'Something went wrong. Please try again.'});
+        } finally {
+          setSending(false);
+          setupSettings = {}; // Reset for next time
+        }
+      }
     }
   });
 
@@ -754,13 +829,6 @@ function setupEventListeners() {
         loadChat(sessionId);
       }
     }
-  });
-
-
-  personaSelector.addEventListener('change', () => {
-    setCurrentPersonaId(personaSelector.value);
-    // Fix: Cannot find name 'dbSet'.
-    dbSet('dm-os-persona', personaSelector.value);
   });
 
   helpBtn.addEventListener('click', () => openModal(helpModal));
@@ -862,16 +930,6 @@ function setupEventListeners() {
   updateAchievementsBtn.addEventListener('click', () => updateLogbookData('achievements'));
   generateImageBtn.addEventListener('click', generateCharacterImage);
   
-  const handleSettingChange = (key: 'tone' | 'narration', value: string) => {
-      const currentSession = getCurrentChat();
-      if(currentSession?.settings) {
-          (currentSession.settings as any)[key] = value;
-          saveChatHistoryToDB();
-      }
-  };
-  settingTone.addEventListener('change', () => handleSettingChange('tone', settingTone.value));
-  settingNarration.addEventListener('change', () => handleSettingChange('narration', settingNarration.value));
-
   fontSizeControls.addEventListener('click', (e) => {
     const button = (e.target as HTMLElement).closest('button');
     if (button?.dataset.size) {
@@ -975,9 +1033,6 @@ async function initApp() {
   renderDiceGrid();
   // Fix: Cannot find name 'renderThemeCards'.
   renderThemeCards();
-  renderPersonaSelector();
-  // Fix: Expected 1 arguments, but got 0.
-  updatePersonaSelectorValue(getCurrentPersonaId());
   // Fix: Cannot find name 'renderUserContext' and it needs an argument.
   renderUserContext(getUserContext());
   renderChatHistory();

@@ -66,7 +66,7 @@ export interface ChatSession {
   createdAt: number;
   adminPassword?: string;
   personaId?: string;
-  creationPhase?: 'guided' | 'quick_start_selection' | 'quick_start_password' | false;
+  creationPhase?: 'guided' | 'character_creation' | 'narrator_selection' | 'world_creation' | 'quick_start_selection' | 'quick_start_password' | false;
   characterSheet?: CharacterSheetData | string;
   inventory?: string;
   characterImageUrl?: string;

@@ -32,7 +32,14 @@ export function migrateAndValidateSession(session: any): ChatSession {
   newSession.adminPassword = typeof session.adminPassword === 'string' ? session.adminPassword : undefined;
   newSession.personaId = typeof session.personaId === 'string' ? session.personaId : 'purist';
 
-  if (session.creationPhase === 'guided' || session.creationPhase === 'quick_start_selection' || session.creationPhase === 'quick_start_password') {
+  if (
+    session.creationPhase === 'guided' ||
+    session.creationPhase === 'character_creation' ||
+    session.creationPhase === 'narrator_selection' ||
+    session.creationPhase === 'world_creation' ||
+    session.creationPhase === 'quick_start_selection' ||
+    session.creationPhase === 'quick_start_password'
+    ) {
     newSession.creationPhase = session.creationPhase;
   } else {
     newSession.creationPhase = false;

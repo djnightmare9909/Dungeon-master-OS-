@@ -21,7 +21,6 @@ export const overlay = document.getElementById('overlay') as HTMLElement;
 export const chatHistoryContainer = document.getElementById('chat-history-container') as HTMLElement;
 export const pinnedChatsList = document.getElementById('pinned-chats-list') as HTMLUListElement;
 export const recentChatsList = document.getElementById('recent-chats-list') as HTMLUListElement;
-export const personaSelector = document.getElementById('persona-selector') as HTMLSelectElement;
 const ttsTemplate = document.getElementById('tts-controls-template') as HTMLTemplateElement;
 export const exportAllBtn = document.getElementById('export-all-btn') as HTMLButtonElement;
 export const importAllBtn = document.getElementById('import-all-btn') as HTMLButtonElement;
@@ -82,8 +81,6 @@ export const generateImageBtn = document.getElementById('generate-image-btn') as
 export const characterImageDisplay = document.getElementById('character-image-display') as HTMLImageElement;
 export const characterImagePlaceholder = document.getElementById('character-image-placeholder') as HTMLElement;
 export const characterImageLoading = document.getElementById('character-image-loading') as HTMLElement;
-export const settingTone = document.getElementById('setting-tone') as HTMLSelectElement;
-export const settingNarration = document.getElementById('setting-narration') as HTMLSelectElement;
 export const fontSizeControls = document.getElementById('font-size-controls') as HTMLElement;
 export const enterToSendToggle = document.getElementById('setting-enter-send') as HTMLInputElement;
 export const changeUiBtn = document.getElementById('change-ui-btn') as HTMLButtonElement;
@@ -146,7 +143,7 @@ export function renderChatHistory() {
     li.innerHTML = `
       <span class="chat-title">${session.title}</span>
       <button class="options-btn" aria-label="Chat options">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9-2-2-.9-2-2-2z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9-2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9-2-2-.9-2-2-2z"/></svg>
       </button>
     `;
 
@@ -167,21 +164,6 @@ export function renderChatHistory() {
   });
 
   (document.getElementById('pinned-chats') as HTMLElement).style.display = pinnedChatsList.children.length > 0 ? 'block' : 'none';
-}
-
-export function renderPersonaSelector() {
-  personaSelector.innerHTML = '';
-  dmPersonas.forEach(persona => {
-    const option = document.createElement('option');
-    option.value = persona.id;
-    option.textContent = persona.name;
-    option.title = persona.description;
-    personaSelector.appendChild(option);
-  });
-}
-
-export function updatePersonaSelectorValue(personaId: string) {
-  personaSelector.value = personaId;
 }
 
 export function openChatOptionsMenu(sessionId: string, buttonEl: HTMLElement) {
@@ -278,6 +260,54 @@ export function renderQuickStartChoices(characters: CharacterSheetData[]) {
   // save handled by controller
 }
 
+export function renderSetupChoices() {
+  const currentSession = getCurrentChat();
+  if (!currentSession) return;
+
+  const choiceHtml = `
+      <p>Excellent. Before we create the world, let's define the feel of the game.</p>
+      <div class="narrator-selection-grid">
+        <div class="narrator-choice-group">
+          <h4>DM Persona</h4>
+          ${dmPersonas.map(persona => `
+            <button class="narrator-choice-btn" data-type="persona" data-value="${persona.id}">
+              <div class="choice-title">${persona.name}</div>
+              <div class="choice-desc">${persona.description}</div>
+            </button>
+          `).join('')}
+        </div>
+        <div class="narrator-choice-group">
+          <h4>Game Tone</h4>
+          <button class="narrator-choice-btn" data-type="tone" data-value="heroic">
+            <div class="choice-title">Heroic Fantasy</div>
+          </button>
+          <button class="narrator-choice-btn" data-type="tone" data-value="gritty">
+            <div class="choice-title">Serious & Gritty</div>
+          </button>
+          <button class="narrator-choice-btn" data-type="tone" data-value="comedic">
+            <div class="choice-title">Comedic</div>
+          </button>
+        </div>
+        <div class="narrator-choice-group">
+          <h4>Narration Style</h4>
+          <button class="narrator-choice-btn" data-type="narration" data-value="concise">
+            <div class="choice-title">Concise</div>
+          </button>
+          <button class="narrator-choice-btn" data-type="narration" data-value="descriptive">
+            <div class="choice-title">Descriptive</div>
+          </button>
+          <button class="narrator-choice-btn" data-type="narration" data-value="cinematic">
+            <div class="choice-title">Cinematic</div>
+          </button>
+        </div>
+      </div>
+    `;
+
+  const choiceMessage: Message = { sender: 'model', text: choiceHtml };
+  appendMessage(choiceMessage);
+  currentSession.messages.push(choiceMessage);
+}
+
 export function renderCharacterSheet(data: CharacterSheetData) {
   characterSheetDisplay.innerHTML = `
       <header class="sheet-header">
@@ -363,11 +393,6 @@ export function updateLogbook(session: ChatSession | undefined) {
     characterImageDisplay.src = '';
     characterImageDisplay.classList.add('hidden');
     characterImagePlaceholder.classList.remove('hidden');
-  }
-
-  if (session.settings) {
-    settingTone.value = session.settings.tone;
-    settingNarration.value = session.settings.narration;
   }
 }
 

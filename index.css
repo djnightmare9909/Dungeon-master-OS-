@@ -477,38 +477,6 @@ body.sidebar-open #sidebar {
   height: 20px;
 }
 
-/* Persona Selector */
-#persona-selector-container {
-    margin-top: 1rem;
-}
-
-#persona-selector-container label {
-    display: block;
-    font-size: 0.9rem;
-    color: var(--text-secondary-color);
-    margin-bottom: 0.5rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-#persona-selector {
-    width: 100%;
-    background-color: var(--model-message-bg);
-    border: 1px solid var(--border-color);
-    color: var(--text-color);
-    padding: 0.75rem;
-    border-radius: 8px;
-    font-family: var(--primary-font);
-    font-size: 1rem;
-    cursor: pointer;
-}
-
-#persona-selector:focus {
-    outline: none;
-    border-color: var(--accent-color);
-}
-
-
 #chat-history-container {
   flex-grow: 1;
   overflow-y: auto;
@@ -2181,6 +2149,60 @@ input:checked + .slider:before {
     pointer-events: none;
 }
 
+/* --- Narrator Selection UI --- */
+.narrator-selection-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+.narrator-choice-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.narrator-choice-group h4 {
+    font-family: var(--primary-font);
+    font-weight: bold;
+    color: var(--accent-color);
+    margin-bottom: 0.25rem;
+}
+.narrator-choice-btn {
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 0.2s, border-color 0.2s;
+    font-family: var(--primary-font);
+}
+.narrator-choice-btn:hover {
+    background-color: var(--user-message-bg);
+    border-color: var(--text-secondary-color);
+}
+.narrator-choice-btn.selected {
+    background-color: var(--accent-color);
+    border-color: var(--accent-hover-color);
+    color: var(--background-color);
+}
+.narrator-choice-btn.selected .choice-desc {
+    color: var(--sidebar-color);
+}
+.narrator-choice-btn.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+.choice-title {
+    font-weight: bold;
+    font-size: 1rem;
+}
+.choice-desc {
+    font-size: 0.85rem;
+    color: var(--text-secondary-color);
+    margin-top: 0.25rem;
+}
 
 /* --- Responsive Design --- */
 @media (max-width: 768px) {
