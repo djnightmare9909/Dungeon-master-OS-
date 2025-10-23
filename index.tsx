@@ -102,6 +102,8 @@ import {
   chatHistoryContainer,
   updateCombatTracker,
   combatTracker,
+  welcomeModal,
+  closeWelcomeBtn,
 } from './ui';
 import {
   stopTTS,
@@ -214,6 +216,17 @@ function runBootSequence(): Promise<void> {
 
     setTimeout(typeLine, 500);
   });
+}
+
+/**
+ * Checks if the v2 welcome modal has been shown and displays it if not.
+ */
+function showWelcomeModalIfNeeded() {
+    const welcomeShown = localStorage.getItem('dm-os-v2-welcome-shown');
+    if (!welcomeShown) {
+        openModal(welcomeModal);
+        localStorage.setItem('dm-os-v2-welcome-shown', 'true');
+    }
 }
 
 
@@ -843,6 +856,7 @@ function setupEventListeners() {
   closeDeleteConfirmBtn.addEventListener('click', closeDeleteConfirmModal);
   cancelDeleteBtn.addEventListener('click', closeDeleteConfirmModal);
   confirmDeleteBtn.addEventListener('click', deleteChat);
+  closeWelcomeBtn.addEventListener('click', () => closeModal(welcomeModal));
 
   renameForm.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1045,6 +1059,7 @@ async function initApp() {
   }
 
   setupEventListeners();
+  showWelcomeModalIfNeeded();
 }
 
 // Start the application

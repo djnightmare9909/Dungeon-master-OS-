@@ -1388,6 +1388,17 @@ footer {
     opacity: 0.85;
 }
 
+.update-feature {
+    margin-bottom: 1.5rem;
+    padding-left: 1rem;
+    border-left: 3px solid var(--accent-color);
+}
+.update-feature h3 {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0.5rem;
+}
+
 
 /* --- Chat Options Menu --- */
 .chat-options-menu {

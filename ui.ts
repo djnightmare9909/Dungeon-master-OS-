@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { getChatHistory, getCurrentChat, getUISettings } from './state';
-import type { Message, ChatSession, CharacterSheetData, Achievement } from './types';
+import type { Message, ChatSession, CharacterSheetData, Achievement, NPCState } from './types';
 import { dmPersonas } from './gemini';
 
 // =================================================================================
@@ -90,6 +90,8 @@ export const themeGrid = document.getElementById('theme-grid') as HTMLElement;
 export const chatOptionsMenu = document.getElementById('chat-options-menu') as HTMLUListElement;
 export const combatTracker = document.getElementById('combat-tracker') as HTMLElement;
 export const combatEnemyList = document.getElementById('combat-enemy-list') as HTMLUListElement;
+export const welcomeModal = document.getElementById('update-welcome-modal') as HTMLElement;
+export const closeWelcomeBtn = document.getElementById('close-welcome-btn') as HTMLButtonElement;
 
 // =================================================================================
 // UI & MODAL MANAGEMENT
@@ -381,7 +383,19 @@ export function updateLogbook(session: ChatSession | undefined) {
 
   inventoryDisplay.textContent = session.inventory || "No data. Ask the DM to summarize your inventory.";
   questsDisplay.textContent = session.questLog || "No quest data. Ask the DM to update your journal.";
-  npcsDisplay.textContent = session.npcList || "No NPC data. Ask the DM for a list of characters you've met.";
+  
+  if (session.npcList && session.npcList.length > 0) {
+    npcsDisplay.innerHTML = session.npcList.map(npc => `
+        <div class="npc-log-entry">
+            <h4>${npc.name}</h4>
+            <p><strong>Description:</strong> ${npc.description}</p>
+            <p><strong>Relationship:</strong> ${npc.relationship}</p>
+        </div>
+    `).join('');
+  } else {
+      npcsDisplay.innerHTML = "<p>No NPC data. Ask the DM for a list of characters you've met.</p>";
+  }
+
 
   renderAchievements(session.achievements || []);
 

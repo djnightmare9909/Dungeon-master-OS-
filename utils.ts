@@ -2,7 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { ChatSession, GameSettings, Message, CharacterSheetData, Achievement } from './types';
+import type { ChatSession, GameSettings, Message, CharacterSheetData, Achievement, NPCState } from './types';
 
 /**
  * Takes any object and safely migrates it into a valid ChatSession object.
@@ -56,7 +56,18 @@ export function migrateAndValidateSession(session: any): ChatSession {
   newSession.inventory = typeof session.inventory === 'string' ? session.inventory : '';
   newSession.characterImageUrl = typeof session.characterImageUrl === 'string' ? session.characterImageUrl : '';
   newSession.questLog = typeof session.questLog === 'string' ? session.questLog : '';
-  newSession.npcList = typeof session.npcList === 'string' ? session.npcList : '';
+  
+  if (Array.isArray(session.npcList)) {
+    newSession.npcList = session.npcList.filter((npc: any) => 
+        typeof npc === 'object' && npc !== null &&
+        typeof npc.name === 'string' &&
+        typeof npc.description === 'string' &&
+        typeof npc.relationship === 'string'
+    ) as NPCState[];
+  } else {
+    newSession.npcList = [];
+  }
+
 
   if (Array.isArray(session.achievements)) {
     newSession.achievements = session.achievements.filter(a =>

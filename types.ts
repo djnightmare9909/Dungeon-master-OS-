@@ -58,6 +58,12 @@ export interface CharacterSheetData {
   backstory?: string;
 }
 
+export interface NPCState {
+    name: string;
+    description: string;
+    relationship: string;
+}
+
 export interface ChatSession {
   id: string;
   title: string;
@@ -71,7 +77,7 @@ export interface ChatSession {
   inventory?: string;
   characterImageUrl?: string;
   questLog?: string;
-  npcList?: string;
+  npcList?: NPCState[];
   achievements?: Achievement[];
   settings?: GameSettings;
   quickStartChars?: CharacterSheetData[];
