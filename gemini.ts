@@ -5,7 +5,18 @@
 import { GoogleGenAI, Chat, Type } from '@google/genai';
 import type { DMPersona } from './types';
 
-export const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+let _ai: GoogleGenAI;
+// Lazily initialize the AI instance to prevent app crash on load if API key is missing.
+// The error will be surfaced to the user during the first API call instead.
+export const ai = new Proxy({}, {
+  get(target, prop, receiver) {
+    if (!_ai) {
+      _ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    }
+    return Reflect.get(_ai, prop, receiver);
+  },
+}) as GoogleGenAI;
+
 
 /**
  * Creates a new Gemini Chat instance with the appropriate system instruction and history.
