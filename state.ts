@@ -21,6 +21,7 @@ let currentPersonaId: string = 'purist';
 let uiSettings: UISettings = {
   enterToSend: true,
   fontSize: 'medium',
+  experimentalUploadLimit: false,
 };
 
 // =================================================================================

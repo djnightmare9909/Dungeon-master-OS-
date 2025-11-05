@@ -539,3 +539,16 @@ export function handleImportAll(event: Event) {
     // to avoid circular dependencies with `loadChat` and `startNewChat`.
     // This is a placeholder; the real implementation is in the main controller.
 }
+
+export function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const result = reader.result as string;
+            // remove 'data:mime/type;base64,' part
+            resolve(result.split(',')[1]);
+        };
+        reader.onerror = error => reject(error);
+    });
+}

@@ -51,6 +51,7 @@ Leverage the power of generative AI to enrich your experience:
 *   **Character Portrait Generation:** Create a unique, high-quality portrait of your character based on their in-game description and equipment using Imagen.
 *   **Text-to-Speech (TTS):** Have the Dungeon Master's narration and dialogue read aloud for a more immersive experience.
 *   **On-Demand Summaries:** Instantly get updated summaries for your inventory, quests, and more without breaking the flow of the game.
+*   **Multimodal RAG Context:** Upload documents (including PDFs), images, audio, or video files. The AI will extract the relevant information and add it to its working context, allowing you to ground your adventure in your own custom content.
 
 ### 7. Rich, Customizable User Interface
 DM OS features a polished and highly customizable interface designed for role-playing.
@@ -63,7 +64,7 @@ DM OS features a polished and highly customizable interface designed for role-pl
 
 ## Technical Architecture
 
-*   **Core AI:** Powered by Google's **Gemini 2.5 Flash**, providing fast, creative, and context-aware responses.
+*   **Core AI:** Powered by Google's **Gemini 2.5 Flash**, providing fast, creative, and context-aware responses. Its multimodal capabilities allow it to process and understand text, images, audio, and video. Ai must be able to read all documents including PDFs.
 *   **Reasoning Engine:** The DM's advanced long-term memory and self-correction capabilities are managed by the **WFGY Universal Unification Framework**, which uses a "Semantic Tree" to ensure perfect campaign continuity over hundreds of turns.
 *   **Data Persistence:** All game data, including chat history, settings, and context, is stored locally and privately in your browser using **IndexedDB**.
 *   **Data Management:** Full support for exporting and importing single adventures or your entire campaign history in JSON format.

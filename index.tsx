@@ -78,6 +78,7 @@ import {
   generateImageBtn,
   fontSizeControls,
   enterToSendToggle,
+  experimentalUploadToggle,
   changeUiBtn,
   themeModal,
   closeThemeBtn,
@@ -104,6 +105,9 @@ import {
   combatTracker,
   welcomeModal,
   closeWelcomeBtn,
+  fileUploadBtn,
+  fileUploadInput,
+  appendFileProcessingMessage,
 } from './ui';
 import {
   stopTTS,
@@ -121,6 +125,7 @@ import {
   clearDiceResults,
   renderDiceGrid,
   renderThemeCards,
+  fileToBase64,
 } from './features';
 import {
   ai,
@@ -583,8 +588,6 @@ async function handleFormSubmit(e: Event) {
                   type: Type.ARRAY,
                   items: quickStartCharacterSchema,
                 },
-                temperature: 1,
-                seed: Math.floor(Math.random() * Date.now()),
               }
             });
             const chars = JSON.parse(charResponse.text);
@@ -651,7 +654,12 @@ async function handleFormSubmit(e: Event) {
     const shouldScroll = chatContainer.scrollHeight - chatContainer.clientHeight <= chatContainer.scrollTop + 10;
 
     try {
-      const result = await geminiChat.sendMessageStream({ message: userInput });
+      const context = getUserContext();
+      const messageWithContext = context.length > 0
+        ? `(OOC: Use the following context to inform your response:\n${context.join('\n')}\n)\n\n${userInput}`
+        : userInput;
+
+      const result = await geminiChat.sendMessageStream({ message: messageWithContext });
       let responseText = '';
       modelMessageEl.classList.remove('loading');
       modelMessageEl.innerHTML = '';
@@ -690,6 +698,92 @@ async function handleFormSubmit(e: Event) {
     }
   } finally {
     setSending(false);
+  }
+}
+
+async function handleFileUpload(event: Event) {
+  const input = event.target as HTMLInputElement;
+  if (!input.files || input.files.length === 0) return;
+  const file = input.files[0];
+  input.value = ''; // Reset for next upload
+
+  const useExperimentalLimit = getUISettings().experimentalUploadLimit;
+  const limitMB = useExperimentalLimit ? 75 : 50;
+  const MAX_FILE_SIZE_BYTES = limitMB * 1024 * 1024;
+
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+      const errorMsg = `❌ Error processing <strong>${file.name}</strong>. File is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Large files can cause performance issues or crashes. Please use files under ${limitMB}MB.`;
+      const messageEl = document.createElement('div');
+      messageEl.classList.add('message', 'system-file');
+      messageEl.innerHTML = `<span>${errorMsg}</span>`;
+      chatContainer.appendChild(messageEl);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+      return;
+  }
+
+  const messageEl = appendFileProcessingMessage(file.name);
+  const currentSession = getCurrentChat();
+  if (!currentSession) {
+      messageEl.classList.remove('loading');
+      messageEl.innerHTML = `<span>❌ Error: No active chat session.</span>`;
+      return;
+  }
+
+  try {
+    const CHUNK_LIMIT = 8000;
+    let extractedText = '';
+    let fileTypeForPrompt = '';
+    let promptText = '';
+
+    const processFile = async (prompt: string) => {
+      const base64Data = await fileToBase64(file);
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: { parts: [
+          { inlineData: { mimeType: file.type, data: base64Data } },
+          { text: prompt }
+        ]},
+      });
+      return response.text;
+    };
+
+    if (file.type.startsWith('text/')) {
+      extractedText = await file.text();
+      fileTypeForPrompt = 'text file';
+    } else if (file.type.startsWith('image/')) {
+      promptText = 'Concisely describe the contents and style of this image. This will be used as RAG context for a D&D game.';
+      extractedText = await processFile(promptText);
+      fileTypeForPrompt = 'image';
+    } else if (file.type.startsWith('audio/')) {
+      promptText = 'Transcribe the audio from this file. This will be used as RAG context for a D&D game.';
+      extractedText = await processFile(promptText);
+      fileTypeForPrompt = 'audio file';
+    } else if (file.type.startsWith('video/')) {
+      promptText = 'Provide a concise summary of the content of this video. This will be used as RAG context for a D&D game.';
+      extractedText = await processFile(promptText);
+      fileTypeForPrompt = 'video file';
+    } else if (file.type === 'application/pdf') {
+      promptText = 'Extract the full text content from this document. This will be used as RAG context for a D&D game.';
+      extractedText = await processFile(promptText);
+      fileTypeForPrompt = 'document';
+    } else {
+      throw new Error(`Unsupported file type: ${file.type}`);
+    }
+    
+    // Common logic for adding extracted content to the RAG context
+    const chunkedText = extractedText.length > CHUNK_LIMIT ? extractedText.substring(0, CHUNK_LIMIT) + '...' : extractedText;
+    addUserContext(`Content from ${fileTypeForPrompt} "${file.name}":\n\n${chunkedText}`);
+    
+    messageEl.classList.remove('loading');
+    messageEl.innerHTML = `<span>✅ File <strong>${file.name}</strong> processed and added to context.</span>`;
+
+  } catch (error) {
+    console.error("File processing failed:", error);
+    const errorMessage = (error as Error).message.includes('Unsupported file type')
+        ? `Unsupported file type: ${file.type}`
+        : 'An error occurred during processing.';
+    messageEl.classList.remove('loading');
+    messageEl.innerHTML = `<span>❌ Error processing <strong>${file.name}</strong>. ${errorMessage}</span>`;
   }
 }
 
@@ -955,7 +1049,10 @@ function setupEventListeners() {
   });
   enterToSendToggle.addEventListener('change', () => {
     getUISettings().enterToSend = enterToSendToggle.checked;
-    // Fix: Cannot find name 'dbSet'.
+    dbSet('dm-os-ui-settings', getUISettings());
+  });
+  experimentalUploadToggle.addEventListener('change', () => {
+    getUISettings().experimentalUploadLimit = experimentalUploadToggle.checked;
     dbSet('dm-os-ui-settings', getUISettings());
   });
 
@@ -1012,6 +1109,9 @@ function setupEventListeners() {
           chatForm.requestSubmit();
       }
   });
+
+  fileUploadBtn.addEventListener('click', () => fileUploadInput.click());
+  fileUploadInput.addEventListener('change', handleFileUpload);
 }
 
 /**

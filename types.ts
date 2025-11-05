@@ -17,6 +17,7 @@ export interface GameSettings {
 export interface UISettings {
   enterToSend: boolean;
   fontSize: 'small' | 'medium' | 'large';
+  experimentalUploadLimit: boolean;
 }
 
 export interface AbilityScore {

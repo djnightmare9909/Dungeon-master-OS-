@@ -83,6 +83,7 @@ export const characterImagePlaceholder = document.getElementById('character-imag
 export const characterImageLoading = document.getElementById('character-image-loading') as HTMLElement;
 export const fontSizeControls = document.getElementById('font-size-controls') as HTMLElement;
 export const enterToSendToggle = document.getElementById('setting-enter-send') as HTMLInputElement;
+export const experimentalUploadToggle = document.getElementById('setting-experimental-upload') as HTMLInputElement;
 export const changeUiBtn = document.getElementById('change-ui-btn') as HTMLButtonElement;
 export const themeModal = document.getElementById('theme-modal') as HTMLElement;
 export const closeThemeBtn = document.getElementById('close-theme-btn') as HTMLButtonElement;
@@ -92,6 +93,9 @@ export const combatTracker = document.getElementById('combat-tracker') as HTMLEl
 export const combatEnemyList = document.getElementById('combat-enemy-list') as HTMLUListElement;
 export const welcomeModal = document.getElementById('update-welcome-modal') as HTMLElement;
 export const closeWelcomeBtn = document.getElementById('close-welcome-btn') as HTMLButtonElement;
+export const fileUploadBtn = document.getElementById('file-upload-btn') as HTMLButtonElement;
+export const fileUploadInput = document.getElementById('file-upload-input') as HTMLInputElement;
+
 
 // =================================================================================
 // UI & MODAL MANAGEMENT
@@ -124,6 +128,9 @@ export function applyUISettings() {
   }
   if (enterToSendToggle) {
     enterToSendToggle.checked = uiSettings.enterToSend;
+  }
+  if (experimentalUploadToggle) {
+    experimentalUploadToggle.checked = uiSettings.experimentalUploadLimit;
   }
 }
 
@@ -237,6 +244,15 @@ export function appendMessage(message: Message, container: HTMLElement = chatCon
 
   container.scrollTop = container.scrollHeight;
   return container.lastElementChild as HTMLElement;
+}
+
+export function appendFileProcessingMessage(fileName: string): HTMLElement {
+  const messageElement = document.createElement('div');
+  messageElement.classList.add('message', 'system-file', 'loading');
+  messageElement.innerHTML = `<span>Processing <strong>${fileName}</strong>...</span>`;
+  chatContainer.appendChild(messageElement);
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+  return messageElement;
 }
 
 export function renderQuickStartChoices(characters: CharacterSheetData[]) {

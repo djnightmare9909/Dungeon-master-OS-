@@ -784,6 +784,32 @@ main {
     font-weight: bold;
 }
 
+.message.system-file {
+  align-self: center;
+  background-color: var(--background-color);
+  border: 1px dashed var(--border-color);
+  color: var(--text-secondary-color);
+  text-align: center;
+  padding: 0.5rem 1rem;
+  max-width: 80%;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.message.system-file.loading::before {
+    content: '';
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--text-secondary-color);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+}
+
 
 /* --- TTS Controls --- */
 .tts-controls {
@@ -878,6 +904,34 @@ footer {
   gap: 0.75rem;
   align-items: flex-end;
   padding: 0.5rem 0.5rem 0.5rem 1.25rem;
+}
+
+#file-upload-btn {
+  background: none;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+  color: var(--text-secondary-color);
+  padding: 0;
+}
+#file-upload-btn:hover {
+  background-color: var(--sidebar-color);
+  color: var(--text-color);
+}
+#file-upload-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+#file-upload-btn svg {
+  width: 22px;
+  height: 22px;
 }
 
 #inventory-btn {
@@ -1788,6 +1842,13 @@ footer {
     margin-bottom: 0.5rem;
     color: var(--text-secondary-color);
     font-size: 0.9rem;
+}
+
+.setting-description {
+    font-size: 0.8rem;
+    color: var(--text-secondary-color);
+    margin-top: 0.5rem;
+    line-height: 1.4;
 }
 
 .setting-item select {
