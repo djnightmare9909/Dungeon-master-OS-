@@ -1,3 +1,4 @@
+
 :root {
   /* High Fantasy (Dark) - Default Theme */
   --background-color: #131314;
@@ -19,95 +20,7 @@
 
 /* --- THEME DEFINITIONS --- */
 
-body[data-theme="sci-fi-blue-hud"] {
-  --background-color: #03070C;
-  --sidebar-color: #08101B;
-  --text-color: #C0D2E8;
-  --text-secondary-color: #7489A1;
-  --primary-font: 'Fira Code', monospace;
-  --title-font: 'Orbitron', sans-serif;
-  --mono-font: 'Fira Code', monospace;
-  --user-message-bg: #102542;
-  --model-message-bg: #0A192F;
-  --border-color: #1E3A5F;
-  --accent-color: #00E5FF;
-  --accent-hover-color: #7AFEFF;
-  --danger-color: #FF468B;
-}
-/* Extra styling for the HUD theme */
-body[data-theme="sci-fi-blue-hud"] {
-  background-image:
-    linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 229, 255, 0.03) 1px, transparent 1px);
-  background-size: 20px 20px;
-}
-body[data-theme="sci-fi-blue-hud"] ::-webkit-scrollbar {
-  width: 8px;
-}
-body[data-theme="sci-fi-blue-hud"] ::-webkit-scrollbar-track {
-  background: #08101B;
-}
-body[data-theme="sci-fi-blue-hud"] ::-webkit-scrollbar-thumb {
-  background-color: var(--accent-color);
-  border-radius: 4px;
-  border: 2px solid #08101B;
-}
-body[data-theme="sci-fi-blue-hud"] .modal-content,
-body[data-theme="sci-fi-blue-hud"] #chat-form,
-body[data-theme="sci-fi-blue-hud"] .message.model,
-body[data-theme="sci-fi-blue-hud"] .inventory-popup {
-  border: 1px solid var(--border-color);
-  box-shadow: 0 0 10px 0px rgba(0, 229, 255, 0.2), inset 0 0 5px 0px rgba(0, 229, 255, 0.1);
-}
-body[data-theme="sci-fi-blue-hud"] #chat-form:focus-within {
-  border-color: var(--accent-color);
-  box-shadow: 0 0 15px 0px rgba(0, 229, 255, 0.5), inset 0 0 8px 0px rgba(0, 229, 255, 0.3);
-}
-body[data-theme="sci-fi-blue-hud"] .logbook-nav-btn.active {
-  box-shadow: inset 0 0 10px rgba(0, 229, 255, 0.3);
-}
-
-body[data-theme="hacker-terminal"] {
-  --background-color: #0d0d0d;
-  --sidebar-color: #001a00;
-  --text-color: #00ff00;
-  --text-secondary-color: #008000;
-  --primary-font: 'Fira Code', monospace;
-  --title-font: 'Fira Code', monospace;
-  --mono-font: 'Fira Code', monospace;
-  --user-message-bg: #003300;
-  --model-message-bg: #001a00;
-  --border-color: #004d00;
-  --accent-color: #00ff00;
-  --accent-hover-color: #66ff66;
-  --danger-color: #ff3333;
-}
-/* Extra styling for the hacker theme */
-body[data-theme="hacker-terminal"] {
-    background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 0, 0.1) 2px, rgba(0, 255, 0, 0.1) 3px);
-}
-body[data-theme="hacker-terminal"] .modal-content,
-body[data-theme="hacker-terminal"] #chat-form,
-body[data-theme="hacker-terminal"] .message,
-body[data-theme="hacker-terminal"] .inventory-popup {
-  border: 1px solid var(--border-color);
-  border-radius: 0;
-}
-body[data-theme="hacker-terminal"] header,
-body[data-theme="hacker-terminal"] .sidebar-header,
-body[data-theme="hacker-terminal"] .sidebar-footer {
-    border-radius: 0;
-}
-body[data-theme="hacker-terminal"] #chat-input::after {
-    content: '_';
-    animation: blink 1s step-end infinite;
-}
-@keyframes blink { 50% { opacity: 0; } }
-body[data-theme="hacker-terminal"] h1, body[data-theme="hacker-terminal"] h2, body[data-theme="hacker-terminal"] h3 {
-    text-shadow: 0 0 5px var(--accent-color);
-}
-
-
+/* --- High Fantasy Dark (Refined) --- */
 body[data-theme="high-fantasy-dark"] {
   --background-color: #131314;
   --sidebar-color: #1e1f20;
@@ -122,140 +35,494 @@ body[data-theme="high-fantasy-dark"] {
   --accent-hover-color: #d8c670;
 }
 
+/* --- High Fantasy Light (New Variant) --- */
 body[data-theme="high-fantasy-light"] {
-  --background-color: #fdf6e3;
-  --sidebar-color: #f4ecd9;
-  --text-color: #586e75;
-  --text-secondary-color: #93a1a1;
-  --user-message-bg: #eee8d5;
-  --model-message-bg: #f4ecd9;
-  --border-color: #93a1a1;
-  --accent-color: #b58900;
-  --accent-hover-color: #cb9700;
+  --background-color: #fdf6e3; /* Parchment */
+  --sidebar-color: #f5ead5;
+  --text-color: #3a2e2c; /* Dark Ink */
+  --text-secondary-color: #65534d;
+  --primary-font: "Merriweather", serif;
+  --title-font: "Uncial Antiqua", cursive;
+  --user-message-bg: #e9dbc2;
+  --model-message-bg: #f5ead5;
+  --border-color: #d3c3a9;
+  --accent-color: #8b4513; /* Saddle Brown */
+  --accent-hover-color: #a0522d;
+  --danger-color: #b22222; /* Firebrick */
+}
+body[data-theme="high-fantasy-light"] #chat-form button[type="submit"] svg {
+  fill: var(--background-color);
 }
 
-body[data-theme="high-fantasy-elven"] {
-  --background-color: #1a1829;
-  --sidebar-color: #24223b;
-  --text-color: #d8d7e9;
-  --user-message-bg: #3a365e;
-  --model-message-bg: #24223b;
-  --border-color: #514d7d;
-  --accent-color: #a489d4;
-  --accent-hover-color: #bda0ea;
+
+/* --- Dark Fantasy Crimson --- */
+body[data-theme="dark-fantasy-crimson"] {
+  --background-color: #0a0a0a;
+  --sidebar-color: #141414;
+  --text-color: #d1d1d1;
+  --text-secondary-color: #888;
+  --primary-font: "Merriweather", serif;
+  --title-font: "Uncial Antiqua", cursive;
+  --user-message-bg: #4a0e1a;
+  --model-message-bg: #1f1f1f;
+  --border-color: #666;
+  --accent-color: #b71c1c;
+  --accent-hover-color: #d32f2f;
+  --danger-color: #ff5252;
+}
+/* Ornate border styles for Crimson theme */
+body[data-theme="dark-fantasy-crimson"] .modal-content,
+body[data-theme="dark-fantasy-crimson"] .message.model {
+  border: 1px solid var(--border-color);
+  position: relative;
+  background-clip: padding-box; /* Prevents background from overlapping the pseudo-element borders */
+}
+body[data-theme="dark-fantasy-crimson"] .modal-content::before,
+body[data-theme="dark-fantasy-crimson"] .modal-content::after,
+body[data-theme="dark-fantasy-crimson"] .message.model::before,
+body[data-theme="dark-fantasy-crimson"] .message.model::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-color: var(--border-color);
+  border-style: solid;
+  transition: border-color 0.3s;
+}
+body[data-theme="dark-fantasy-crimson"] .modal-content:hover::before,
+body[data-theme="dark-fantasy-crimson"] .modal-content:hover::after,
+body[data-theme="dark-fantasy-crimson"] .message.model:hover::before,
+body[data-theme="dark-fantasy-crimson"] .message.model:hover::after {
+  border-color: var(--accent-color);
+}
+/* Top-left corner */
+body[data-theme="dark-fantasy-crimson"] .modal-content::before,
+body[data-theme="dark-fantasy-crimson"] .message.model::before {
+  top: -6px; left: -6px;
+  border-width: 2px 0 0 2px;
+}
+/* Bottom-right corner */
+body[data-theme="dark-fantasy-crimson"] .modal-content::after,
+body[data-theme="dark-fantasy-crimson"] .message.model::after {
+  bottom: -6px; right: -6px;
+  border-width: 0 2px 2px 0;
 }
 
-body[data-theme="cyberpunk-neon"] {
+/* --- Classic RPG Parchment --- */
+body[data-theme="classic-rpg-parchment"] {
+  --background-color: #4d3c2a;
+  --sidebar-color: #3b2e21;
+  --text-color: #d5c8b8;
+  --text-secondary-color: #a39586;
+  --primary-font: "Merriweather", serif;
+  --title-font: "Uncial Antiqua", cursive;
+  --user-message-bg: #6b543b;
+  --model-message-bg: #3b2e21;
+  --border-color: #8c6742;
+  --accent-color: #e5c100;
+  --accent-hover-color: #f8d430;
+}
+/* Skeuomorphic styles for RPG theme */
+body[data-theme="classic-rpg-parchment"] {
+   background-image: url('data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%233b2e21" fill-opacity="0.4"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');
+}
+body[data-theme="classic-rpg-parchment"] .modal-content,
+body[data-theme="classic-rpg-parchment"] .message,
+body[data-theme="classic-rpg-parchment"] #sidebar,
+body[data-theme="classic-rpg-parchment"] #chat-form {
+  border: 2px solid var(--border-color);
+  box-shadow: inset 0 0 10px #00000080, 2px 2px 5px #00000050;
+}
+body[data-theme="classic-rpg-parchment"] button {
+  box-shadow: inset 0px 1px 0px 0px #ffffff50, 0px 1px 3px 0px #000000a0;
+}
+
+/* --- Cyberpunk HUD Advanced --- */
+body[data-theme="cyberpunk-hud-advanced"] {
   --background-color: #0d0221;
   --sidebar-color: #140c2b;
-  --text-color: #e0e0e0;
+  --text-color: #00f0ff;
   --text-secondary-color: #a0a0a0;
   --primary-font: 'Fira Code', monospace;
   --title-font: 'Orbitron', sans-serif;
-  --mono-font: 'Fira Code', monospace;
-  --user-message-bg: #2a004f;
-  --model-message-bg: #1d1135;
-  --border-color: #4a00e0;
+  --user-message-bg: rgba(42, 0, 79, 0.5);
+  --model-message-bg: rgba(29, 17, 53, 0.5);
+  --border-color: #c72cff;
   --accent-color: #00f0ff;
   --accent-hover-color: #8affff;
   --danger-color: #ff0055;
 }
-
-body[data-theme="cyberpunk-corporate"] {
-  --background-color: #1a2228;
-  --sidebar-color: #242f38;
-  --text-color: #e1e8ed;
-  --primary-font: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  --title-font: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  --user-message-bg: #354654;
-  --model-message-bg: #242f38;
-  --border-color: #3f505f;
-  --accent-color: #ff4d4d;
-  --accent-hover-color: #ff7f7f;
+/* HUD styles for Cyberpunk theme */
+body[data-theme="cyberpunk-hud-advanced"] {
+  background-image:
+    linear-gradient(rgba(0, 240, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.1) 1px, transparent 1px);
+  background-size: 25px 25px;
+}
+body[data-theme="cyberpunk-hud-advanced"] h1,
+body[data-theme="cyberpunk-hud-advanced"] h2,
+body[data-theme="cyberpunk-hud-advanced"] h3,
+body[data-theme="cyberpunk-hud-advanced"] .message {
+  text-shadow: 0 0 2px var(--accent-color), 0 0 5px var(--accent-color);
+}
+body[data-theme="cyberpunk-hud-advanced"] .modal-content,
+body[data-theme="cyberpunk-hud-advanced"] .message.model {
+  border: 1px solid #c72cff50;
+  position: relative;
+  background: radial-gradient(circle, rgba(29, 17, 53, 0.8) 0%, rgba(13, 2, 33, 0.8) 100%);
+  backdrop-filter: blur(4px);
+}
+/* Corner brackets for HUD */
+body[data-theme="cyberpunk-hud-advanced"] .modal-content::before,
+body[data-theme="cyberpunk-hud-advanced"] .modal-content::after,
+body[data-theme="cyberpunk-hud-advanced"] .message.model::before,
+body[data-theme="cyberpunk-hud-advanced"] .message.model::after {
+  content: '';
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  border-color: var(--accent-color);
+  border-style: solid;
+}
+body[data-theme="cyberpunk-hud-advanced"] .modal-content::before,
+body[data-theme="cyberpunk-hud-advanced"] .message.model::before {
+  top: 0; left: 0;
+  border-width: 2px 0 0 2px;
+}
+body[data-theme="cyberpunk-hud-advanced"] .modal-content::after,
+body[data-theme="cyberpunk-hud-advanced"] .message.model::after {
+  bottom: 0; right: 0;
+  border-width: 0 2px 2px 0;
+}
+/* Animation for modals */
+@keyframes stretch-and-form {
+  0% { transform: scale(0, 0.005); opacity: 0; }
+  40% { transform: scale(1, 0.005); opacity: 1; }
+  100% { transform: scale(1, 1); }
+}
+body[data-theme="cyberpunk-hud-advanced"] .modal-content {
+  transform-origin: center;
+  animation: stretch-and-form 0.4s cubic-bezier(0.785, 0.135, 0.15, 0.86) forwards;
 }
 
-body[data-theme="cyberpunk-dystopian"] {
-  --background-color: #212121;
-  --sidebar-color: #2a2a2a;
-  --text-color: #b2a490;
-  --primary-font: 'Courier New', Courier, monospace;
-  --title-font: 'Impact', sans-serif;
-  --user-message-bg: #4d443a;
-  --model-message-bg: #2a2a2a;
-  --border-color: #5d5d5d;
+/* --- Cyberpunk Bladerunner (New Variant) --- */
+body[data-theme="cyberpunk-bladerunner"] {
+  --background-color: #040a18;
+  --sidebar-color: #0b132b;
+  --text-color: #90b4ce;
+  --text-secondary-color: #5e6b7e;
+  --primary-font: 'Fira Code', monospace;
+  --title-font: 'Orbitron', sans-serif;
+  --user-message-bg: rgba(61, 89, 171, 0.3);
+  --model-message-bg: rgba(28, 37, 65, 0.5);
+  --border-color: #3d5aab;
   --accent-color: #ff9900;
   --accent-hover-color: #ffb84d;
+  --danger-color: #f94144;
+}
+body[data-theme="cyberpunk-bladerunner"] {
+  background-color: #040a18;
+  background-image: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.6) 100%);
+}
+body[data-theme="cyberpunk-bladerunner"] h1,
+body[data-theme="cyberpunk-bladerunner"] h2,
+body[data-theme="cyberpunk-bladerunner"] h3 {
+  text-shadow: 0 0 4px var(--accent-color), 0 0 8px #ff5500;
+}
+body[data-theme="cyberpunk-bladerunner"] .message {
+  border-left: 3px solid var(--accent-color);
 }
 
-body[data-theme="hellscape-fire"] {
-  --background-color: #100808;
-  --sidebar-color: #1a0c0c;
-  --text-color: #ffc2a1;
+/* --- Glitch Terminal --- */
+body[data-theme="glitch-terminal"] {
+  --background-color: #000;
+  --sidebar-color: #050505;
+  --text-color: #fff;
+  --text-secondary-color: #888;
+  --primary-font: 'Fira Code', monospace;
+  --title-font: 'Fira Code', monospace;
+  --user-message-bg: #111;
+  --model-message-bg: #050505;
+  --border-color: #555;
+  --accent-color: #fff;
+  --accent-hover-color: #ccc;
+  --danger-color: #fff;
+}
+/* Glitch styles */
+body[data-theme="glitch-terminal"] * {
+  border-radius: 0 !important;
+}
+@keyframes glitch-flicker {
+  0% { opacity: 1; }
+  50% { opacity: 0.8; }
+  100% { opacity: 1; }
+}
+body[data-theme="glitch-terminal"] {
+  animation: glitch-flicker 0.1s infinite;
+}
+body[data-theme="glitch-terminal"] header h1 {
+  animation: glitch-text 3s infinite steps(1);
+}
+@keyframes glitch-text {
+  0% { text-shadow: 1px 0 0 red, -1px 0 0 cyan; }
+  2% { text-shadow: 1px 0 0 red, -1px 0 0 cyan; }
+  3% { text-shadow: none; }
+  10% { text-shadow: none; }
+  11% { text-shadow: -1px 0 0 red, 1px 0 0 cyan; }
+  12% { text-shadow: none; }
+  20% { text-shadow: none; }
+  21% { transform: skewX(-10deg); }
+  22% { transform: skewX(0); }
+  100% { transform: skewX(0); }
+}
+body[data-theme="glitch-terminal"] .message {
+  border: 1px dashed var(--border-color);
+}
+body[data-theme="glitch-terminal"] .btn-danger {
+  background-color: var(--background-color);
+  color: #f00;
+  border: 1px solid #f00;
+}
+
+/* --- Glitch Terminal CRT --- */
+body[data-theme="glitch-terminal-crt"] {
+  --background-color: #000;
+  --sidebar-color: #050505;
+  --text-color: #e0e0e0; /* Slightly off-white */
+  --text-secondary-color: #888;
+  --primary-font: 'Fira Code', monospace;
+  --title-font: 'Fira Code', monospace;
+  --user-message-bg: #111;
+  --model-message-bg: #050505;
+  --border-color: #555;
+  --accent-color: #e0e0e0;
+  --accent-hover-color: #fff;
+  --danger-color: #e0e0e0;
+}
+/* CRT styles */
+body[data-theme="glitch-terminal-crt"] * {
+  border-radius: 0 !important;
+}
+body[data-theme="glitch-terminal-crt"] {
+  animation: glitch-flicker 0.1s infinite;
+  position: relative;
+  overflow: hidden; /* For pseudo elements */
+}
+/* Vignette / screen curve effect */
+body[data-theme="glitch-terminal-crt"]::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,0) 60%, rgba(0,0,0,0.8) 100%);
+  pointer-events: none;
+  z-index: 999;
+}
+/* Scanlines */
+body[data-theme="glitch-terminal-crt"]::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(0deg, rgba(0,0,0,0.5), rgba(0,0,0,0.5) 1px, transparent 1px, transparent 2px);
+  pointer-events: none;
+  z-index: 1000;
+}
+
+body[data-theme="glitch-terminal-crt"] h1,
+body[data-theme="glitch-terminal-crt"] h2,
+body[data-theme="glitch-terminal-crt"] h3,
+body[data-theme="glitch-terminal-crt"] .message,
+body[data-theme="glitch-terminal-crt"] button,
+body[data-theme="glitch-terminal-crt"] span {
+  text-shadow: 0 0 1px #e0e0e0, 0 0 3px #e0e0e080; /* Subtle phosphor glow */
+}
+body[data-theme="glitch-terminal-crt"] header h1 {
+  animation: glitch-text 3s infinite steps(1);
+}
+body[data-theme="glitch-terminal-crt"] .message {
+  border: 1px dashed var(--border-color);
+}
+body[data-theme="glitch-terminal-crt"] .btn-danger {
+  background-color: var(--background-color);
+  color: #f00;
+  border: 1px solid #f00;
+}
+
+/* --- Hacker Terminal --- */
+body[data-theme="hacker-terminal"] {
+  --background-color: #0d0d0d;
+  --sidebar-color: #001a00;
+  --text-color: #00ff00;
+  --text-secondary-color: #008000;
+  --primary-font: 'Fira Code', monospace;
+  --title-font: 'Fira Code', monospace;
+  --user-message-bg: #003300;
+  --model-message-bg: #001a00;
+  --border-color: #004d00;
+  --accent-color: #00ff00;
+  --accent-hover-color: #66ff66;
+  --danger-color: #ff3333;
+}
+body[data-theme="hacker-terminal"] {
+    background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 0, 0.1) 2px, rgba(0, 255, 0, 0.1) 3px);
+}
+body[data-theme="hacker-terminal"] * {
+  border-radius: 0 !important;
+}
+body[data-theme="hacker-terminal"] h1, body[data-theme="hacker-terminal"] h2, body[data-theme="hacker-terminal"] h3 {
+    text-shadow: 0 0 5px var(--accent-color);
+}
+
+/* --- Hacker Terminal Glitch --- */
+body[data-theme="hacker-terminal-glitch"] {
+  --background-color: #0d0d0d;
+  --sidebar-color: #001a00;
+  --text-color: #00ff00;
+  --text-secondary-color: #008000;
+  --primary-font: 'Fira Code', monospace;
+  --title-font: 'Fira Code', monospace;
+  --user-message-bg: #003300;
+  --model-message-bg: #001a00;
+  --border-color: #004d00;
+  --accent-color: #00ff00;
+  --accent-hover-color: #66ff66;
+  --danger-color: #ff3333;
+}
+body[data-theme="hacker-terminal-glitch"] * {
+  border-radius: 0 !important;
+}
+body[data-theme="hacker-terminal-glitch"] {
+  animation: glitch-flicker 0.1s infinite;
+}
+body[data-theme="hacker-terminal-glitch"] header h1 {
+  animation: glitch-text 3s infinite steps(1);
+}
+body[data-theme="hacker-terminal-glitch"] .message {
+  border: 1px dashed var(--border-color);
+}
+body[data-theme="hacker-terminal-glitch"] h1, 
+body[data-theme="hacker-terminal-glitch"] h2, 
+body[data-theme="hacker-terminal-glitch"] h3 {
+    text-shadow: 0 0 5px var(--accent-color);
+}
+
+/* --- Hacker Terminal Amber (New Variant) --- */
+body[data-theme="hacker-terminal-amber"] {
+  --background-color: #000;
+  --sidebar-color: #1a0a00;
+  --text-color: #ffb400;
+  --text-secondary-color: #b37e00;
+  --primary-font: 'Fira Code', monospace;
+  --title-font: 'Fira Code', monospace;
+  --user-message-bg: #331f00;
+  --model-message-bg: #1a0a00;
+  --border-color: #4d2e00;
+  --accent-color: #ffb400;
+  --accent-hover-color: #ffcf4d;
+  --danger-color: #ff4d4d;
+}
+body[data-theme="hacker-terminal-amber"] * { border-radius: 0 !important; }
+body[data-theme="hacker-terminal-amber"] h1, h2, h3 { text-shadow: 0 0 5px var(--accent-color); }
+
+/* --- Hacker Terminal Vault-Tec (New Variant) --- */
+body[data-theme="hacker-terminal-vault-tec"] {
+  --background-color: #0a141f;
+  --sidebar-color: #0f1c2d;
+  --text-color: #27bce0;
+  --text-secondary-color: #1a7b94;
+  --primary-font: 'Fira Code', monospace;
+  --title-font: 'Fira Code', monospace;
+  --user-message-bg: #142a40;
+  --model-message-bg: #0f1c2d;
+  --border-color: #1d405c;
+  --accent-color: #ffe832;
+  --accent-hover-color: #fff178;
+  --danger-color: #ff6b6b;
+}
+body[data-theme="hacker-terminal-vault-tec"] * { border-radius: 0 !important; }
+body[data-theme="hacker-terminal-vault-tec"] h1, h2, h3 { text-shadow: 0 0 5px var(--text-color); }
+
+/* --- Vampire Gothic Terminal (New) --- */
+body[data-theme="vampire-gothic-terminal"] {
+  --background-color: #050101;
+  --sidebar-color: #1a0303;
+  --text-color: #e0baba;
+  --text-secondary-color: #7d3c3c;
+  --primary-font: 'Fira Code', monospace;
   --title-font: "Uncial Antiqua", cursive;
-  --user-message-bg: #4d1818;
-  --model-message-bg: #1a0c0c;
-  --border-color: #5c2424;
-  --accent-color: #ff4500;
-  --accent-hover-color: #ff6a2e;
+  --user-message-bg: #3b0f0f;
+  --model-message-bg: #1a0303;
+  --border-color: #5c1f1f;
+  --accent-color: #ff4d4d;
+  --accent-hover-color: #ff8080;
+  --danger-color: #ff4d4d;
+}
+body[data-theme="vampire-gothic-terminal"] {
+  background-image: repeating-linear-gradient(0deg, rgba(100,0,0,0.1) 0, rgba(100,0,0,0.1) 1px, transparent 1px, transparent 3px);
+}
+body[data-theme="vampire-gothic-terminal"] h1,
+body[data-theme="vampire-gothic-terminal"] h2 {
+  text-shadow: 0 0 6px var(--accent-color);
+  font-weight: bold;
+}
+body[data-theme="vampire-gothic-terminal"] .message {
+  border-left: 2px solid var(--accent-color);
+  border-radius: 0 8px 8px 0;
 }
 
-body[data-theme="hellscape-soul"] {
-  --background-color: #130f1a;
-  --sidebar-color: #1b1524;
-  --text-color: #c8bfe0;
-  --user-message-bg: #382d4a;
-  --model-message-bg: #1b1524;
-  --border-color: #4d3a66;
-  --accent-color: #7fff00;
-  --accent-hover-color: #99ff33;
+/* --- Text Adventure Dark --- */
+body[data-theme="text-adventure-dark"] {
+  --background-color: #000;
+  --sidebar-color: #000;
+  --text-color: #ccc;
+  --text-secondary-color: #888;
+  --primary-font: 'Fira Code', monospace;
+  --title-font: 'Fira Code', monospace;
+  --user-message-bg: transparent;
+  --model-message-bg: transparent;
+  --border-color: #333;
+  --accent-color: #ccc;
+  --accent-hover-color: #fff;
 }
-
-body[data-theme="hellscape-ash"] {
-  --background-color: #202020;
-  --sidebar-color: #282828;
-  --text-color: #cccccc;
-  --text-secondary-color: #888888;
-  --user-message-bg: #404040;
-  --model-message-bg: #282828;
-  --border-color: #505050;
-  --accent-color: #b22222;
-  --accent-hover-color: #cc3f3f;
+/* Stripped-back styles for Text Adventure */
+body[data-theme="text-adventure-dark"] .message {
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  max-width: 100%;
 }
-
-body[data-theme="medieval-stone"] {
-  --background-color: #3e3e3e;
-  --sidebar-color: #4a4a4a;
-  --text-color: #e0e0e0;
-  --user-message-bg: #5a5a5a;
-  --model-message-bg: #4a4a4a;
-  --border-color: #6a6a6a;
-  --accent-color: #8b4513;
-  --accent-hover-color: #a0522d;
+body[data-theme="text-adventure-dark"] .message-model-container {
+  max-width: 100%;
+  gap: 0.25rem;
 }
-
-body[data-theme="medieval-royal"] {
-  --background-color: #001f3f;
-  --sidebar-color: #002b54;
-  --text-color: #f0f0f0;
-  --user-message-bg: #003f7f;
-  --model-message-bg: #002b54;
-  --border-color: #005a9e;
-  --accent-color: #ffd700;
-  --accent-hover-color: #ffdf33;
+body[data-theme="text-adventure-dark"] .message.user::before {
+  content: '> ';
+  color: var(--accent-color);
 }
-
-body[data-theme="medieval-parchment"] {
-  --background-color: #c2b59b;
-  --sidebar-color: #d1c6af;
-  --text-color: #3a2e20;
-  --text-secondary-color: #5c4a35;
-  --user-message-bg: #b5a88c;
-  --model-message-bg: #d1c6af;
-  --border-color: #8b795e;
-  --accent-color: #800000;
-  --accent-hover-color: #a00000;
+body[data-theme="text-adventure-dark"] .tts-controls {
+  display: none;
 }
+body[data-theme="text-adventure-dark"] #chat-form {
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--border-color);
+  border-radius: 0;
+}
+body[data-theme="text-adventure-dark"] #chat-input {
+  padding-left: 0.5rem;
+}
+body[data-theme="text-adventure-dark"] #chat-input::placeholder {
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
 
+/* --- Outer Space Starship --- */
 body[data-theme="outer-space-starship"] {
   --background-color: #eef2f5;
   --sidebar-color: #ffffff;
@@ -269,31 +536,35 @@ body[data-theme="outer-space-starship"] {
   --accent-color: #007bff;
   --accent-hover-color: #3395ff;
 }
+body[data-theme="outer-space-starship"] #chat-form button[type="submit"] svg {
+  fill: var(--background-color);
+}
 
-body[data-theme="outer-space-deep"] {
-  --background-color: #0c0d21;
-  --sidebar-color: #141633;
-  --text-color: #dbe4ff;
-  --primary-font: 'Fira Code', monospace;
+/* --- Outer Space Alert (New Variant) --- */
+body[data-theme="outer-space-alert"] {
+  --background-color: #3d0000;
+  --sidebar-color: #2e0000;
+  --text-color: #ffdddd;
+  --text-secondary-color: #ff9999;
+  --primary-font: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --title-font: 'Orbitron', sans-serif;
-  --user-message-bg: #292d5c;
-  --model-message-bg: #141633;
-  --border-color: #434882;
-  --accent-color: #9d00ff;
-  --accent-hover-color: #b133ff;
+  --user-message-bg: #5c0000;
+  --model-message-bg: #2e0000;
+  --border-color: #8f0000;
+  --accent-color: #ff4444;
+  --accent-hover-color: #ff7777;
+}
+@keyframes red-alert-pulse {
+  0% { box-shadow: 0 0 10px #ff0000, inset 0 0 10px #ff0000; }
+  50% { box-shadow: 0 0 20px #ff0000, inset 0 0 20px #ff0000; }
+  100% { box-shadow: 0 0 10px #ff0000, inset 0 0 10px #ff0000; }
+}
+body[data-theme="outer-space-alert"] {
+  animation: red-alert-pulse 2s infinite;
 }
 
-body[data-theme="outer-space-alien"] {
-  --background-color: #23092d;
-  --sidebar-color: #331042;
-  --text-color: #d4f8e3;
-  --user-message-bg: #531c69;
-  --model-message-bg: #331042;
-  --border-color: #792d96;
-  --accent-color: #00ff7f;
-  --accent-hover-color: #50ffa9;
-}
 
+/* --- Pirate Sea --- */
 body[data-theme="pirate-sea"] {
   --background-color: #f0e5d1;
   --sidebar-color: #faeedb;
@@ -307,32 +578,179 @@ body[data-theme="pirate-sea"] {
   --accent-color: #008b8b;
   --accent-hover-color: #00a2a2;
 }
-
-body[data-theme="pirate-treasure"] {
-  --background-color: #3d2c1c;
-  --sidebar-color: #4d3824;
-  --text-color: #e8d9c3;
-  --primary-font: "Merriweather", serif;
-  --title-font: "Pirata One", cursive;
-  --user-message-bg: #63482d;
-  --model-message-bg: #4d3824;
-  --border-color: #8c6742;
-  --accent-color: #e5c100;
-  --accent-hover-color: #f8d430;
+body[data-theme="pirate-sea"] #chat-form button[type="submit"] svg {
+  fill: var(--background-color);
 }
 
-body[data-theme="pirate-grog"] {
-  --background-color: #5c4b3f;
-  --sidebar-color: #6c5a4f;
-  --text-color: #f1e9e3;
+/* --- Steampunk (New) --- */
+body[data-theme="steampunk"] {
+  --background-color: #5a3e2b;
+  --sidebar-color: #3d2b1f;
+  --text-color: #e6d8c9;
+  --text-secondary-color: #a39586;
+  --primary-font: "Merriweather", serif;
+  --title-font: "Uncial Antiqua", cursive;
+  --user-message-bg: #8c6742;
+  --model-message-bg: #4a3728;
+  --border-color: #a1887f;
+  --accent-color: #d4ac0d;
+  --accent-hover-color: #e5be37;
+}
+body[data-theme="steampunk"] {
+  background-image: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="52" height="26" viewBox="0 0 52 26"%3E%3Cg fill-rule="evenodd"%3E%3Cg fill="%233d2b1f" fill-opacity="0.4"%3E%3Cpath d="M10 10c0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6h2c0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4v2c-3.314 0-6-2.686-6-6 0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6zm25.464-1.95l8.486 8.486-1.414 1.414-8.486-8.486 1.414-1.414z" /%3E%3C/g%3E%3C/g%3E%3C/svg%3E');
+}
+
+/* --- Art Deco (New) --- */
+body[data-theme="art-deco"] {
+  --background-color: #0d2c2c;
+  --sidebar-color: #041f1f;
+  --text-color: #c5b8a5;
+  --text-secondary-color: #8a7f70;
   --primary-font: "Merriweather", serif;
   --title-font: "Pirata One", cursive;
-  --user-message-bg: #826e60;
-  --model-message-bg: #6c5a4f;
-  --border-color: #a08a7c;
-  --accent-color: #daa520;
-  --accent-hover-color: #e7b53a;
+  --user-message-bg: #1a4d4d;
+  --model-message-bg: #0b3d3d;
+  --border-color: #bfa885;
+  --accent-color: #d4af37;
+  --accent-hover-color: #e7c45f;
 }
+body[data-theme="art-deco"] .message,
+body[data-theme="art-deco"] .modal-content {
+  border: 1px solid var(--border-color);
+  border-image: linear-gradient(45deg, var(--accent-color), var(--border-color)) 1;
+}
+
+/* --- Solarpunk (New) --- */
+body[data-theme="solarpunk"] {
+  --background-color: #f0f5e6;
+  --sidebar-color: #ffffff;
+  --text-color: #2b4138;
+  --text-secondary-color: #5c7a6e;
+  --primary-font: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --title-font: 'Orbitron', sans-serif;
+  --user-message-bg: #d9e6cc;
+  --model-message-bg: #ffffff;
+  --border-color: #a7c4ac;
+  --accent-color: #ff9900;
+  --accent-hover-color: #ffb84d;
+}
+body[data-theme="solarpunk"] .message,
+body[data-theme="solarpunk"] #chat-form {
+  border-radius: 2rem;
+}
+body[data-theme="solarpunk"] #chat-form button[type="submit"] svg {
+  fill: var(--background-color);
+}
+
+/* --- Aquatic (New) --- */
+body[data-theme="aquatic"] {
+  --background-color: #0a1f3a;
+  --sidebar-color: #061528;
+  --text-color: #bfeaff;
+  --text-secondary-color: #7da5c2;
+  --primary-font: "Merriweather", serif;
+  --title-font: "Uncial Antiqua", cursive;
+  --user-message-bg: #1a3960;
+  --model-message-bg: #0f2746;
+  --border-color: #3b6b9e;
+  --accent-color: #33d4ff;
+  --accent-hover-color: #77e3ff;
+}
+@keyframes underwater-ripple {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+body[data-theme="aquatic"] {
+  background: linear-gradient(135deg, #0a1f3a 25%, transparent 25%) -50px 0,
+              linear-gradient(225deg, #0a1f3a 25%, transparent 25%) -50px 0,
+              linear-gradient(315deg, #0a1f3a 25%, transparent 25%),
+              linear-gradient(45deg, #0a1f3a 25%, transparent 25%);
+  background-size: 100px 100px;
+  background-color: #061528;
+  animation: underwater-ripple 15s ease infinite;
+}
+body[data-theme="aquatic"] h1, h2, h3 {
+  text-shadow: 0 0 5px var(--accent-color);
+}
+
+/* --- Apocalyptic (New) --- */
+body[data-theme="apocalyptic"] {
+  --background-color: #3b3a35;
+  --sidebar-color: #2b2a26;
+  --text-color: #adaa9d;
+  --text-secondary-color: #7b7971;
+  --primary-font: 'Fira Code', monospace;
+  --title-font: 'Orbitron', sans-serif;
+  --user-message-bg: #4f4d48;
+  --model-message-bg: #2b2a26;
+  --border-color: #615f58;
+  --accent-color: #a3955a;
+  --accent-hover-color: #bdb078;
+}
+body[data-theme="apocalyptic"] {
+  background-image: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"%3E%3Cg fill-rule="evenodd"%3E%3Cg fill="%232b2a26" fill-opacity="0.4"%3E%3Cpath opacity=".5" d="M96 95h4v1h-4v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h4v1h-4v9h4v1h-4v9h4v1h-4v9h4v1h-4v9h4v1h-4v9h4v1h-4v9h4v1h-4v9h4v1h-4v9zm-1 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-9-10h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm9-10v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-9-10h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm9-10v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-9-10h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm9-10v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-9-10h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9z"/%3E%3Cpath d="M6 5V0h1v5h5v1H6v5H5V6H0V5h5z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');
+}
+body[data-theme="apocalyptic"] .message {
+  border: 1px solid var(--border-color);
+  border-radius: 2px;
+}
+
+/* --- 8-Bit Arcade (New) --- */
+body[data-theme="8-bit-arcade"] {
+  --background-color: #000;
+  --sidebar-color: #0d0d0d;
+  --text-color: #fff;
+  --text-secondary-color: #aaa;
+  --primary-font: 'Fira Code', monospace;
+  --title-font: 'Fira Code', monospace;
+  --user-message-bg: #2a004a;
+  --model-message-bg: #0d0d0d;
+  --border-color: #ff00ff;
+  --accent-color: #00ffff;
+  --accent-hover-color: #80ffff;
+}
+body[data-theme="8-bit-arcade"] * {
+  image-rendering: pixelated;
+  border-radius: 0 !important;
+}
+body[data-theme="8-bit-arcade"] .message,
+body[data-theme="8-bit-arcade"] .modal-content,
+body[data-theme="8-bit-arcade"] button {
+  border: 4px solid var(--border-color);
+  box-shadow: 4px 4px 0 #000;
+}
+body[data-theme="8-bit-arcade"] h1 {
+  text-shadow: 2px 2px 0 var(--accent-color), 4px 4px 0 var(--border-color);
+}
+
+/* --- Celestial (New) --- */
+body[data-theme="celestial"] {
+  --background-color: #100f1a;
+  --sidebar-color: #191829;
+  --text-color: #d8d8e8;
+  --text-secondary-color: #8c8ca0;
+  --primary-font: "Merriweather", serif;
+  --title-font: "Uncial Antiqua", cursive;
+  --user-message-bg: #3c3a59;
+  --model-message-bg: #24223d;
+  --border-color: #63608a;
+  --accent-color: #d8b8ff;
+  --accent-hover-color: #e8d0ff;
+}
+@keyframes move-stars {
+  from { background-position: 0 0; }
+  to { background-position: -10000px 5000px; }
+}
+body[data-theme="celestial"] {
+  background-image: url('https://www.transparenttextures.com/patterns/stardust.png');
+  background-color: #100f1a;
+  animation: move-stars 200s linear infinite;
+}
+body[data-theme="celestial"] .message.model {
+  box-shadow: 0 0 15px rgba(216, 184, 255, 0.15);
+}
+
 
 /* --- Base Styles --- */
 * {

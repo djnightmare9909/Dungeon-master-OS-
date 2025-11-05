@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -457,26 +458,30 @@ export async function fetchAndRenderInventoryPopup() {
 // UI THEMEING
 // =================================================================================
 const themes = [
-    { id: 'sci-fi-blue-hud', name: 'Sci-Fi (Blue HUD)', colors: ['#03070C', '#102542', '#0A4A6E', '#00E5FF'] },
-    { id: 'hacker-terminal', name: 'Hacker (Terminal)', colors: ['#0d0d0d', '#001a00', '#003300', '#00ff00'] },
     { id: 'high-fantasy-dark', name: 'High Fantasy (Dark)', colors: ['#131314', '#1e1f20', '#2a3a4a', '#c5b358'] },
-    { id: 'high-fantasy-light', name: 'High Fantasy (Light)', colors: ['#fdf6e3', '#f4ecd9', '#eee8d5', '#b58900'] },
-    { id: 'high-fantasy-elven', name: 'High Fantasy (Elven)', colors: ['#1a1829', '#24223b', '#3a365e', '#a489d4'] },
-    { id: 'cyberpunk-neon', name: 'Cyberpunk (Neon)', colors: ['#0d0221', '#140c2b', '#2a004f', '#00f0ff'] },
-    { id: 'cyberpunk-corporate', name: 'Cyberpunk (Corporate)', colors: ['#1a2228', '#242f38', '#354654', '#ff4d4d'] },
-    { id: 'cyberpunk-dystopian', name: 'Cyberpunk (Dystopian)', colors: ['#212121', '#2a2a2a', '#4d443a', '#ff9900'] },
-    { id: 'hellscape-fire', name: 'Hellscape (Fire)', colors: ['#100808', '#1a0c0c', '#4d1818', '#ff4500'] },
-    { id: 'hellscape-soul', name: 'Hellscape (Soul)', colors: ['#130f1a', '#1b1524', '#382d4a', '#7fff00'] },
-    { id: 'hellscape-ash', name: 'Hellscape (Ash)', colors: ['#202020', '#282828', '#404040', '#b22222'] },
-    { id: 'medieval-stone', name: 'Medieval (Stone)', colors: ['#3e3e3e', '#4a4a4a', '#5a5a5a', '#8b4513'] },
-    { id: 'medieval-royal', name: 'Medieval (Royal)', colors: ['#001f3f', '#002b54', '#003f7f', '#ffd700'] },
-    { id: 'medieval-parchment', name: 'Medieval (Parchment)', colors: ['#c2b59b', '#d1c6af', '#b5a88c', '#800000'] },
+    { id: 'high-fantasy-light', name: 'High Fantasy (Light)', colors: ['#fdf6e3', '#f5ead5', '#e9dbc2', '#8b4513'] },
+    { id: 'dark-fantasy-crimson', name: 'Dark Fantasy (Crimson)', colors: ['#0a0a0a', '#1f1f1f', '#4a0e1a', '#b71c1c'] },
+    { id: 'classic-rpg-parchment', name: 'Classic RPG (Parchment)', colors: ['#4d3c2a', '#3b2e21', '#6b543b', '#e5c100'] },
+    { id: 'cyberpunk-hud-advanced', name: 'Cyberpunk (Advanced HUD)', colors: ['#0d0221', '#140c2b', '#c72cff', '#00f0ff'] },
+    { id: 'cyberpunk-bladerunner', name: 'Cyberpunk (Bladerunner)', colors: ['#040a18', '#0b132b', '#1c2541', '#ff9900'] },
+    { id: 'glitch-terminal', name: 'Glitch (Terminal)', colors: ['#000000', '#111111', '#222222', '#ffffff'] },
+    { id: 'glitch-terminal-crt', name: 'Glitch (CRT)', colors: ['#000000', '#111111', '#555555', '#e0e0e0'] },
+    { id: 'hacker-terminal', name: 'Hacker (Terminal)', colors: ['#0d0d0d', '#001a00', '#003300', '#00ff00'] },
+    { id: 'hacker-terminal-glitch', name: 'Hacker (Glitch)', colors: ['#0d0d0d', '#001a00', '#003300', '#00ff00'] },
+    { id: 'hacker-terminal-amber', name: 'Hacker (Amber)', colors: ['#000000', '#1a0a00', '#331f00', '#ffb400'] },
+    { id: 'hacker-terminal-vault-tec', name: 'Hacker (Vault-Tec)', colors: ['#0a141f', '#0f1c2d', '#142a40', '#27bce0'] },
+    { id: 'vampire-gothic-terminal', name: 'Vampire (Gothic Terminal)', colors: ['#050101', '#1a0303', '#3b0f0f', '#ff4d4d'] },
+    { id: 'text-adventure-dark', name: 'Text Adventure (Dark)', colors: ['#000000', '#0a0a0a', '#111111', '#cccccc'] },
     { id: 'outer-space-starship', name: 'Outer Space (Starship)', colors: ['#eef2f5', '#ffffff', '#d7dfe5', '#007bff'] },
-    { id: 'outer-space-deep', name: 'Outer Space (Deep)', colors: ['#0c0d21', '#141633', '#292d5c', '#9d00ff'] },
-    { id: 'outer-space-alien', name: 'Outer Space (Alien)', colors: ['#23092d', '#331042', '#531c69', '#00ff7f'] },
+    { id: 'outer-space-alert', name: 'Outer Space (Alert)', colors: ['#3d0000', '#2e0000', '#5c0000', '#ff4444'] },
     { id: 'pirate-sea', name: 'Pirates (High Seas)', colors: ['#f0e5d1', '#faeedb', '#e6d9c1', '#008b8b'] },
-    { id: 'pirate-treasure', name: 'Pirates (Treasure)', colors: ['#3d2c1c', '#4d3824', '#63482d', '#e5c100'] },
-    { id: 'pirate-grog', name: 'Pirates (Grog Tavern)', colors: ['#5c4b3f', '#6c5a4f', '#826e60', '#daa520'] },
+    { id: 'steampunk', name: 'Steampunk', colors: ['#5a3e2b', '#3d2b1f', '#8c6742', '#d4ac0d'] },
+    { id: 'art-deco', name: 'Art Deco', colors: ['#0d2c2c', '#041f1f', '#1a4d4d', '#d4af37'] },
+    { id: 'solarpunk', name: 'Solarpunk', colors: ['#f0f5e6', '#ffffff', '#d9e6cc', '#ff9900'] },
+    { id: 'aquatic', name: 'Aquatic', colors: ['#0a1f3a', '#061528', '#1a3960', '#33d4ff'] },
+    { id: 'apocalyptic', name: 'Apocalyptic', colors: ['#3b3a35', '#2b2a26', '#4f4d48', '#a3955a'] },
+    { id: '8-bit-arcade', name: '8-Bit Arcade', colors: ['#000000', '#0d0d0d', '#2a004a', '#00ffff'] },
+    { id: 'celestial', name: 'Celestial', colors: ['#100f1a', '#191829', '#3c3a59', '#d8b8ff'] },
 ];
 
 export function renderThemeCards() {
