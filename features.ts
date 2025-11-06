@@ -1,4 +1,5 @@
 
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -41,51 +42,244 @@ import { ai } from './gemini';
 import type { CharacterSheetData, Achievement, NPCState } from './types';
 
 // =================================================================================
-// TTS
+// TTS (Re-architected for stability)
 // =================================================================================
-let currentSpeech: SpeechSynthesisUtterance | null = null;
-let currentlyPlayingTTSButton: HTMLButtonElement | null = null;
 
-export function stopTTS() {
-  if (speechSynthesis.speaking) {
-    speechSynthesis.cancel();
-  }
-  if (currentlyPlayingTTSButton) {
-    const soundWave = currentlyPlayingTTSButton.nextElementSibling as HTMLElement;
-    const playIcon = currentlyPlayingTTSButton.querySelector('.play-icon') as SVGElement;
-    const pauseIcon = currentlyPlayingTTSButton.querySelector('.pause-icon') as SVGElement;
-    soundWave.classList.remove('playing');
-    playIcon.style.display = 'block';
-    pauseIcon.style.display = 'none';
-    currentlyPlayingTTSButton = null;
-  }
+// --- State Management ---
+let ttsState: 'IDLE' | 'PLAYING' | 'PAUSED' = 'IDLE';
+let ttsQueue: SpeechSynthesisUtterance[] = [];
+let ttsCurrentUtteranceIndex = 0;
+let ttsCurrentButton: HTMLButtonElement | null = null;
+let ttsVoices: SpeechSynthesisVoice[] = [];
+// Generation counter to prevent race conditions from stale async callbacks.
+let ttsGeneration = 0;
+
+// --- Defensive Voice Loading ---
+// Memoize the promise to avoid re-running this logic on every click
+let voicesPromise: Promise<SpeechSynthesisVoice[]> | null = null;
+function getAvailableVoices(): Promise<SpeechSynthesisVoice[]> {
+    if (voicesPromise) {
+        return voicesPromise;
+    }
+    voicesPromise = new Promise((resolve, reject) => {
+        // Set a timeout in case the browser never fires the event.
+        const timeout = setTimeout(() => {
+            if (speechSynthesis.getVoices().length > 0) {
+              resolve(speechSynthesis.getVoices());
+            } else {
+              reject(new Error('Speech synthesis voice loading timed out.'));
+            }
+        }, 2000);
+
+        const checkVoices = () => {
+            const voices = speechSynthesis.getVoices();
+            if (voices.length > 0) {
+                clearTimeout(timeout);
+                ttsVoices = voices;
+                resolve(voices);
+                // Important: remove the listener once voices are loaded.
+                speechSynthesis.onvoiceschanged = null;
+            }
+        };
+
+        if (speechSynthesis.getVoices().length > 0) {
+            checkVoices();
+        } else {
+            speechSynthesis.onvoiceschanged = checkVoices;
+        }
+    });
+    return voicesPromise;
+}
+// Pre-warm the voices when the module loads.
+getAvailableVoices().catch(err => console.warn(err));
+
+
+// --- Core Functions ---
+function updateTTS_UI() {
+    if (!ttsCurrentButton) return;
+
+    const soundWave = ttsCurrentButton.nextElementSibling as HTMLElement;
+    const playIcon = ttsCurrentButton.querySelector('.play-icon') as SVGElement;
+    const pauseIcon = ttsCurrentButton.querySelector('.pause-icon') as SVGElement;
+
+    if (ttsState === 'PLAYING') {
+        soundWave.classList.add('playing');
+        playIcon.style.display = 'none';
+        pauseIcon.style.display = 'block';
+    } else { // PAUSED or IDLE
+        soundWave.classList.remove('playing');
+        playIcon.style.display = 'block';
+        pauseIcon.style.display = 'none';
+    }
 }
 
-export function handleTTS(text: string, button: HTMLButtonElement) {
-  const isPlaying = (currentlyPlayingTTSButton === button);
-  stopTTS();
-  if (isPlaying) return;
+/**
+ * Aggressively stops all TTS, cleans up state, and resets the UI of the
+ * currently active button. This is the primary function for ensuring a clean slate.
+ */
+export function stopTTS() {
+    // Invalidate all old callbacks by incrementing the generation counter.
+    // This is the most important step to prevent race conditions.
+    ttsGeneration++;
 
-  const plainText = new DOMParser().parseFromString(text, 'text/html').body.textContent || '';
-  if (!plainText) return;
+    // This is a critical workaround for a common browser bug.
+    // If speech is paused and then cancelled, the engine can get stuck.
+    // Resuming it for a moment before cancelling forces it into a clean state.
+    if (speechSynthesis.paused) {
+        speechSynthesis.resume();
+    }
+    
+    // Cancel any speaking or pending utterances.
+    // This will trigger 'onend' or 'onerror' with a 'canceled' error,
+    // which our handlers will now safely ignore due to the generation check.
+    if (speechSynthesis.speaking || speechSynthesis.pending) {
+        speechSynthesis.cancel();
+    }
+    
+    // Reset the UI of the previously active button, if it exists.
+    if (ttsCurrentButton) {
+        const soundWave = ttsCurrentButton.nextElementSibling as HTMLElement;
+        const playIcon = ttsCurrentButton.querySelector('.play-icon') as SVGElement;
+        const pauseIcon = ttsCurrentButton.querySelector('.pause-icon') as SVGElement;
+        
+        if (soundWave && playIcon && pauseIcon) {
+            soundWave.classList.remove('playing');
+            playIcon.style.display = 'block';
+            pauseIcon.style.display = 'none';
+        }
+    }
 
-  currentSpeech = new SpeechSynthesisUtterance(plainText);
-  currentlyPlayingTTSButton = button;
-  const soundWave = button.nextElementSibling as HTMLElement;
-  const playIcon = button.querySelector('.play-icon') as SVGElement;
-  const pauseIcon = button.querySelector('.pause-icon') as SVGElement;
+    // Reset all state variables to idle.
+    ttsState = 'IDLE';
+    ttsQueue = [];
+    ttsCurrentUtteranceIndex = 0;
+    ttsCurrentButton = null;
+}
 
-  currentSpeech.onstart = () => {
-    soundWave.classList.add('playing');
-    playIcon.style.display = 'none';
-    pauseIcon.style.display = 'block';
-  };
-  currentSpeech.onend = () => stopTTS();
-  currentSpeech.onerror = (event: SpeechSynthesisErrorEvent) => {
-    if (event.error !== 'canceled') console.error('SpeechSynthesisUtterance.onerror', event);
-    stopTTS();
-  };
-  speechSynthesis.speak(currentSpeech);
+function playQueue(generation: number) {
+    // If the generation is stale, this playback has been cancelled. Abort.
+    if (generation !== ttsGeneration) return;
+
+    if (ttsQueue.length === 0 || ttsCurrentUtteranceIndex >= ttsQueue.length) {
+        stopTTS();
+        return;
+    }
+    
+    ttsState = 'PLAYING';
+    updateTTS_UI();
+    const utterance = ttsQueue[ttsCurrentUtteranceIndex];
+    speechSynthesis.speak(utterance);
+}
+
+function handleUtteranceEnd(generation: number) {
+    // If the generation is stale, this playback has been cancelled. Abort.
+    if (generation !== ttsGeneration) return;
+
+    ttsCurrentUtteranceIndex++;
+    playQueue(generation);
+}
+
+/**
+ * Chunks text into manageable pieces for the speech synthesis engine.
+ */
+function chunkText(text: string, maxLength = 180): string[] {
+    if (!text) return [];
+    
+    const chunks: string[] = [];
+    const sentences = text.match(/[^.!?\n]+(?:[.!?\n]|$)/g) || [text];
+
+    for (let sentence of sentences) {
+        sentence = sentence.trim();
+        if (sentence.length === 0) continue;
+        if (sentence.length <= maxLength) {
+            chunks.push(sentence);
+            continue;
+        }
+
+        let currentChunk = '';
+        const words = sentence.split(/\s+/);
+        for (const word of words) {
+            if ((currentChunk + ' ' + word).length > maxLength && currentChunk.length > 0) {
+                chunks.push(currentChunk);
+                currentChunk = word;
+            } else {
+                currentChunk += (currentChunk ? ' ' : '') + word;
+            }
+        }
+        if (currentChunk) {
+            chunks.push(currentChunk);
+        }
+    }
+    return chunks.filter(c => c.length > 0);
+}
+
+/**
+ * Main entry point for TTS requests. Manages the state machine.
+ */
+export async function handleTTS(rawHtml: string, button: HTMLButtonElement) {
+    if (button === ttsCurrentButton) {
+        if (ttsState === 'PLAYING') {
+            speechSynthesis.pause();
+            ttsState = 'PAUSED';
+        } else if (ttsState === 'PAUSED') {
+            speechSynthesis.resume();
+            ttsState = 'PLAYING';
+        }
+        updateTTS_UI();
+        return;
+    }
+
+    stopTTS(); // This performs a full, clean reset and increments the generation.
+
+    const currentGeneration = ttsGeneration; // Capture the new, valid generation.
+    ttsCurrentButton = button;
+    
+    const plainText = new DOMParser().parseFromString(rawHtml, 'text/html').body.textContent || '';
+    if (!plainText.trim()) {
+        stopTTS();
+        return;
+    }
+
+    try {
+        await getAvailableVoices();
+    } catch (e) {
+        console.error("Could not load speech synthesis voices.", e);
+        stopTTS();
+        return;
+    }
+    
+    const chunks = chunkText(plainText);
+    if (chunks.length === 0) {
+        stopTTS();
+        return;
+    }
+
+    ttsQueue = chunks.map(chunk => {
+        const utterance = new SpeechSynthesisUtterance(chunk);
+        const defaultVoice = ttsVoices.find(v => v.default) || ttsVoices[0];
+        if (defaultVoice) {
+            utterance.voice = defaultVoice;
+        } else {
+            console.warn("No speech synthesis voices found to assign.");
+        }
+        
+        utterance.onend = () => handleUtteranceEnd(currentGeneration); // Pass generation to handler
+        
+        utterance.onerror = (e) => {
+            // Abort if this error is from a stale, cancelled playback.
+            if (currentGeneration !== ttsGeneration) return;
+            
+            if (e.error !== 'canceled') {
+                console.error("Speech Synthesis Error:", e.error);
+            }
+            // Still try to continue to the next chunk even if one fails.
+            handleUtteranceEnd(currentGeneration);
+        };
+        return utterance;
+    });
+    
+    ttsCurrentUtteranceIndex = 0;
+    playQueue(currentGeneration);
 }
 
 // =================================================================================

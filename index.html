@@ -43,17 +43,24 @@
         </div>
       </div>
        <div class="sidebar-footer">
-          <div id="context-manager">
-            <h2>User Context</h2>
-            <form id="context-form">
-                <input type="text" id="context-input" placeholder="Add a fact to remember..." required />
-                <button type="submit" aria-label="Add Context">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                </button>
-            </form>
-            <ul id="context-list">
-                <!-- Context items will be rendered here by JS -->
-            </ul>
+          <div id="context-manager" class="expanded">
+            <div id="context-header" class="sidebar-section-header">
+              <h2>User Context</h2>
+              <button id="context-toggle-btn" aria-label="Toggle user context">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+              </button>
+            </div>
+            <div id="context-content">
+              <form id="context-form">
+                  <input type="text" id="context-input" placeholder="Add a fact to remember..." required />
+                  <button type="submit" aria-label="Add Context">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                  </button>
+              </form>
+              <ul id="context-list">
+                  <!-- Context items will be rendered here by JS -->
+              </ul>
+            </div>
           </div>
           <div id="data-management">
             <h2>Data Management</h2>
@@ -93,7 +100,12 @@
       </header>
       <main id="chat-container"></main>
       <div id="combat-tracker" class="hidden">
-        <h3>Combat Status</h3>
+        <div id="combat-tracker-header">
+          <h3>Combat Status</h3>
+          <button id="combat-tracker-toggle" aria-label="Toggle combat tracker">
+            <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+          </button>
+        </div>
         <ul id="combat-enemy-list"></ul>
       </div>
       <footer>

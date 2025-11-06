@@ -103,16 +103,20 @@ import {
   chatHistoryContainer,
   updateCombatTracker,
   combatTracker,
+  combatTrackerHeader,
   welcomeModal,
   closeWelcomeBtn,
   fileUploadBtn,
   fileUploadInput,
   appendFileProcessingMessage,
+  contextManager,
+  contextHeader,
 } from './ui';
 import {
   stopTTS,
   addUserContext,
   deleteUserContext,
+  handleTTS,
   handleDieRoll,
   rollDice,
   updateLogbookData,
@@ -816,6 +820,21 @@ function setupEventListeners() {
 
   chatContainer.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement;
+
+    // Handle TTS button clicks
+    const ttsButton = target.closest<HTMLButtonElement>('.tts-button');
+    if (ttsButton) {
+        const messageContainer = ttsButton.closest('.message-model-container');
+        if (messageContainer) {
+            const messageEl = messageContainer.querySelector('.message.model');
+            if (messageEl) {
+                // Pass the raw HTML to handleTTS, it will parse it
+                handleTTS(messageEl.innerHTML, ttsButton);
+            }
+        }
+        return; // Event handled
+    }
+    
     const currentSession = getCurrentChat();
     if (!currentSession || isSending()) return;
     
@@ -951,6 +970,12 @@ function setupEventListeners() {
   cancelDeleteBtn.addEventListener('click', closeDeleteConfirmModal);
   confirmDeleteBtn.addEventListener('click', deleteChat);
   closeWelcomeBtn.addEventListener('click', () => closeModal(welcomeModal));
+  combatTrackerHeader.addEventListener('click', () => {
+    combatTracker.classList.toggle('expanded');
+  });
+  contextHeader.addEventListener('click', () => {
+    contextManager.classList.toggle('expanded');
+  });
 
   renameForm.addEventListener('submit', (e) => {
     e.preventDefault();

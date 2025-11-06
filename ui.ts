@@ -28,6 +28,8 @@ export const importAllFileInput = document.getElementById('import-all-file-input
 export const contextForm = document.getElementById('context-form') as HTMLFormElement;
 export const contextInput = document.getElementById('context-input') as HTMLInputElement;
 export const contextList = document.getElementById('context-list') as HTMLUListElement;
+export const contextManager = document.getElementById('context-manager') as HTMLElement;
+export const contextHeader = document.getElementById('context-header') as HTMLElement;
 export const quickActionsBar = document.getElementById('quick-actions-bar') as HTMLElement;
 export const inventoryBtn = document.getElementById('inventory-btn') as HTMLButtonElement;
 export const inventoryPopup = document.getElementById('inventory-popup') as HTMLElement;
@@ -90,6 +92,7 @@ export const closeThemeBtn = document.getElementById('close-theme-btn') as HTMLB
 export const themeGrid = document.getElementById('theme-grid') as HTMLElement;
 export const chatOptionsMenu = document.getElementById('chat-options-menu') as HTMLUListElement;
 export const combatTracker = document.getElementById('combat-tracker') as HTMLElement;
+export const combatTrackerHeader = document.getElementById('combat-tracker-header') as HTMLElement;
 export const combatEnemyList = document.getElementById('combat-enemy-list') as HTMLUListElement;
 export const welcomeModal = document.getElementById('update-welcome-modal') as HTMLElement;
 export const closeWelcomeBtn = document.getElementById('close-welcome-btn') as HTMLButtonElement;
@@ -444,6 +447,7 @@ export function renderUserContext(userContext: string[]) {
 export function updateCombatTracker(enemies: { name: string, status: string }[]) {
   if (!enemies || enemies.length === 0) {
     combatTracker.classList.add('hidden');
+    combatTracker.classList.remove('expanded');
     return;
   }
 
@@ -459,4 +463,5 @@ export function updateCombatTracker(enemies: { name: string, status: string }[])
     combatEnemyList.appendChild(li);
   });
   combatTracker.classList.remove('hidden');
+  combatTracker.classList.add('expanded');
 }

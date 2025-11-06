@@ -1,4 +1,3 @@
-
 :root {
   /* High Fantasy (Dark) - Default Theme */
   --background-color: #131314;
@@ -1068,26 +1067,54 @@ main {
   top: 80px;
   right: 20px;
   width: 250px;
-  background-color: rgba(var(--sidebar-color-rgb, 30 31 32) / 0.85);
+  background-color: var(--model-message-bg);
   backdrop-filter: blur(5px);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  padding: 1rem;
   z-index: 5;
   box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+#combat-tracker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  cursor: pointer;
 }
 #combat-tracker h3 {
   font-family: var(--title-font);
   font-size: 1.2rem;
   color: var(--accent-color);
-  margin-bottom: 0.75rem;
-  text-align: center;
+  margin: 0;
+}
+#combat-tracker-toggle {
+  background: none;
+  border: none;
+  color: var(--text-secondary-color);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  transition: transform 0.3s ease-in-out;
+}
+#combat-tracker.expanded #combat-tracker-toggle {
+  transform: rotate(180deg);
 }
 #combat-enemy-list {
   list-style: none;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out, padding-bottom 0.3s ease-in-out;
+  padding: 0 1rem;
+  margin: 0;
+}
+#combat-tracker.expanded #combat-enemy-list {
+  max-height: 250px;
+  overflow-y: auto;
+  padding-bottom: 1rem;
 }
 .combat-enemy-item {
   display: flex;
@@ -1578,6 +1605,41 @@ footer {
     letter-spacing: 0.5px;
 }
 
+.sidebar-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+.sidebar-section-header h2 {
+  padding-bottom: 0;
+}
+.sidebar-section-header button {
+  background: none;
+  border: none;
+  color: var(--text-secondary-color);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  transition: transform 0.3s ease-in-out;
+}
+
+#context-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out, padding-top 0.3s ease-in-out;
+}
+
+#context-manager.expanded #context-content {
+  max-height: 250px;
+  padding-top: 1rem;
+}
+
+#context-manager.expanded #context-toggle-btn {
+  transform: rotate(180deg);
+}
+
 .data-buttons {
     display: flex;
     gap: 0.5rem;
@@ -1652,7 +1714,22 @@ footer {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    /* For Firefox scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) var(--background-color);
 }
+/* For Webkit browsers (Chrome, Safari) */
+#context-list::-webkit-scrollbar {
+  width: 8px;
+}
+#context-list::-webkit-scrollbar-track {
+  background: var(--background-color);
+}
+#context-list::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+  border-radius: 4px;
+}
+
 
 .context-item {
     display: flex;
