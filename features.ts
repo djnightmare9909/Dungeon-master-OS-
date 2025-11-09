@@ -462,8 +462,12 @@ export async function updateLogbookData(type: 'sheet' | 'inventory' | 'quests' |
       }
       saveChatHistoryToDB();
     } catch (error) {
-      console.error(`${type} generation failed:`, error);
-      display.innerHTML = `<div class="sheet-placeholder"><p>Failed to generate ${type} data. Please try again.</p></div>`;
+        console.error(`${type} generation failed:`, error);
+        let errorMessage = `Failed to generate ${type} data. Please try again.`;
+        if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
+            errorMessage = `Failed to generate data: API Key is missing or invalid.`;
+        }
+        display.innerHTML = `<div class="sheet-placeholder"><p>${errorMessage}</p></div>`;
     } finally {
       button.disabled = false;
       button.textContent = originalText;
@@ -508,7 +512,11 @@ export async function updateLogbookData(type: 'sheet' | 'inventory' | 'quests' |
         saveChatHistoryToDB();
     } catch (error) {
         console.error("NPC list generation failed:", error);
-        display.innerHTML = `<div class="sheet-placeholder"><p>Failed to generate NPC data. Please try again.</p></div>`;
+        let errorMessage = 'Failed to generate NPC data. Please try again.';
+        if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
+            errorMessage = `Failed to generate data: API Key is missing or invalid.`;
+        }
+        display.innerHTML = `<div class="sheet-placeholder"><p>${errorMessage}</p></div>`;
     } finally {
         button.disabled = false;
         button.textContent = originalText;
@@ -541,7 +549,11 @@ export async function updateLogbookData(type: 'sheet' | 'inventory' | 'quests' |
     saveChatHistoryToDB();
   } catch (error) {
     console.error(`${type} generation failed:`, error);
-    display.textContent = `Failed to generate ${type}. Please try again.`;
+    let errorMessage = `Failed to generate ${type}. Please try again.`;
+    if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
+        errorMessage = `Failed to generate data: API Key is missing or invalid.`;
+    }
+    display.textContent = errorMessage;
   } finally {
     button.disabled = false;
     button.textContent = originalText;
@@ -586,7 +598,13 @@ export async function generateCharacterImage() {
     console.error("Image generation failed:", error);
     characterImagePlaceholder.classList.remove('hidden');
     const placeholderParagraph = characterImagePlaceholder.querySelector('p');
-    if (placeholderParagraph) placeholderParagraph.textContent = 'Image generation failed. Please try again.';
+    if (placeholderParagraph) {
+        let errorMessage = 'Image generation failed. Please try again.';
+        if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
+            errorMessage = 'Image generation failed: API Key is missing or invalid.';
+        }
+        placeholderParagraph.textContent = errorMessage;
+    }
   } finally {
     setGeneratingData(false);
     generateImageBtn.disabled = false;
@@ -642,7 +660,11 @@ export async function fetchAndRenderInventoryPopup() {
     }
   } catch (error) {
     console.error("Inventory fetch failed:", error);
-    inventoryPopupContent.innerHTML = `<div class="placeholder">Failed to get inventory.</div>`;
+    let errorMessage = `Failed to get inventory.`;
+    if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
+        errorMessage = 'Failed to get inventory: API Key is missing or invalid.';
+    }
+    inventoryPopupContent.innerHTML = `<div class="placeholder">${errorMessage}</div>`;
   } finally {
     setGeneratingData(false);
   }

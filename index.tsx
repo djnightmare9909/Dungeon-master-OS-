@@ -290,7 +290,11 @@ async function startNewChat() {
   } catch (error) {
     console.error('New game setup failed:', error);
     loadingContainer.remove();
-    appendMessage({ sender: 'error', text: 'Failed to start the game setup. Please try again.' });
+    let errorMessage = 'Failed to start the game setup. Please try again.';
+    if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
+        errorMessage = 'Error: API Key is missing or invalid. Please ensure it is correctly configured in your environment.';
+    }
+    appendMessage({ sender: 'error', text: errorMessage });
   }
 }
 
@@ -328,7 +332,11 @@ function loadChat(id: string) {
     } catch (error) {
       console.error('Failed to create Gemini chat instance:', error);
       renderMessages(session.messages);
-      appendMessage({ sender: 'error', text: 'Error initializing the AI. Please check your setup or start a new chat.' });
+      let errorMessage = 'Error initializing the AI. Please check your setup or start a new chat.';
+      if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
+          errorMessage = 'Error: API Key is missing or invalid. Please ensure it is correctly configured in your environment.';
+      }
+      appendMessage({ sender: 'error', text: errorMessage });
       setGeminiChat(null);
     }
 
@@ -642,7 +650,11 @@ async function handleFormSubmit(e: Event) {
     }
 
     const geminiChat = getGeminiChat();
-    if (!geminiChat) return;
+    if (!geminiChat) {
+        appendMessage({ sender: 'error', text: 'The connection to the AI has been lost. This can happen if the API Key is missing or invalid. Please check your configuration and start a new chat.' });
+        setSending(false);
+        return;
+    }
     stopTTS();
 
     const userMessage: Message = { sender: 'user', text: userInput };
@@ -698,7 +710,11 @@ async function handleFormSubmit(e: Event) {
     } catch (error) {
       console.error("Gemini API Error:", error);
       modelMessageContainer.remove();
-      appendMessage({ sender: 'error', text: 'The DM seems to be pondering deeply ... and has gone quiet. Please try again.' });
+      let errorMessage = 'The DM seems to be pondering deeply ... and has gone quiet. Please try again.';
+      if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
+          errorMessage = 'Error: API Key is missing or invalid. Please ensure it is correctly configured in your environment.';
+      }
+      appendMessage({ sender: 'error', text: errorMessage });
     }
   } finally {
     setSending(false);
@@ -783,9 +799,14 @@ async function handleFileUpload(event: Event) {
 
   } catch (error) {
     console.error("File processing failed:", error);
-    const errorMessage = (error as Error).message.includes('Unsupported file type')
-        ? `Unsupported file type: ${file.type}`
-        : 'An error occurred during processing.';
+    let errorMessage = 'An error occurred during processing.';
+    if (error instanceof Error) {
+        if (error.message.includes('Unsupported file type')) {
+            errorMessage = `Unsupported file type: ${file.type}`;
+        } else if (error.message.includes('API Key') || error.message.includes('API key')) {
+            errorMessage = 'API Key is missing or invalid. Please check your configuration.';
+        }
+    }
     messageEl.classList.remove('loading');
     messageEl.innerHTML = `<span>❌ Error processing <strong>${file.name}</strong>. ${errorMessage}</span>`;
   }
