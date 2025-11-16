@@ -65,6 +65,17 @@ export interface NPCState {
     relationship: string;
 }
 
+export interface ProgressClock {
+  current: number;
+  max: number;
+  label: string;
+}
+
+export interface Faction {
+  status: string;
+  goal: string;
+}
+
 export interface ChatSession {
   id: string;
   title: string;
@@ -82,6 +93,8 @@ export interface ChatSession {
   achievements?: Achievement[];
   settings?: GameSettings;
   quickStartChars?: CharacterSheetData[];
+  progressClocks?: { [id: string]: ProgressClock };
+  factions?: { [id: string]: Faction };
 }
 
 export interface DMPersona {

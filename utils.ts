@@ -2,7 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { ChatSession, GameSettings, Message, CharacterSheetData, Achievement, NPCState } from './types';
+import type { ChatSession, GameSettings, Message, CharacterSheetData, Achievement, NPCState, ProgressClock, Faction } from './types';
 
 /**
  * Takes any object and safely migrates it into a valid ChatSession object.
@@ -95,6 +95,9 @@ export function migrateAndValidateSession(session: any): ChatSession {
   } else {
     newSession.quickStartChars = undefined;
   }
+
+  newSession.progressClocks = typeof session.progressClocks === 'object' && session.progressClocks !== null ? session.progressClocks as { [id: string]: ProgressClock } : {};
+  newSession.factions = typeof session.factions === 'object' && session.factions !== null ? session.factions as { [id: string]: Faction } : {};
 
   return newSession as ChatSession;
 }

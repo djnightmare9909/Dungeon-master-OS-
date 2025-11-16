@@ -26,6 +26,8 @@ import {
   chatHistory,
   dbGet,
   dbSet,
+  getChroniclerChat,
+  setChroniclerChat,
 } from './state';
 import {
   chatContainer,
@@ -137,6 +139,7 @@ import {
   dmPersonas,
   getNewGameSetupInstruction,
   getQuickStartCharacterPrompt,
+  getChroniclerPrompt,
 } from './gemini';
 // Fix: import UISettings type
 import type { Message, ChatSession, UISettings, GameSettings } from './types';
@@ -282,6 +285,8 @@ async function startNewChat() {
         tone: 'heroic',
         narration: 'descriptive',
       },
+      progressClocks: {},
+      factions: {},
     };
 
     getChatHistory().push(newSession);
@@ -323,11 +328,14 @@ function loadChat(id: string) {
       if (session.creationPhase) {
         const instruction = getNewGameSetupInstruction();
         setGeminiChat(createNewChatInstance(geminiHistory, instruction));
+        setChroniclerChat(null); // No chronicler during setup
       } else {
         const personaId = session.personaId || 'purist';
         const persona = dmPersonas.find(p => p.id === personaId) || dmPersonas[0];
         const instruction = persona.getInstruction(session.adminPassword || '');
         setGeminiChat(createNewChatInstance(geminiHistory, instruction));
+        // Initialize chronicler for existing games
+        setChroniclerChat(createNewChatInstance([], getChroniclerPrompt()));
       }
     } catch (error) {
       console.error('Failed to create Gemini chat instance:', error);
@@ -419,6 +427,68 @@ async function deleteChat() {
 }
 
 /**
+ * Runs a background "world turn" with the Chronicler AI.
+ * This function is fire-and-forget and should not block the UI.
+ * @param session The current chat session to update.
+ */
+async function runChroniclerTurn(session: ChatSession) {
+  const chronicler = getChroniclerChat();
+  if (!chronicler || isSending()) return; // Prevent simultaneous runs
+
+  // This is a background task, but we still need to prevent conflicts.
+  // The main isSending() flag will prevent new user messages and other chronicler turns.
+  setSending(true);
+
+  try {
+    // 1. Get current state and last player action
+    const currentState = {
+      progressClocks: session.progressClocks || {},
+      factions: session.factions || {}
+    };
+    // Find the last *user* message
+    const lastUserMessage = [...session.messages].reverse().find(m => m.sender === 'user');
+    const playerAction = lastUserMessage ? lastUserMessage.text : "The player took a long rest.";
+
+    // 2. Build the prompt for the Chronicler
+    const chroniclerPrompt = `
+      Current State: ${JSON.stringify(currentState)}
+      Player Action: "${playerAction}"
+    `;
+
+    // 3. Talk to the Chronicler AI
+    const result = await chronicler.sendMessage({ message: chroniclerPrompt });
+    const responseText = result.text;
+
+    // 4. Parse the JSON response
+    const parsedData = JSON.parse(responseText);
+
+    // 5. Save the new state to the current session object
+    session.progressClocks = parsedData.newState.progressClocks;
+    session.factions = parsedData.newState.factions;
+
+    // 6. Save the event log as a HIDDEN system message for RAG context
+    const chroniclerEvent: Message = {
+      sender: 'system',
+      text: `[CHRONICLER EVENT]: ${parsedData.eventLog}`,
+      hidden: true // This won't be rendered, but will inform the main DM AI
+    };
+    session.messages.push(chroniclerEvent);
+    
+    // 7. Persist the updated session to IndexedDB
+    saveChatHistoryToDB();
+
+  } catch (error) {
+    console.error("Chronicler turn failed:", error);
+    // Don't bother the user with a UI error, just log it.
+    // The game can continue without this background update.
+  } finally {
+    // Release the sending lock so the user can send another message.
+    setSending(false);
+  }
+}
+
+
+/**
  * A helper function to finalize the setup phase and transition to the main game.
  * @param session The current chat session.
  * @param title The title for the new adventure.
@@ -454,6 +524,8 @@ async function finalizeSetupAndStartGame(session: ChatSession, title: string, fi
       .map(m => ({ role: m.sender as 'user' | 'model', parts: [{ text: m.text }] }));
 
     setGeminiChat(createNewChatInstance(geminiHistory, instruction));
+    // Initialize the Chronicler AI for the main game
+    setChroniclerChat(createNewChatInstance([], getChroniclerPrompt()));
 
     const kickoffResult = await getGeminiChat()!.sendMessageStream({ message: "The setup is complete. Begin the adventure by narrating the opening scene." });
 
@@ -707,6 +779,24 @@ async function handleFormSubmit(e: Event) {
       const finalMessage: Message = { sender: 'model', text: responseText.replace(combatStatusRegex, '').trim() };
       currentSession.messages.push(finalMessage);
       saveChatHistoryToDB();
+      
+      // --- LIVING WORLD ENGINE TRIGGER ---
+      // Now, check if we need to run a "World Turn" in the background
+      const lowerCaseInputForTurn = userInput.toLowerCase();
+      const isWorldTurn = lowerCaseInputForTurn.includes(' rest') ||
+                            lowerCaseInputForTurn.includes('travel') ||
+                            lowerCaseInputForTurn.includes('make camp') ||
+                            lowerCaseInputForTurn.includes('days pass') ||
+                            lowerCaseInputForTurn.includes('sleep') ||
+                            lowerCaseInputForTurn.includes('wait');
+
+      if (isWorldTurn && getChroniclerChat()) {
+        // This runs in the background and does not block the UI.
+        runChroniclerTurn(currentSession).catch(err => {
+            console.error("Caught an error from the background chronicler turn:", err);
+        });
+      }
+
     } catch (error) {
       console.error("Gemini API Error:", error);
       modelMessageContainer.remove();

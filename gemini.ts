@@ -29,7 +29,7 @@ export function createNewChatInstance(history: { role: 'user' | 'model'; parts: 
     systemInstruction: instruction,
     temperature: 0.9,
   };
-  if (instruction !== getNewGameSetupInstruction()) {
+  if (instruction !== getNewGameSetupInstruction() && !instruction.includes('backend world simulation engine')) {
     config.tools = [{ googleSearch: {} }];
   }
   return ai.chats.create({
@@ -436,4 +436,35 @@ export function getQuickStartCharacterPrompt(): string {
       }
     }
     `;
+}
+
+export function getChroniclerPrompt(): string {
+  return `
+You are a silent, backend world simulation engine.
+Your sole purpose is to update a JSON world state based on player actions and the passage of time.
+You will receive the current world state and the last player action.
+You will simulate "off-screen" events for 1-2 key factions or NPCs.
+You MUST respond with ONLY a valid JSON object. Do not add any conversational text.
+
+Your response MUST match this schema:
+{
+  "newState": {
+    "progressClocks": { "id": { "current": number, "max": number, "label": string } },
+    "factions": { "id": { "status": string, "goal": string } }
+  },
+  "eventLog": "A brief, 1-2 sentence narrative summary of the off-screen event you simulated."
+}
+
+EXAMPLE INPUT:
+Current State: { "progressClocks": { "goblin_invasion": { "current": 2, "max": 6, "label": "Goblin Invasion" } } }
+Player Action: "I make camp and rest for the night."
+
+EXAMPLE RESPONSE:
+{
+  "newState": {
+    "progressClocks": { "goblin_invasion": { "current": 3, "max": 6, "label": "Goblin Invasion" } }
+  },
+  "eventLog": "The goblin scouting party, finding no resistance at the river, has advanced their main war camp's position."
+}
+`;
 }
