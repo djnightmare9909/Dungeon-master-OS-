@@ -1,5 +1,4 @@
 
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -39,8 +38,9 @@ import {
   contextList
 } from './ui';
 import { renderCharacterSheet, renderAchievements, renderUserContext, updateLogbook } from './ui';
-import { ai } from './gemini';
-import type { CharacterSheetData, Achievement, NPCState } from './types';
+import { ai, generateEmbedding } from './gemini';
+import { calculateCosineSimilarity } from './utils';
+import type { CharacterSheetData, Achievement, NPCState, SemanticNode } from './types';
 
 // =================================================================================
 // TTS (Re-architected for stability)
@@ -284,11 +284,93 @@ export async function handleTTS(rawHtml: string, button: HTMLButtonElement) {
 }
 
 // =================================================================================
+// SEMANTIC MEMORY (WFGY-Lite)
+// =================================================================================
+
+/**
+ * Commits a piece of text to the session's long-term semantic memory.
+ * It generates a vector embedding for the text and stores it in the Semantic Tree.
+ * @param text The narrative event, fact, or memory to store.
+ * @param importance A score (0-1) indicating how critical this memory is. Defaults to 0.5.
+ */
+export async function commitToSemanticMemory(text: string, importance: number = 0.5) {
+    const session = getCurrentChat();
+    if (!session) return;
+
+    if (!session.semanticLog) {
+        session.semanticLog = [];
+    }
+
+    try {
+        const embedding = await generateEmbedding(text);
+        if (embedding.length === 0) return;
+
+        const node: SemanticNode = {
+            id: `mem-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            content: text,
+            embedding: embedding,
+            timestamp: Date.now(),
+            importance: importance
+        };
+
+        session.semanticLog.push(node);
+        // Limit the log size to prevent bloat, keeping the most important memories
+        // Simple FIFO for now, but could use importance weighting for retention later
+        if (session.semanticLog.length > 200) {
+             session.semanticLog.shift();
+        }
+        saveChatHistoryToDB();
+        console.debug(`[WFGY] Committed to memory: "${text.substring(0, 30)}..."`);
+    } catch (error) {
+        console.error("[WFGY] Failed to commit memory:", error);
+    }
+}
+
+/**
+ * Recalls relevant memories from the Semantic Tree based on a query.
+ * Uses cosine similarity to find the most semantically related nodes.
+ * @param query The text to search for (e.g., user's current action).
+ * @param limit Number of memories to return.
+ * @returns Array of memory content strings.
+ */
+export async function recallRelevantMemories(query: string, limit: number = 3): Promise<string[]> {
+    const session = getCurrentChat();
+    if (!session || !session.semanticLog || session.semanticLog.length === 0) {
+        return [];
+    }
+
+    try {
+        const queryEmbedding = await generateEmbedding(query);
+        if (queryEmbedding.length === 0) return [];
+
+        const scoredNodes = session.semanticLog.map(node => {
+            const similarity = calculateCosineSimilarity(queryEmbedding, node.embedding);
+            // Boost similarity by importance score to surface critical memories
+            const score = similarity * (1 + (node.importance * 0.2));
+            return { node, score };
+        });
+
+        // Sort by score descending
+        scoredNodes.sort((a, b) => b.score - a.score);
+
+        // Return the content of the top N nodes
+        return scoredNodes.slice(0, limit).map(item => item.node.content);
+
+    } catch (error) {
+        console.error("[WFGY] Memory recall failed:", error);
+        return [];
+    }
+}
+
+
+// =================================================================================
 // USER CONTEXT
 // =================================================================================
 
 export function addUserContext(text: string) {
   getUserContext().push(text);
+  // Also ingest into semantic memory for better auto-recall
+  commitToSemanticMemory(text, 1.0); 
   saveUserContextToDB();
   renderUserContext(getUserContext());
 }

@@ -78,6 +78,14 @@ export interface Faction {
   goal: string;
 }
 
+export interface SemanticNode {
+  id: string;
+  content: string;
+  embedding: number[];
+  timestamp: number;
+  importance: number; // 0-1 score
+}
+
 export interface ChatSession {
   id: string;
   title: string;
@@ -97,6 +105,7 @@ export interface ChatSession {
   quickStartChars?: CharacterSheetData[];
   progressClocks?: { [id: string]: ProgressClock };
   factions?: { [id: string]: Faction };
+  semanticLog?: SemanticNode[];
 }
 
 export interface DMPersona {

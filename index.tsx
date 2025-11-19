@@ -134,6 +134,8 @@ import {
   renderDiceGrid,
   renderThemeCards,
   fileToBase64,
+  recallRelevantMemories,
+  commitToSemanticMemory
 } from './features';
 import {
   ai,
@@ -336,8 +338,8 @@ function loadChat(id: string) {
         const persona = dmPersonas.find(p => p.id === personaId) || dmPersonas[0];
         const instruction = persona.getInstruction(session.adminPassword || '');
         setGeminiChat(createNewChatInstance(geminiHistory, instruction));
-        // Initialize chronicler for existing games
-        setChroniclerChat(createNewChatInstance([], getChroniclerPrompt()));
+        // Initialize chronicler for existing games. Explicitly use 'gemini-2.5-flash' for cost/speed.
+        setChroniclerChat(createNewChatInstance([], getChroniclerPrompt(), 'gemini-2.5-flash'));
       }
     } catch (error) {
       console.error('Failed to create Gemini chat instance:', error);
@@ -443,8 +445,18 @@ async function runChroniclerTurn(session: ChatSession) {
 
   try {
     // 1. Get current state and last player action
+    // Filter out completed clocks to save tokens and context window
+    const activeClocks: Record<string, any> = {};
+    if (session.progressClocks) {
+        Object.entries(session.progressClocks).forEach(([key, clock]) => {
+            if (clock.current < clock.max) {
+                activeClocks[key] = clock;
+            }
+        });
+    }
+
     const currentState = {
-      progressClocks: session.progressClocks || {},
+      progressClocks: activeClocks,
       factions: session.factions || {}
     };
     // Find the last *user* message
@@ -465,8 +477,20 @@ async function runChroniclerTurn(session: ChatSession) {
     const parsedData = JSON.parse(responseText);
 
     // 5. Save the new state to the current session object
-    session.progressClocks = parsedData.newState.progressClocks;
-    session.factions = parsedData.newState.factions;
+    // Merge new state into existing, respecting the filtered view.
+    // We iterate the response and update the master list.
+    if (parsedData.newState.progressClocks) {
+        if (!session.progressClocks) session.progressClocks = {};
+        Object.entries(parsedData.newState.progressClocks).forEach(([key, val]) => {
+             session.progressClocks![key] = val as any;
+        });
+    }
+    if (parsedData.newState.factions) {
+        if (!session.factions) session.factions = {};
+        Object.entries(parsedData.newState.factions).forEach(([key, val]) => {
+             session.factions![key] = val as any;
+        });
+    }
 
     // 6. Save the event log as a HIDDEN system message for RAG context
     const chroniclerEvent: Message = {
@@ -476,7 +500,10 @@ async function runChroniclerTurn(session: ChatSession) {
     };
     session.messages.push(chroniclerEvent);
     
-    // 7. Persist the updated session to IndexedDB
+    // 7. Commit the event log to the Semantic Tree
+    await commitToSemanticMemory(parsedData.eventLog, 0.8); // High importance
+    
+    // 8. Persist the updated session to IndexedDB
     saveChatHistoryToDB();
 
   } catch (error) {
@@ -526,8 +553,8 @@ async function finalizeSetupAndStartGame(session: ChatSession, title: string, fi
       .map(m => ({ role: m.sender as 'user' | 'model', parts: [{ text: m.text }] }));
 
     setGeminiChat(createNewChatInstance(geminiHistory, instruction));
-    // Initialize the Chronicler AI for the main game
-    setChroniclerChat(createNewChatInstance([], getChroniclerPrompt()));
+    // Initialize the Chronicler AI for the main game. Explicitly use 'gemini-2.5-flash' for cost/speed.
+    setChroniclerChat(createNewChatInstance([], getChroniclerPrompt(), 'gemini-2.5-flash'));
 
     const kickoffResult = await getGeminiChat()!.sendMessageStream({ message: "The setup is complete. Begin the adventure by narrating the opening scene." });
 
@@ -745,9 +772,24 @@ async function handleFormSubmit(e: Event) {
 
     try {
       const context = getUserContext();
-      const messageWithContext = context.length > 0
-        ? `(OOC: Use the following context to inform your response:\n${context.join('\n')}\n)\n\n${userInput}`
-        : userInput;
+      
+      // WFGY-Lite: Semantic Memory Retrieval
+      // Query the "Semantic Tree" for relevant past memories
+      const relevantMemories = await recallRelevantMemories(userInput, 3);
+      
+      let messageWithContext = userInput;
+      let contextBlock = "";
+      
+      if (context.length > 0) {
+          contextBlock += `\nUser Notes:\n${context.join('\n')}`;
+      }
+      if (relevantMemories.length > 0) {
+          contextBlock += `\nRetrieved Memories from Semantic Tree:\n${relevantMemories.join('\n')}`;
+      }
+      
+      if (contextBlock) {
+          messageWithContext = `(System: Context Injection:\n${contextBlock}\n)\n\n${userInput}`;
+      }
 
       const result = await geminiChat.sendMessageStream({ message: messageWithContext });
       let responseText = '';

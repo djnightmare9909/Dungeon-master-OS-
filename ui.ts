@@ -138,7 +138,14 @@ export function applyUISettings() {
     experimentalUploadToggle.checked = uiSettings.experimentalUploadLimit;
   }
   if (modelSelect) {
-    modelSelect.value = uiSettings.activeModel;
+    // If the saved model isn't in the list (e.g., old 2.5-pro), default to 3.0-pro-preview
+    const options = Array.from(modelSelect.options).map(o => o.value);
+    if (options.includes(uiSettings.activeModel)) {
+      modelSelect.value = uiSettings.activeModel;
+    } else {
+      modelSelect.value = 'gemini-3-pro-preview';
+      uiSettings.activeModel = 'gemini-3-pro-preview';
+    }
   }
 }
 
