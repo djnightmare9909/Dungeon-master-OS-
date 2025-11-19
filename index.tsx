@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -81,6 +82,7 @@ import {
   fontSizeControls,
   enterToSendToggle,
   experimentalUploadToggle,
+  modelSelect,
   changeUiBtn,
   themeModal,
   closeThemeBtn,
@@ -188,7 +190,7 @@ function runBootSequence(): Promise<void> {
 
     const lines = [
       'DM OS v2.1 Initializing...',
-      'Connecting to WFGY Universal Unification Framework... OK',
+      'Connecting to WFGY Core Flagship v2.0... OK',
       'Loading Semantic Tree... 1.2TB nodes loaded.',
       'Calibrating Collapse-Rebirth Cycle (BBCR)... STABLE',
       'Waking Dungeon Master Persona...',
@@ -664,7 +666,7 @@ async function handleFormSubmit(e: Event) {
 
           try {
             const charResponse = await ai.models.generateContent({
-              model: 'gemini-3-pro-preview',
+              model: getUISettings().activeModel,
               contents: getQuickStartCharacterPrompt(),
               config: {
                 responseMimeType: 'application/json',
@@ -848,7 +850,7 @@ async function handleFileUpload(event: Event) {
     const processFile = async (prompt: string) => {
       const base64Data = await fileToBase64(file);
       const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        model: getUISettings().activeModel,
         contents: { parts: [
           { inlineData: { mimeType: file.type, data: base64Data } },
           { text: prompt }
@@ -1190,6 +1192,15 @@ function setupEventListeners() {
   experimentalUploadToggle.addEventListener('change', () => {
     getUISettings().experimentalUploadLimit = experimentalUploadToggle.checked;
     dbSet('dm-os-ui-settings', getUISettings());
+  });
+  modelSelect.addEventListener('change', () => {
+    getUISettings().activeModel = modelSelect.value;
+    dbSet('dm-os-ui-settings', getUISettings());
+    // Reload current chat to apply model change immediately if a chat is active
+    const currentChat = getCurrentChat();
+    if (currentChat) {
+        loadChat(currentChat.id);
+    }
   });
 
   changeUiBtn.addEventListener('click', () => openModal(themeModal));

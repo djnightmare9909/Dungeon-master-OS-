@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -86,6 +87,7 @@ export const characterImageLoading = document.getElementById('character-image-lo
 export const fontSizeControls = document.getElementById('font-size-controls') as HTMLElement;
 export const enterToSendToggle = document.getElementById('setting-enter-send') as HTMLInputElement;
 export const experimentalUploadToggle = document.getElementById('setting-experimental-upload') as HTMLInputElement;
+export const modelSelect = document.getElementById('setting-model') as HTMLSelectElement;
 export const changeUiBtn = document.getElementById('change-ui-btn') as HTMLButtonElement;
 export const themeModal = document.getElementById('theme-modal') as HTMLElement;
 export const closeThemeBtn = document.getElementById('close-theme-btn') as HTMLButtonElement;
@@ -134,6 +136,9 @@ export function applyUISettings() {
   }
   if (experimentalUploadToggle) {
     experimentalUploadToggle.checked = uiSettings.experimentalUploadLimit;
+  }
+  if (modelSelect) {
+    modelSelect.value = uiSettings.activeModel;
   }
 }
 

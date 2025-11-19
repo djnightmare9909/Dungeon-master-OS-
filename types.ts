@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -18,6 +19,7 @@ export interface UISettings {
   enterToSend: boolean;
   fontSize: 'small' | 'medium' | 'large';
   experimentalUploadLimit: boolean;
+  activeModel: string;
 }
 
 export interface AbilityScore {
