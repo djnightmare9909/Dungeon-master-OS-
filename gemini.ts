@@ -33,7 +33,7 @@ export function createNewChatInstance(history: { role: 'user' | 'model'; parts: 
     config.tools = [{ googleSearch: {} }];
   }
   return ai.chats.create({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3-pro-preview',
     config: config,
     history: history
   });

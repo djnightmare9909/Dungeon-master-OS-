@@ -664,7 +664,7 @@ async function handleFormSubmit(e: Event) {
 
           try {
             const charResponse = await ai.models.generateContent({
-              model: 'gemini-2.5-flash',
+              model: 'gemini-3-pro-preview',
               contents: getQuickStartCharacterPrompt(),
               config: {
                 responseMimeType: 'application/json',
@@ -848,7 +848,7 @@ async function handleFileUpload(event: Event) {
     const processFile = async (prompt: string) => {
       const base64Data = await fileToBase64(file);
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-pro-preview',
         contents: { parts: [
           { inlineData: { mimeType: file.type, data: base64Data } },
           { text: prompt }
