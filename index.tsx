@@ -1,10 +1,9 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
 // Fix: Improved the 'generateContent' call for creating quick start characters by adding a 'responseSchema' to ensure valid JSON output.
-import { Type } from '@google/genai';
+import { Type, GenerateContentResponse } from '@google/genai';
 import {
   initDB,
   loadChatHistoryFromDB,
@@ -148,6 +147,7 @@ import {
   getChroniclerPrompt,
   resetAI,
 } from './gemini';
+import { retryOperation } from './utils';
 // Fix: import UISettings type
 import type { Message, ChatSession, UISettings, GameSettings } from './types';
 
@@ -269,7 +269,7 @@ async function startNewChat() {
     const kickoffMessage = "Let's begin the setup for our new game.";
     const firstUserMessage: Message = { sender: 'user', text: kickoffMessage, hidden: true };
 
-    const result = await setupGeminiChat.sendMessageStream({ message: kickoffMessage });
+    const result = await retryOperation(() => setupGeminiChat.sendMessageStream({ message: kickoffMessage })) as any;
     let responseText = '';
     for await (const chunk of result) {
       responseText += chunk.text || '';
@@ -454,11 +454,12 @@ async function deleteChat() {
  */
 async function runChroniclerTurn(session: ChatSession) {
   const chronicler = getChroniclerChat();
-  if (!chronicler || isSending()) return; // Prevent simultaneous runs
-
-  // This is a background task, but we still need to prevent conflicts.
-  // The main isSending() flag will prevent new user messages and other chronicler turns.
-  setSending(true);
+  // Note: We do NOT check isSending() here because this function is called 
+  // usually *while* the main DM response is finishing or just finished.
+  // If we block on isSending(), it might never run if the user types fast.
+  // Instead, we just run it. The AI instance is separate.
+  
+  if (!chronicler) return; 
 
   try {
     // 1. Get current state and last player action
@@ -486,23 +487,24 @@ async function runChroniclerTurn(session: ChatSession) {
       Player Action: "${playerAction}"
     `;
 
-    // 3. Talk to the Chronicler AI
-    const result = await chronicler.sendMessage({ message: chroniclerPrompt });
+    // 3. Talk to the Chronicler AI - With Retry
+    // We use a separate retry block here so if it fails, it just dies quietly
+    const result = await retryOperation(() => chronicler.sendMessage({ message: chroniclerPrompt })) as GenerateContentResponse;
     const responseText = result.text;
 
     // 4. Parse the JSON response
-    const parsedData = JSON.parse(responseText);
+    const parsedData = JSON.parse(responseText || '{}');
 
     // 5. Save the new state to the current session object
     // Merge new state into existing, respecting the filtered view.
     // We iterate the response and update the master list.
-    if (parsedData.newState.progressClocks) {
+    if (parsedData.newState && parsedData.newState.progressClocks) {
         if (!session.progressClocks) session.progressClocks = {};
         Object.entries(parsedData.newState.progressClocks).forEach(([key, val]) => {
              session.progressClocks![key] = val as any;
         });
     }
-    if (parsedData.newState.factions) {
+    if (parsedData.newState && parsedData.newState.factions) {
         if (!session.factions) session.factions = {};
         Object.entries(parsedData.newState.factions).forEach(([key, val]) => {
              session.factions![key] = val as any;
@@ -524,13 +526,10 @@ async function runChroniclerTurn(session: ChatSession) {
     saveChatHistoryToDB();
 
   } catch (error) {
-    console.error("Chronicler turn failed:", error);
+    console.warn("Chronicler turn failed (background task):", error);
     // Don't bother the user with a UI error, just log it.
     // The game can continue without this background update.
-  } finally {
-    // Release the sending lock so the user can send another message.
-    setSending(false);
-  }
+  } 
 }
 
 
@@ -573,7 +572,7 @@ async function finalizeSetupAndStartGame(session: ChatSession, title: string, fi
     // Initialize the Chronicler AI for the main game. Explicitly use 'gemini-2.5-flash' for cost/speed.
     setChroniclerChat(createNewChatInstance([], getChroniclerPrompt(), 'gemini-2.5-flash'));
 
-    const kickoffResult = await getGeminiChat()!.sendMessageStream({ message: "The setup is complete. Begin the adventure by narrating the opening scene." });
+    const kickoffResult = await retryOperation(() => getGeminiChat()!.sendMessageStream({ message: "The setup is complete. Begin the adventure by narrating the opening scene." })) as any;
 
     let openingSceneText = '';
     gameLoadingMessage.classList.remove('loading');
@@ -670,7 +669,7 @@ async function handleFormSubmit(e: Event) {
             ? "Let's create my character."
             : userInput;
 
-        const result = await geminiChat.sendMessageStream({ message: messageToSend });
+        const result = await retryOperation(() => geminiChat.sendMessageStream({ message: messageToSend })) as any;
         let responseText = '';
         modelMessageEl.classList.remove('loading');
         modelMessageEl.innerHTML = '';
@@ -709,7 +708,7 @@ async function handleFormSubmit(e: Event) {
           charLoadingMessage.textContent = 'Generating a party of adventurers...';
 
           try {
-            const charResponse = await ai.models.generateContent({
+            const charResponse = await retryOperation(() => ai.models.generateContent({
               model: getUISettings().activeModel,
               contents: getQuickStartCharacterPrompt(),
               config: {
@@ -719,8 +718,8 @@ async function handleFormSubmit(e: Event) {
                   items: quickStartCharacterSchema,
                 },
               }
-            });
-            const chars = JSON.parse(charResponse.text);
+            })) as GenerateContentResponse;
+            const chars = JSON.parse(charResponse.text || '[]');
             currentSession.quickStartChars = chars;
             saveChatHistoryToDB();
             charLoadingContainer.remove();
@@ -796,7 +795,13 @@ async function handleFormSubmit(e: Event) {
       
       // WFGY-Lite: Semantic Memory Retrieval
       // Query the "Semantic Tree" for relevant past memories
-      const relevantMemories = await recallRelevantMemories(userInput, 3);
+      // We wrap this in a try/catch just in case it fails, so it doesn't block the chat.
+      let relevantMemories: string[] = [];
+      try {
+          relevantMemories = await recallRelevantMemories(userInput, 3);
+      } catch (memErr) {
+          console.warn("Memory recall failed, proceeding without context.", memErr);
+      }
       
       let messageWithContext = userInput;
       let contextBlock = "";
@@ -812,7 +817,7 @@ async function handleFormSubmit(e: Event) {
           messageWithContext = `(System: Context Injection:\n${contextBlock}\n)\n\n${userInput}`;
       }
 
-      const result = await geminiChat.sendMessageStream({ message: messageWithContext });
+      const result = await retryOperation(() => geminiChat.sendMessageStream({ message: messageWithContext })) as any;
       let responseText = '';
       modelMessageEl.classList.remove('loading');
       modelMessageEl.innerHTML = '';
@@ -918,14 +923,14 @@ async function handleFileUpload(event: Event) {
 
     const processFile = async (prompt: string) => {
       const base64Data = await fileToBase64(file);
-      const response = await ai.models.generateContent({
+      const response = await retryOperation(() => ai.models.generateContent({
         model: getUISettings().activeModel,
         contents: { parts: [
           { inlineData: { mimeType: file.type, data: base64Data } },
           { text: prompt }
         ]},
-      });
-      return response.text;
+      })) as GenerateContentResponse;
+      return response.text || '';
     };
 
     if (file.type.startsWith('text/')) {
@@ -1099,7 +1104,7 @@ function setupEventListeners() {
           
           const personaName = dmPersonas.find(p => p.id === setupSettings.personaId)?.name || 'DM';
           const userMessageText = `I've chosen the ${personaName} with a ${setupSettings.tone} tone and ${setupSettings.narration} narration. Now, let's create the world.`;
-          const result = await geminiChat.sendMessageStream({ message: userMessageText });
+          const result = await retryOperation(() => geminiChat.sendMessageStream({ message: userMessageText })) as any;
           
           let responseText = '';
           modelMessageEl.classList.remove('loading');

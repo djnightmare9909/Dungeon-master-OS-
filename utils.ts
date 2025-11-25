@@ -131,3 +131,35 @@ export function calculateCosineSimilarity(vecA: number[], vecB: number[]): numbe
     if (normA === 0 || normB === 0) return 0;
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
+
+/**
+ * Retries an async operation with exponential backoff.
+ * Useful for handling API rate limits (429 errors).
+ * @param operation A function that returns a promise.
+ * @param maxRetries Maximum number of retries.
+ * @param baseDelay Base delay in milliseconds.
+ */
+export async function retryOperation<T>(operation: () => Promise<T>, maxRetries = 3, baseDelay = 2000): Promise<T> {
+  let lastError: any;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+      // Check for various 429 signatures (status code, error code, or message content)
+      const isRateLimit = 
+        error.status === 429 || 
+        error.code === 429 || 
+        (error.message && (error.message.includes('429') || error.message.includes('quota') || error.message.includes('Too Many Requests')));
+      
+      if (isRateLimit) {
+        const delay = baseDelay * Math.pow(2, i);
+        console.warn(`Rate limit hit. Retrying in ${delay}ms... (Attempt ${i + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      throw error; // Not a rate limit error, rethrow immediately
+    }
+  }
+  throw lastError;
+}

@@ -6,6 +6,7 @@
 import { GoogleGenAI, Chat } from '@google/genai';
 import type { DMPersona } from './types';
 import { getUISettings } from './state';
+import { retryOperation } from './utils';
 
 /**
  * Safely retrieves the API key.
@@ -143,29 +144,35 @@ export function createNewChatInstance(history: { role: 'user' | 'model'; parts: 
 
 /**
  * Generates a vector embedding for a given text using the 'text-embedding-004' model.
+ * Wraps the call in a retry mechanism to handle 429 Rate Limit errors.
  * @param text The text to embed.
  * @returns A promise resolving to an array of numbers (the vector).
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
-    try {
-        const response = await ai.models.embedContent({
-            model: 'text-embedding-004',
-            contents: {
-                parts: [{ text }]
+    return retryOperation(async () => {
+        try {
+            const response = await ai.models.embedContent({
+                model: 'text-embedding-004',
+                contents: {
+                    parts: [{ text }]
+                }
+            });
+            // SDK response type adjustment: Handle both 'embeddings' (plural) and 'embedding' (singular) properties
+            const respAny = response as any;
+            if (respAny.embeddings && respAny.embeddings.length > 0) {
+                return respAny.embeddings[0].values || [];
             }
-        });
-        // SDK response type adjustment: Handle both 'embeddings' (plural) and 'embedding' (singular) properties
-        const respAny = response as any;
-        if (respAny.embeddings && respAny.embeddings.length > 0) {
-            return respAny.embeddings[0].values || [];
+            if (respAny.embedding) {
+                return respAny.embedding.values || [];
+            }
+        } catch (e) {
+            // If it's not a rate limit error, we want to log it here but rethrow so retryOperation can decide
+            // if it should retry (if it is a 429) or fail.
+            console.warn("Embedding generation attempt failed:", e);
+            throw e;
         }
-        if (respAny.embedding) {
-            return respAny.embedding.values || [];
-        }
-    } catch (e) {
-        console.warn("Embedding generation failed:", e);
-    }
-    return [];
+        return [];
+    });
 }
 
 function getSystemInstruction(password: string): string {
