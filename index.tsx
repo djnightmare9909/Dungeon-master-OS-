@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -299,20 +300,25 @@ async function startNewChat() {
     getChatHistory().push(newSession);
     saveChatHistoryToDB();
     loadChat(newId);
-  } catch (error) {
+  } catch (error: any) {
     console.error('New game setup failed:', error);
     loadingContainer.remove();
-    let errorMessage = 'Failed to start the game setup. Please try again.';
-    if (error instanceof Error) {
-        errorMessage = `Failed to start game. Error details: ${error.message}`;
-        if (error.message.includes('API Key') || error.message.includes('API key')) {
-            errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
-            // Auto-open settings
-            openModal(logbookModal);
-            const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
-            if (settingsTabBtn) settingsTabBtn.click();
-        }
+    
+    let errorMessage = `Failed to start game. Error details: ${error.message || 'Unknown error'}`;
+    
+    // Handle Rate Limit (429) specific message
+    if (error.status === 429 || (error.message && error.message.includes('429'))) {
+        errorMessage = "⚠️ System Overload (429): The 'Gemini 3.0 Pro' model is currently busy. Please go to Settings (in Logbook) and switch the AI Model to 'Gemini 2.5 Flash' for a smoother experience.";
     }
+    
+    if (error.message && (error.message.includes('API Key') || error.message.includes('API key'))) {
+        errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
+        // Auto-open settings
+        openModal(logbookModal);
+        const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
+        if (settingsTabBtn) settingsTabBtn.click();
+    }
+    
     appendMessage({ sender: 'error', text: errorMessage });
   }
 }
@@ -351,7 +357,7 @@ function loadChat(id: string) {
         // Initialize chronicler for existing games. Explicitly use 'gemini-2.5-flash' for cost/speed.
         setChroniclerChat(createNewChatInstance([], getChroniclerPrompt(), 'gemini-2.5-flash'));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create Gemini chat instance:', error);
       renderMessages(session.messages);
       let errorMessage = 'Error initializing the AI. Please check your setup or start a new chat.';
@@ -867,7 +873,7 @@ async function handleFormSubmit(e: Event) {
         });
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Gemini API Error:", error);
       modelMessageContainer.remove();
       let errorMessage = 'The DM seems to be pondering deeply ... and has gone quiet. Please try again.';
@@ -879,6 +885,10 @@ async function handleFormSubmit(e: Event) {
               const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
               if (settingsTabBtn) settingsTabBtn.click();
           }
+      }
+      // Handle Rate Limit (429) specific message
+      if (error.status === 429 || (error.message && error.message.includes('429'))) {
+          errorMessage = "⚠️ System Overload (429): The 'Gemini 3.0 Pro' model is currently busy. Please go to Settings (in Logbook) and switch the AI Model to 'Gemini 2.5 Flash' for a smoother experience.";
       }
       appendMessage({ sender: 'error', text: errorMessage });
     }

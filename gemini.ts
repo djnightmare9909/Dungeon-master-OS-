@@ -11,7 +11,7 @@ import { retryOperation } from './utils';
 /**
  * Safely retrieves the API key.
  * Prioritizes the key stored in user settings.
- * Then checks process.env.GEMINI_API_KEY which represents the value in env.local.
+ * Then checks process.env.API_KEY which represents the value in env.local.
  */
 function getApiKey(): string {
   // 1. User Setting (Priority override)
@@ -20,11 +20,11 @@ function getApiKey(): string {
 
   // 2. Environment Variables (env.local)
   // We use a direct try/catch access. This allows build tools (Vite/Parcel/Webpack)
-  // to find the string 'process.env.GEMINI_API_KEY' and replace it with your actual key
+  // to find the string 'process.env.API_KEY' and replace it with your actual key
   // at build time.
   try {
     // @ts-ignore
-    const envKey = process.env.GEMINI_API_KEY || '';
+    const envKey = process.env.API_KEY || '';
     if (envKey) {
         // Log verification to help debug "missing key" issues without exposing the full key
         console.log(`DM OS: Found API Key in environment variables (Length: ${envKey.length}, Ends with: ${envKey.slice(-4)})`);
@@ -51,7 +51,7 @@ export const ai = new Proxy({}, {
     if (!_ai) {
       const key = getApiKey();
       if (!key) {
-          console.warn("DM OS: No API Key found. Please check env.local has GEMINI_API_KEY set, or enter it in Settings.");
+          console.warn("DM OS: No API Key found. Please check env.local has API_KEY set, or enter it in Settings.");
       }
       _ai = new GoogleGenAI({ apiKey: key });
     }

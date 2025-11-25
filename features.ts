@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -625,6 +626,8 @@ export async function commitToSemanticMemory(text: string, importance: number = 
     if (!session.semanticLog) session.semanticLog = [];
 
     try {
+        // Rate limit protection: If embedding fails (e.g., 429), we just skip adding memory.
+        // This prevents the game from crashing due to background tasks.
         const embedding = await generateEmbedding(text);
         const node: SemanticNode = {
             id: `mem-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -637,7 +640,7 @@ export async function commitToSemanticMemory(text: string, importance: number = 
         saveChatHistoryToDB();
         // console.log("Committed to Semantic Tree:", text.substring(0, 30) + "...");
     } catch (e) {
-        console.error("Failed to commit to semantic memory:", e);
+        console.warn("Failed to commit to semantic memory (skipped):", e);
     }
 }
 
@@ -665,7 +668,7 @@ export async function recallRelevantMemories(query: string, topK: number = 3): P
             
         return relevant;
     } catch (e) {
-        console.error("Memory recall failed:", e);
+        console.warn("Memory recall failed (skipped):", e);
         return [];
     }
 }
