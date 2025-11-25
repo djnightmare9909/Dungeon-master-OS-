@@ -23,7 +23,12 @@ function getApiKey(): string {
   // at build time.
   try {
     // @ts-ignore
-    return process.env.GEMINI_API_KEY || '';
+    const envKey = process.env.GEMINI_API_KEY || '';
+    if (envKey) {
+        // Log verification to help debug "missing key" issues without exposing the full key
+        console.log(`DM OS: Found API Key in environment variables (Length: ${envKey.length}, Ends with: ${envKey.slice(-4)})`);
+    }
+    return envKey;
   } catch (e) {
     // If the variable wasn't injected and we are in a strict browser environment,
     // accessing 'process' might throw. We catch it here to prevent a crash.

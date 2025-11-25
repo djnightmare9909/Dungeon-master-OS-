@@ -303,12 +303,15 @@ async function startNewChat() {
     console.error('New game setup failed:', error);
     loadingContainer.remove();
     let errorMessage = 'Failed to start the game setup. Please try again.';
-    if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
-        errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
-        // Auto-open settings
-        openModal(logbookModal);
-        const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
-        if (settingsTabBtn) settingsTabBtn.click();
+    if (error instanceof Error) {
+        errorMessage = `Failed to start game. Error details: ${error.message}`;
+        if (error.message.includes('API Key') || error.message.includes('API key')) {
+            errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
+            // Auto-open settings
+            openModal(logbookModal);
+            const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
+            if (settingsTabBtn) settingsTabBtn.click();
+        }
     }
     appendMessage({ sender: 'error', text: errorMessage });
   }
@@ -352,12 +355,15 @@ function loadChat(id: string) {
       console.error('Failed to create Gemini chat instance:', error);
       renderMessages(session.messages);
       let errorMessage = 'Error initializing the AI. Please check your setup or start a new chat.';
-      if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
-          errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
-          // Auto-open settings
-          openModal(logbookModal);
-          const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
-          if (settingsTabBtn) settingsTabBtn.click();
+      if (error instanceof Error) {
+          errorMessage = `Error initializing AI: ${error.message}`;
+          if (error.message.includes('API Key') || error.message.includes('API key')) {
+              errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
+              // Auto-open settings
+              openModal(logbookModal);
+              const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
+              if (settingsTabBtn) settingsTabBtn.click();
+          }
       }
       appendMessage({ sender: 'error', text: errorMessage });
       setGeminiChat(null);
@@ -860,11 +866,14 @@ async function handleFormSubmit(e: Event) {
       console.error("Gemini API Error:", error);
       modelMessageContainer.remove();
       let errorMessage = 'The DM seems to be pondering deeply ... and has gone quiet. Please try again.';
-      if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
-          errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
-          openModal(logbookModal);
-          const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
-          if (settingsTabBtn) settingsTabBtn.click();
+      if (error instanceof Error) {
+          errorMessage = `AI Connection Error: ${error.message}`;
+          if (error.message.includes('API Key') || error.message.includes('API key')) {
+              errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
+              openModal(logbookModal);
+              const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
+              if (settingsTabBtn) settingsTabBtn.click();
+          }
       }
       appendMessage({ sender: 'error', text: errorMessage });
     }
@@ -953,9 +962,10 @@ async function handleFileUpload(event: Event) {
     console.error("File processing failed:", error);
     let errorMessage = 'An error occurred during processing.';
     if (error instanceof Error) {
+        errorMessage = error.message;
         if (error.message.includes('Unsupported file type')) {
             errorMessage = `Unsupported file type: ${file.type}`;
-        } else if (error.message.includes('API Key') || error.message.includes('API key'))) {
+        } else if (error.message.includes('API Key') || error.message.includes('API key')) {
             errorMessage = 'API Key is missing or invalid. Please check your settings in the Logbook.';
             openModal(logbookModal);
             const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
