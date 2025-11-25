@@ -17,24 +17,29 @@ function getApiKey(): string {
   const userKey = getUISettings().apiKey;
   if (userKey && userKey.trim().length > 0) return userKey;
 
-  // 2. Process Env (Node/Bundlers)
+  // 2. Process Env (Standard Node/Bundlers)
+  // We use a direct try/catch because bundlers often replace 'process.env.API_KEY'
+  // with a string literal at build time, but do NOT polyfill the 'process' object.
+  // Checking 'if (typeof process ...)' first causes the key to be ignored in browsers.
   try {
-    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-      return process.env.API_KEY;
-    }
+    // @ts-ignore
+    const envKey = process.env.API_KEY;
+    if (envKey) return envKey;
   } catch (e) {
-    // Ignore reference errors
+    // Ignore ReferenceError if process is not defined
   }
 
   // 3. Vite Env (Modern Bundlers)
   try {
     // @ts-ignore
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.API_KEY) {
-      // @ts-ignore
-      return import.meta.env.API_KEY;
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+        // @ts-ignore
+        if (import.meta.env.API_KEY) return import.meta.env.API_KEY;
+        // @ts-ignore
+        if (import.meta.env.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
     }
   } catch (e) {
-    // Ignore reference errors
+    // Ignore errors
   }
 
   return '';
