@@ -8,28 +8,34 @@ import type { DMPersona } from './types';
 import { getUISettings } from './state';
 
 /**
- * Safely retrieves the API key from the environment.
- * Wraps access in a try-catch block to prevent ReferenceErrors in environments
- * where 'process' is not defined (like standard browser contexts).
+ * Safely retrieves the API key.
+ * Prioritizes the key stored in user settings.
+ * Falls back to the environment variable if available.
  */
 function getApiKey(): string {
+  const userKey = getUISettings().apiKey;
+  if (userKey) return userKey;
+
   try {
     return process.env.API_KEY || '';
   } catch (e) {
-    console.warn("Could not access process.env.API_KEY. If you are running locally, ensure your environment variables are configured correctly.");
+    // Safe fallback for environments where process is not defined
     return '';
   }
 }
 
-let _ai: GoogleGenAI;
-// Lazily initialize the AI instance to prevent app crash on load if API key is missing.
-// The error will be surfaced to the user during the first API call instead.
+let _ai: GoogleGenAI | null = null;
+
+// Allows the UI to reset the client when the API key changes in settings.
+export function resetAI() {
+  _ai = null;
+}
+
+// Lazily initialize the AI instance.
 export const ai = new Proxy({}, {
   get(target, prop, receiver) {
     if (!_ai) {
       const key = getApiKey();
-      // We initialize even with an empty key so the app loads.
-      // Calls will fail gracefully with an auth error, which the UI handles.
       _ai = new GoogleGenAI({ apiKey: key });
     }
     return Reflect.get(_ai, prop, receiver);

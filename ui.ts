@@ -3,9 +3,9 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import { getChatHistory, getCurrentChat, getUISettings } from './state';
+import { getChatHistory, getCurrentChat, getUISettings, dbSet } from './state';
 import type { Message, ChatSession, CharacterSheetData, Achievement, NPCState } from './types';
-import { dmPersonas } from './gemini';
+import { dmPersonas, resetAI } from './gemini';
 
 // =================================================================================
 // DOM ELEMENT SELECTORS
@@ -64,15 +64,10 @@ export const logbookModal = document.getElementById('logbook-modal') as HTMLElem
 export const closeLogbookBtn = document.getElementById('close-logbook-btn') as HTMLButtonElement;
 export const logbookNav = document.querySelector('.logbook-nav') as HTMLElement;
 export const logbookPanes = document.querySelectorAll('.logbook-pane') as NodeListOf<HTMLElement>;
-// Fix: Export characterSheetDisplay for use in other modules
 export const characterSheetDisplay = document.getElementById('character-sheet-display') as HTMLElement;
-// Fix: Export inventoryDisplay for use in other modules
 export const inventoryDisplay = document.getElementById('inventory-display') as HTMLElement;
-// Fix: Export questsDisplay for use in other modules
 export const questsDisplay = document.getElementById('quests-display') as HTMLElement;
-// Fix: Export npcsDisplay for use in other modules
 export const npcsDisplay = document.getElementById('npcs-display') as HTMLElement;
-// Fix: Export achievementsDisplay for use in other modules
 export const achievementsDisplay = document.getElementById('achievements-display') as HTMLElement;
 export const updateSheetBtn = document.getElementById('update-sheet-btn') as HTMLButtonElement;
 export const updateInventoryBtn = document.getElementById('update-inventory-btn') as HTMLButtonElement;
@@ -80,7 +75,6 @@ export const updateQuestsBtn = document.getElementById('update-quests-btn') as H
 export const updateNpcsBtn = document.getElementById('update-npcs-btn') as HTMLButtonElement;
 export const updateAchievementsBtn = document.getElementById('update-achievements-btn') as HTMLButtonElement;
 export const generateImageBtn = document.getElementById('generate-image-btn') as HTMLButtonElement;
-// Fix: Export characterImageDisplay for use in other modules
 export const characterImageDisplay = document.getElementById('character-image-display') as HTMLImageElement;
 export const characterImagePlaceholder = document.getElementById('character-image-placeholder') as HTMLElement;
 export const characterImageLoading = document.getElementById('character-image-loading') as HTMLElement;
@@ -88,6 +82,7 @@ export const fontSizeControls = document.getElementById('font-size-controls') as
 export const enterToSendToggle = document.getElementById('setting-enter-send') as HTMLInputElement;
 export const experimentalUploadToggle = document.getElementById('setting-experimental-upload') as HTMLInputElement;
 export const modelSelect = document.getElementById('setting-model') as HTMLSelectElement;
+export const apiKeyInput = document.getElementById('setting-api-key') as HTMLInputElement;
 export const changeUiBtn = document.getElementById('change-ui-btn') as HTMLButtonElement;
 export const themeModal = document.getElementById('theme-modal') as HTMLElement;
 export const closeThemeBtn = document.getElementById('close-theme-btn') as HTMLButtonElement;
@@ -138,7 +133,6 @@ export function applyUISettings() {
     experimentalUploadToggle.checked = uiSettings.experimentalUploadLimit;
   }
   if (modelSelect) {
-    // If the saved model isn't in the list (e.g., old 2.5-pro), default to 3.0-pro-preview
     const options = Array.from(modelSelect.options).map(o => o.value);
     if (options.includes(uiSettings.activeModel)) {
       modelSelect.value = uiSettings.activeModel;
@@ -146,6 +140,9 @@ export function applyUISettings() {
       modelSelect.value = 'gemini-3-pro-preview';
       uiSettings.activeModel = 'gemini-3-pro-preview';
     }
+  }
+  if (apiKeyInput) {
+      apiKeyInput.value = uiSettings.apiKey || '';
   }
 }
 
@@ -251,7 +248,6 @@ export function appendMessage(message: Message, container: HTMLElement = chatCon
 
     if (message.sender === 'model' && message.text && container === chatContainer) {
       const ttsControls = ttsTemplate.content.cloneNode(true) as DocumentFragment;
-      // Event listener for this will be in features.ts, attached by the main controller
       msgContainer.appendChild(ttsControls);
     }
     container.appendChild(msgContainer);
@@ -290,7 +286,6 @@ export function renderQuickStartChoices(characters: CharacterSheetData[]) {
   const choiceMessage: Message = { sender: 'model', text: choiceHtml };
   appendMessage(choiceMessage);
   currentSession.messages.push(choiceMessage);
-  // save handled by controller
 }
 
 export function renderSetupChoices() {

@@ -25,6 +25,7 @@ let uiSettings: UISettings = {
   fontSize: 'medium',
   experimentalUploadLimit: false,
   activeModel: 'gemini-3-pro-preview',
+  apiKey: '',
 };
 
 // =================================================================================

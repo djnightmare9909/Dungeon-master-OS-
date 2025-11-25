@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
   <head>
@@ -395,6 +396,11 @@
                     <div class="settings-separator"></div>
                     <h3>Interface Settings</h3>
                     <div class="settings-grid">
+                        <div class="setting-item" style="grid-column: 1 / -1;">
+                            <label for="setting-api-key">API Key</label>
+                            <input type="password" id="setting-api-key" placeholder="Paste your Google GenAI API Key here" style="width: 100%; padding: 0.75rem; background-color: var(--background-color); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-color); font-family: var(--mono-font);">
+                            <p class="setting-description">Get your key from <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--accent-color);">Google AI Studio</a>. Stored locally in your browser.</p>
+                        </div>
                         <div class="setting-item">
                             <label for="setting-model">AI Model</label>
                             <select id="setting-model">

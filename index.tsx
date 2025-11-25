@@ -83,6 +83,7 @@ import {
   enterToSendToggle,
   experimentalUploadToggle,
   modelSelect,
+  apiKeyInput,
   changeUiBtn,
   themeModal,
   closeThemeBtn,
@@ -144,6 +145,7 @@ import {
   getNewGameSetupInstruction,
   getQuickStartCharacterPrompt,
   getChroniclerPrompt,
+  resetAI,
 } from './gemini';
 // Fix: import UISettings type
 import type { Message, ChatSession, UISettings, GameSettings } from './types';
@@ -301,7 +303,7 @@ async function startNewChat() {
     loadingContainer.remove();
     let errorMessage = 'Failed to start the game setup. Please try again.';
     if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
-        errorMessage = 'Error: API Key is missing or invalid. Please ensure it is correctly configured in your environment.';
+        errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
     }
     appendMessage({ sender: 'error', text: errorMessage });
   }
@@ -346,7 +348,7 @@ function loadChat(id: string) {
       renderMessages(session.messages);
       let errorMessage = 'Error initializing the AI. Please check your setup or start a new chat.';
       if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
-          errorMessage = 'Error: API Key is missing or invalid. Please ensure it is correctly configured in your environment.';
+          errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
       }
       appendMessage({ sender: 'error', text: errorMessage });
       setGeminiChat(null);
@@ -752,7 +754,7 @@ async function handleFormSubmit(e: Event) {
 
     const geminiChat = getGeminiChat();
     if (!geminiChat) {
-        appendMessage({ sender: 'error', text: 'The connection to the AI has been lost. This can happen if the API Key is missing or invalid. Please check your configuration and start a new chat.' });
+        appendMessage({ sender: 'error', text: 'The connection to the AI has been lost. This can happen if the API Key is missing or invalid. Please check your settings in the Logbook and start a new chat.' });
         setSending(false);
         return;
     }
@@ -846,7 +848,7 @@ async function handleFormSubmit(e: Event) {
       modelMessageContainer.remove();
       let errorMessage = 'The DM seems to be pondering deeply ... and has gone quiet. Please try again.';
       if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
-          errorMessage = 'Error: API Key is missing or invalid. Please ensure it is correctly configured in your environment.';
+          errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
       }
       appendMessage({ sender: 'error', text: errorMessage });
     }
@@ -938,7 +940,7 @@ async function handleFileUpload(event: Event) {
         if (error.message.includes('Unsupported file type')) {
             errorMessage = `Unsupported file type: ${file.type}`;
         } else if (error.message.includes('API Key') || error.message.includes('API key')) {
-            errorMessage = 'API Key is missing or invalid. Please check your configuration.';
+            errorMessage = 'API Key is missing or invalid. Please check your settings in the Logbook.';
         }
     }
     messageEl.classList.remove('loading');
@@ -1244,6 +1246,14 @@ function setupEventListeners() {
         loadChat(currentChat.id);
     }
   });
+  
+  if (apiKeyInput) {
+      apiKeyInput.addEventListener('change', () => {
+          getUISettings().apiKey = apiKeyInput.value.trim();
+          dbSet('dm-os-ui-settings', getUISettings());
+          resetAI(); // Reset the AI instance to use the new key immediately
+      });
+  }
 
   changeUiBtn.addEventListener('click', () => openModal(themeModal));
   closeThemeBtn.addEventListener('click', () => closeModal(themeModal));
