@@ -84,6 +84,7 @@ import {
   experimentalUploadToggle,
   modelSelect,
   apiKeyInput,
+  saveApiKeyBtn,
   changeUiBtn,
   themeModal,
   closeThemeBtn,
@@ -304,6 +305,10 @@ async function startNewChat() {
     let errorMessage = 'Failed to start the game setup. Please try again.';
     if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
         errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
+        // Auto-open settings
+        openModal(logbookModal);
+        const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
+        if (settingsTabBtn) settingsTabBtn.click();
     }
     appendMessage({ sender: 'error', text: errorMessage });
   }
@@ -349,6 +354,10 @@ function loadChat(id: string) {
       let errorMessage = 'Error initializing the AI. Please check your setup or start a new chat.';
       if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
           errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
+          // Auto-open settings
+          openModal(logbookModal);
+          const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
+          if (settingsTabBtn) settingsTabBtn.click();
       }
       appendMessage({ sender: 'error', text: errorMessage });
       setGeminiChat(null);
@@ -754,8 +763,12 @@ async function handleFormSubmit(e: Event) {
 
     const geminiChat = getGeminiChat();
     if (!geminiChat) {
-        appendMessage({ sender: 'error', text: 'The connection to the AI has been lost. This can happen if the API Key is missing or invalid. Please check your settings in the Logbook and start a new chat.' });
+        const errorMessage = 'The connection to the AI has been lost. This can happen if the API Key is missing or invalid. Please check your settings in the Logbook and start a new chat.';
+        appendMessage({ sender: 'error', text: errorMessage });
         setSending(false);
+        openModal(logbookModal);
+        const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
+        if (settingsTabBtn) settingsTabBtn.click();
         return;
     }
     stopTTS();
@@ -849,6 +862,9 @@ async function handleFormSubmit(e: Event) {
       let errorMessage = 'The DM seems to be pondering deeply ... and has gone quiet. Please try again.';
       if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
           errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
+          openModal(logbookModal);
+          const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
+          if (settingsTabBtn) settingsTabBtn.click();
       }
       appendMessage({ sender: 'error', text: errorMessage });
     }
@@ -941,6 +957,9 @@ async function handleFileUpload(event: Event) {
             errorMessage = `Unsupported file type: ${file.type}`;
         } else if (error.message.includes('API Key') || error.message.includes('API key')) {
             errorMessage = 'API Key is missing or invalid. Please check your settings in the Logbook.';
+            openModal(logbookModal);
+            const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
+            if (settingsTabBtn) settingsTabBtn.click();
         }
     }
     messageEl.classList.remove('loading');
@@ -1247,6 +1266,8 @@ function setupEventListeners() {
     }
   });
   
+  // UI logic for API key moved to saveApiKeyBtn listener in ui.ts
+  // However, we retain this just in case user presses enter or blurs
   if (apiKeyInput) {
       apiKeyInput.addEventListener('change', () => {
           getUISettings().apiKey = apiKeyInput.value.trim();

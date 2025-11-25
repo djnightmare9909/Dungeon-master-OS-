@@ -83,6 +83,7 @@ export const enterToSendToggle = document.getElementById('setting-enter-send') a
 export const experimentalUploadToggle = document.getElementById('setting-experimental-upload') as HTMLInputElement;
 export const modelSelect = document.getElementById('setting-model') as HTMLSelectElement;
 export const apiKeyInput = document.getElementById('setting-api-key') as HTMLInputElement;
+export const saveApiKeyBtn = document.getElementById('save-api-key-btn') as HTMLButtonElement;
 export const changeUiBtn = document.getElementById('change-ui-btn') as HTMLButtonElement;
 export const themeModal = document.getElementById('theme-modal') as HTMLElement;
 export const closeThemeBtn = document.getElementById('close-theme-btn') as HTMLButtonElement;

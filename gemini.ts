@@ -10,18 +10,34 @@ import { getUISettings } from './state';
 /**
  * Safely retrieves the API key.
  * Prioritizes the key stored in user settings.
- * Falls back to the environment variable if available.
+ * Checks process.env and import.meta.env for local dev support.
  */
 function getApiKey(): string {
+  // 1. User Setting (Priority)
   const userKey = getUISettings().apiKey;
-  if (userKey) return userKey;
+  if (userKey && userKey.trim().length > 0) return userKey;
 
+  // 2. Process Env (Node/Bundlers)
   try {
-    return process.env.API_KEY || '';
+    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+      return process.env.API_KEY;
+    }
   } catch (e) {
-    // Safe fallback for environments where process is not defined
-    return '';
+    // Ignore reference errors
   }
+
+  // 3. Vite Env (Modern Bundlers)
+  try {
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.API_KEY) {
+      // @ts-ignore
+      return import.meta.env.API_KEY;
+    }
+  } catch (e) {
+    // Ignore reference errors
+  }
+
+  return '';
 }
 
 let _ai: GoogleGenAI | null = null;
@@ -29,6 +45,7 @@ let _ai: GoogleGenAI | null = null;
 // Allows the UI to reset the client when the API key changes in settings.
 export function resetAI() {
   _ai = null;
+  console.log("AI Client reset. Next call will use new API Key.");
 }
 
 // Lazily initialize the AI instance.
@@ -36,6 +53,9 @@ export const ai = new Proxy({}, {
   get(target, prop, receiver) {
     if (!_ai) {
       const key = getApiKey();
+      if (!key) {
+          console.warn("DM OS: No API Key found in settings or environment.");
+      }
       _ai = new GoogleGenAI({ apiKey: key });
     }
     return Reflect.get(_ai, prop, receiver);
@@ -131,20 +151,23 @@ export function createNewChatInstance(history: { role: 'user' | 'model'; parts: 
  * @returns A promise resolving to an array of numbers (the vector).
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
-    const response = await ai.models.embedContent({
-        model: 'text-embedding-004',
-        contents: {
-            parts: [{ text }]
+    try {
+        const response = await ai.models.embedContent({
+            model: 'text-embedding-004',
+            contents: {
+                parts: [{ text }]
+            }
+        });
+        // SDK response type adjustment: Handle both 'embeddings' (plural) and 'embedding' (singular) properties
+        const respAny = response as any;
+        if (respAny.embeddings && respAny.embeddings.length > 0) {
+            return respAny.embeddings[0].values || [];
         }
-    });
-    // SDK response type adjustment: Handle both 'embeddings' (plural) and 'embedding' (singular) properties
-    // as the SDK types evolve. The error "Did you mean 'embeddings'?" implies plural usage.
-    const respAny = response as any;
-    if (respAny.embeddings && respAny.embeddings.length > 0) {
-        return respAny.embeddings[0].values || [];
-    }
-    if (respAny.embedding) {
-        return respAny.embedding.values || [];
+        if (respAny.embedding) {
+            return respAny.embedding.values || [];
+        }
+    } catch (e) {
+        console.warn("Embedding generation failed:", e);
     }
     return [];
 }
