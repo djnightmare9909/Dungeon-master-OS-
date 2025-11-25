@@ -10,39 +10,25 @@ import { getUISettings } from './state';
 /**
  * Safely retrieves the API key.
  * Prioritizes the key stored in user settings.
- * Checks process.env and import.meta.env for local dev support.
+ * Then checks process.env.GEMINI_API_KEY which represents the value in env.local.
  */
 function getApiKey(): string {
-  // 1. User Setting (Priority)
+  // 1. User Setting (Priority override)
   const userKey = getUISettings().apiKey;
   if (userKey && userKey.trim().length > 0) return userKey;
 
-  // 2. Process Env (Standard Node/Bundlers)
-  // We use a direct try/catch because bundlers often replace 'process.env.API_KEY'
-  // with a string literal at build time, but do NOT polyfill the 'process' object.
-  // Checking 'if (typeof process ...)' first causes the key to be ignored in browsers.
+  // 2. Environment Variables (env.local)
+  // We use a direct try/catch access. This allows build tools (Vite/Parcel/Webpack)
+  // to find the string 'process.env.GEMINI_API_KEY' and replace it with your actual key
+  // at build time.
   try {
     // @ts-ignore
-    const envKey = process.env.API_KEY;
-    if (envKey) return envKey;
+    return process.env.GEMINI_API_KEY || '';
   } catch (e) {
-    // Ignore ReferenceError if process is not defined
+    // If the variable wasn't injected and we are in a strict browser environment,
+    // accessing 'process' might throw. We catch it here to prevent a crash.
+    return '';
   }
-
-  // 3. Vite Env (Modern Bundlers)
-  try {
-    // @ts-ignore
-    if (typeof import.meta !== 'undefined' && import.meta.env) {
-        // @ts-ignore
-        if (import.meta.env.API_KEY) return import.meta.env.API_KEY;
-        // @ts-ignore
-        if (import.meta.env.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
-    }
-  } catch (e) {
-    // Ignore errors
-  }
-
-  return '';
 }
 
 let _ai: GoogleGenAI | null = null;
@@ -59,7 +45,7 @@ export const ai = new Proxy({}, {
     if (!_ai) {
       const key = getApiKey();
       if (!key) {
-          console.warn("DM OS: No API Key found in settings or environment.");
+          console.warn("DM OS: No API Key found. Please check env.local has GEMINI_API_KEY set, or enter it in Settings.");
       }
       _ai = new GoogleGenAI({ apiKey: key });
     }

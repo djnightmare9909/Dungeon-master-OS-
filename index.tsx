@@ -955,7 +955,7 @@ async function handleFileUpload(event: Event) {
     if (error instanceof Error) {
         if (error.message.includes('Unsupported file type')) {
             errorMessage = `Unsupported file type: ${file.type}`;
-        } else if (error.message.includes('API Key') || error.message.includes('API key')) {
+        } else if (error.message.includes('API Key') || error.message.includes('API key'))) {
             errorMessage = 'API Key is missing or invalid. Please check your settings in the Logbook.';
             openModal(logbookModal);
             const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
@@ -1266,13 +1266,23 @@ function setupEventListeners() {
     }
   });
   
-  // UI logic for API key moved to saveApiKeyBtn listener in ui.ts
-  // However, we retain this just in case user presses enter or blurs
-  if (apiKeyInput) {
-      apiKeyInput.addEventListener('change', () => {
-          getUISettings().apiKey = apiKeyInput.value.trim();
-          dbSet('dm-os-ui-settings', getUISettings());
-          resetAI(); // Reset the AI instance to use the new key immediately
+  // Add listener for Save API Key Button
+  if (saveApiKeyBtn) {
+      saveApiKeyBtn.addEventListener('click', () => {
+          if (apiKeyInput) {
+              getUISettings().apiKey = apiKeyInput.value.trim();
+              dbSet('dm-os-ui-settings', getUISettings());
+              resetAI(); // Reset the AI instance to use the new key immediately
+              
+              // Visual feedback
+              const originalText = saveApiKeyBtn.textContent;
+              saveApiKeyBtn.textContent = 'Saved!';
+              saveApiKeyBtn.classList.add('success');
+              setTimeout(() => {
+                  saveApiKeyBtn.textContent = originalText;
+                  saveApiKeyBtn.classList.remove('success');
+              }, 2000);
+          }
       });
   }
 
