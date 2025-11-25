@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -6,13 +7,30 @@ import { GoogleGenAI, Chat } from '@google/genai';
 import type { DMPersona } from './types';
 import { getUISettings } from './state';
 
+/**
+ * Safely retrieves the API key from the environment.
+ * Wraps access in a try-catch block to prevent ReferenceErrors in environments
+ * where 'process' is not defined (like standard browser contexts).
+ */
+function getApiKey(): string {
+  try {
+    return process.env.API_KEY || '';
+  } catch (e) {
+    console.warn("Could not access process.env.API_KEY. If you are running locally, ensure your environment variables are configured correctly.");
+    return '';
+  }
+}
+
 let _ai: GoogleGenAI;
 // Lazily initialize the AI instance to prevent app crash on load if API key is missing.
 // The error will be surfaced to the user during the first API call instead.
 export const ai = new Proxy({}, {
   get(target, prop, receiver) {
     if (!_ai) {
-      _ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const key = getApiKey();
+      // We initialize even with an empty key so the app loads.
+      // Calls will fail gracefully with an auth error, which the UI handles.
+      _ai = new GoogleGenAI({ apiKey: key });
     }
     return Reflect.get(_ai, prop, receiver);
   },
