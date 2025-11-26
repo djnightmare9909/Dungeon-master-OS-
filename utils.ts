@@ -133,32 +133,28 @@ export function calculateCosineSimilarity(vecA: number[], vecB: number[]): numbe
 }
 
 /**
- * Retries an async operation with exponential backoff.
- * Useful for handling API rate limits (429 errors).
- * @param operation A function that returns a promise.
- * @param maxRetries Maximum number of retries.
- * @param baseDelay Base delay in milliseconds.
+ * Executes an asynchronous operation with automatic retries on 429 (Too Many Requests) errors.
+ * @param operation The async function to execute.
+ * @param maxRetries The maximum number of retry attempts.
+ * @param delay The initial delay in milliseconds before the first retry.
+ * @returns The result of the operation.
  */
-export async function retryOperation<T>(operation: () => Promise<T>, maxRetries = 3, baseDelay = 2000): Promise<T> {
+export async function retryOperation<T>(operation: () => Promise<T>, maxRetries = 3, delay = 1000): Promise<T> {
   let lastError: any;
   for (let i = 0; i < maxRetries; i++) {
     try {
       return await operation();
     } catch (error: any) {
       lastError = error;
-      // Check for various 429 signatures (status code, error code, or message content)
-      const isRateLimit = 
-        error.status === 429 || 
-        error.code === 429 || 
-        (error.message && (error.message.includes('429') || error.message.includes('quota') || error.message.includes('Too Many Requests')));
-      
+      const isRateLimit = error.status === 429 || error.code === 429 || (error.message && error.message.includes('429'));
       if (isRateLimit) {
-        const delay = baseDelay * Math.pow(2, i);
-        console.warn(`Rate limit hit. Retrying in ${delay}ms... (Attempt ${i + 1}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        // Exponential backoff with jitter
+        const waitTime = delay * Math.pow(2, i) + (Math.random() * 100);
+        console.warn(`Rate limit hit (429). Retrying in ${Math.round(waitTime)}ms... (Attempt ${i + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
-      throw error; // Not a rate limit error, rethrow immediately
+      throw error; // Throw other errors immediately
     }
   }
   throw lastError;

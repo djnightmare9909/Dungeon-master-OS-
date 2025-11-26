@@ -8,42 +8,27 @@ import type { DMPersona } from './types';
 import { getUISettings } from './state';
 import { retryOperation } from './utils';
 
+let _ai: GoogleGenAI;
+
 /**
- * Safely retrieves the API key.
- * Prioritizes the key stored in user settings.
- * Then checks process.env.API_KEY which represents the value in env.local.
+ * Helper to safely retrieve the API key from various environment locations.
+ * Supports process.env (standard Node/Cloud) and import.meta.env (Vite/Local).
  */
-function getApiKey(): string {
-  // 1. User Setting (Priority override)
-  const userKey = getUISettings().apiKey;
-  if (userKey && userKey.trim().length > 0) return userKey;
-
-  // 2. Environment Variables (env.local)
-  // We use a direct try/catch access. This allows build tools (Vite/Parcel/Webpack)
-  // to find the string 'process.env.API_KEY' and replace it with your actual key
-  // at build time.
-  try {
-    // @ts-ignore
-    const envKey = process.env.API_KEY || '';
-    if (envKey) {
-        // Log verification to help debug "missing key" issues without exposing the full key
-        console.log(`DM OS: Found API Key in environment variables (Length: ${envKey.length}, Ends with: ${envKey.slice(-4)})`);
-    }
-    return envKey;
-  } catch (e) {
-    // If the variable wasn't injected and we are in a strict browser environment,
-    // accessing 'process' might throw. We catch it here to prevent a crash.
-    return '';
+const getApiKey = (): string | undefined => {
+  // 1. Check standard process.env (Cloud/Node)
+  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+    return process.env.API_KEY;
   }
-}
-
-let _ai: GoogleGenAI | null = null;
-
-// Allows the UI to reset the client when the API key changes in settings.
-export function resetAI() {
-  _ai = null;
-  console.log("AI Client reset. Next call will use new API Key.");
-}
+  // 2. Check Vite environment variables (Local Development)
+  // @ts-ignore
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    // @ts-ignore
+    if (import.meta.env.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
+    // @ts-ignore
+    if (import.meta.env.API_KEY) return import.meta.env.API_KEY;
+  }
+  return undefined;
+};
 
 // Lazily initialize the AI instance.
 export const ai = new Proxy({}, {
@@ -51,9 +36,9 @@ export const ai = new Proxy({}, {
     if (!_ai) {
       const key = getApiKey();
       if (!key) {
-          console.warn("DM OS: No API Key found. Please check env.local has API_KEY set, or enter it in Settings.");
+        console.error("DM OS Error: API Key not found. Please configure VITE_API_KEY or API_KEY in your environment.");
       }
-      _ai = new GoogleGenAI({ apiKey: key });
+      _ai = new GoogleGenAI({ apiKey: key || '' });
     }
     return Reflect.get(_ai, prop, receiver);
   },
@@ -144,32 +129,24 @@ export function createNewChatInstance(history: { role: 'user' | 'model'; parts: 
 
 /**
  * Generates a vector embedding for a given text using the 'text-embedding-004' model.
- * Wraps the call in a retry mechanism to handle 429 Rate Limit errors.
  * @param text The text to embed.
  * @returns A promise resolving to an array of numbers (the vector).
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
+    // Using retryOperation to handle potential rate limits on embedding API
     return retryOperation(async () => {
-        try {
-            const response = await ai.models.embedContent({
-                model: 'text-embedding-004',
-                contents: {
-                    parts: [{ text }]
-                }
-            });
-            // SDK response type adjustment: Handle both 'embeddings' (plural) and 'embedding' (singular) properties
-            const respAny = response as any;
-            if (respAny.embeddings && respAny.embeddings.length > 0) {
-                return respAny.embeddings[0].values || [];
+        const response = await ai.models.embedContent({
+            model: 'text-embedding-004',
+            contents: {
+                parts: [{ text }]
             }
-            if (respAny.embedding) {
-                return respAny.embedding.values || [];
-            }
-        } catch (e) {
-            // If it's not a rate limit error, we want to log it here but rethrow so retryOperation can decide
-            // if it should retry (if it is a 429) or fail.
-            console.warn("Embedding generation attempt failed:", e);
-            throw e;
+        });
+        const respAny = response as any;
+        if (respAny.embeddings && respAny.embeddings.length > 0) {
+            return respAny.embeddings[0].values || [];
+        }
+        if (respAny.embedding) {
+            return respAny.embedding.values || [];
         }
         return [];
     });

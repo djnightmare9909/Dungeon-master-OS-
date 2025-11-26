@@ -20,7 +20,6 @@ export interface UISettings {
   fontSize: 'small' | 'medium' | 'large';
   experimentalUploadLimit: boolean;
   activeModel: string;
-  apiKey: string;
 }
 
 export interface AbilityScore {

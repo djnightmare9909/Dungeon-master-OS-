@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -83,8 +82,6 @@ import {
   enterToSendToggle,
   experimentalUploadToggle,
   modelSelect,
-  apiKeyInput,
-  saveApiKeyBtn,
   changeUiBtn,
   themeModal,
   closeThemeBtn,
@@ -146,7 +143,6 @@ import {
   getNewGameSetupInstruction,
   getQuickStartCharacterPrompt,
   getChroniclerPrompt,
-  resetAI,
 } from './gemini';
 import { retryOperation } from './utils';
 // Fix: import UISettings type
@@ -270,7 +266,9 @@ async function startNewChat() {
     const kickoffMessage = "Let's begin the setup for our new game.";
     const firstUserMessage: Message = { sender: 'user', text: kickoffMessage, hidden: true };
 
-    const result = await retryOperation(() => setupGeminiChat.sendMessageStream({ message: kickoffMessage })) as any;
+    // Wrapped in retryOperation to handle rate limits during setup
+    const result = await retryOperation(() => setupGeminiChat.sendMessageStream({ message: kickoffMessage })) as AsyncIterable<GenerateContentResponse>;
+    
     let responseText = '';
     for await (const chunk of result) {
       responseText += chunk.text || '';
@@ -300,25 +298,13 @@ async function startNewChat() {
     getChatHistory().push(newSession);
     saveChatHistoryToDB();
     loadChat(newId);
-  } catch (error: any) {
+  } catch (error) {
     console.error('New game setup failed:', error);
     loadingContainer.remove();
-    
-    let errorMessage = `Failed to start game. Error details: ${error.message || 'Unknown error'}`;
-    
-    // Handle Rate Limit (429) specific message
-    if (error.status === 429 || (error.message && error.message.includes('429'))) {
-        errorMessage = "⚠️ System Overload (429): The 'Gemini 3.0 Pro' model is currently busy. Please go to Settings (in Logbook) and switch the AI Model to 'Gemini 2.5 Flash' for a smoother experience.";
+    let errorMessage = 'Failed to start the game setup. Please try again.';
+    if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
+        errorMessage = 'Error: API Key is missing or invalid. Please ensure it is correctly configured in your environment.';
     }
-    
-    if (error.message && (error.message.includes('API Key') || error.message.includes('API key'))) {
-        errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
-        // Auto-open settings
-        openModal(logbookModal);
-        const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
-        if (settingsTabBtn) settingsTabBtn.click();
-    }
-    
     appendMessage({ sender: 'error', text: errorMessage });
   }
 }
@@ -357,19 +343,12 @@ function loadChat(id: string) {
         // Initialize chronicler for existing games. Explicitly use 'gemini-2.5-flash' for cost/speed.
         setChroniclerChat(createNewChatInstance([], getChroniclerPrompt(), 'gemini-2.5-flash'));
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to create Gemini chat instance:', error);
       renderMessages(session.messages);
       let errorMessage = 'Error initializing the AI. Please check your setup or start a new chat.';
-      if (error instanceof Error) {
-          errorMessage = `Error initializing AI: ${error.message}`;
-          if (error.message.includes('API Key') || error.message.includes('API key')) {
-              errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
-              // Auto-open settings
-              openModal(logbookModal);
-              const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
-              if (settingsTabBtn) settingsTabBtn.click();
-          }
+      if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
+          errorMessage = 'Error: API Key is missing or invalid. Please ensure it is correctly configured in your environment.';
       }
       appendMessage({ sender: 'error', text: errorMessage });
       setGeminiChat(null);
@@ -460,12 +439,11 @@ async function deleteChat() {
  */
 async function runChroniclerTurn(session: ChatSession) {
   const chronicler = getChroniclerChat();
-  // Note: We do NOT check isSending() here because this function is called 
-  // usually *while* the main DM response is finishing or just finished.
-  // If we block on isSending(), it might never run if the user types fast.
-  // Instead, we just run it. The AI instance is separate.
-  
-  if (!chronicler) return; 
+  if (!chronicler || isSending()) return; // Prevent simultaneous runs
+
+  // This is a background task, but we still need to prevent conflicts.
+  // The main isSending() flag will prevent new user messages and other chronicler turns.
+  setSending(true);
 
   try {
     // 1. Get current state and last player action
@@ -493,24 +471,23 @@ async function runChroniclerTurn(session: ChatSession) {
       Player Action: "${playerAction}"
     `;
 
-    // 3. Talk to the Chronicler AI - With Retry
-    // We use a separate retry block here so if it fails, it just dies quietly
+    // 3. Talk to the Chronicler AI (with retry)
     const result = await retryOperation(() => chronicler.sendMessage({ message: chroniclerPrompt })) as GenerateContentResponse;
     const responseText = result.text;
 
     // 4. Parse the JSON response
-    const parsedData = JSON.parse(responseText || '{}');
+    const parsedData = JSON.parse(responseText);
 
     // 5. Save the new state to the current session object
     // Merge new state into existing, respecting the filtered view.
     // We iterate the response and update the master list.
-    if (parsedData.newState && parsedData.newState.progressClocks) {
+    if (parsedData.newState.progressClocks) {
         if (!session.progressClocks) session.progressClocks = {};
         Object.entries(parsedData.newState.progressClocks).forEach(([key, val]) => {
              session.progressClocks![key] = val as any;
         });
     }
-    if (parsedData.newState && parsedData.newState.factions) {
+    if (parsedData.newState.factions) {
         if (!session.factions) session.factions = {};
         Object.entries(parsedData.newState.factions).forEach(([key, val]) => {
              session.factions![key] = val as any;
@@ -532,10 +509,13 @@ async function runChroniclerTurn(session: ChatSession) {
     saveChatHistoryToDB();
 
   } catch (error) {
-    console.warn("Chronicler turn failed (background task):", error);
+    console.error("Chronicler turn failed:", error);
     // Don't bother the user with a UI error, just log it.
     // The game can continue without this background update.
-  } 
+  } finally {
+    // Release the sending lock so the user can send another message.
+    setSending(false);
+  }
 }
 
 
@@ -578,7 +558,8 @@ async function finalizeSetupAndStartGame(session: ChatSession, title: string, fi
     // Initialize the Chronicler AI for the main game. Explicitly use 'gemini-2.5-flash' for cost/speed.
     setChroniclerChat(createNewChatInstance([], getChroniclerPrompt(), 'gemini-2.5-flash'));
 
-    const kickoffResult = await retryOperation(() => getGeminiChat()!.sendMessageStream({ message: "The setup is complete. Begin the adventure by narrating the opening scene." })) as any;
+    // Wrapped in retryOperation for robustness
+    const kickoffResult = await retryOperation(() => getGeminiChat()!.sendMessageStream({ message: "The setup is complete. Begin the adventure by narrating the opening scene." })) as AsyncIterable<GenerateContentResponse>;
 
     let openingSceneText = '';
     gameLoadingMessage.classList.remove('loading');
@@ -675,7 +656,7 @@ async function handleFormSubmit(e: Event) {
             ? "Let's create my character."
             : userInput;
 
-        const result = await retryOperation(() => geminiChat.sendMessageStream({ message: messageToSend })) as any;
+        const result = await retryOperation(() => geminiChat.sendMessageStream({ message: messageToSend })) as AsyncIterable<GenerateContentResponse>;
         let responseText = '';
         modelMessageEl.classList.remove('loading');
         modelMessageEl.innerHTML = '';
@@ -714,18 +695,20 @@ async function handleFormSubmit(e: Event) {
           charLoadingMessage.textContent = 'Generating a party of adventurers...';
 
           try {
-            const charResponse = await retryOperation(() => ai.models.generateContent({
-              model: getUISettings().activeModel,
-              contents: getQuickStartCharacterPrompt(),
-              config: {
-                responseMimeType: 'application/json',
-                responseSchema: {
-                  type: Type.ARRAY,
-                  items: quickStartCharacterSchema,
-                },
-              }
-            })) as GenerateContentResponse;
-            const chars = JSON.parse(charResponse.text || '[]');
+            const charResponse = await retryOperation(async () => {
+                return ai.models.generateContent({
+                  model: getUISettings().activeModel,
+                  contents: getQuickStartCharacterPrompt(),
+                  config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: {
+                      type: Type.ARRAY,
+                      items: quickStartCharacterSchema,
+                    },
+                  }
+                });
+            });
+            const chars = JSON.parse(charResponse.text);
             currentSession.quickStartChars = chars;
             saveChatHistoryToDB();
             charLoadingContainer.remove();
@@ -774,12 +757,8 @@ async function handleFormSubmit(e: Event) {
 
     const geminiChat = getGeminiChat();
     if (!geminiChat) {
-        const errorMessage = 'The connection to the AI has been lost. This can happen if the API Key is missing or invalid. Please check your settings in the Logbook and start a new chat.';
-        appendMessage({ sender: 'error', text: errorMessage });
+        appendMessage({ sender: 'error', text: 'The connection to the AI has been lost. This can happen if the API Key is missing or invalid. Please check your configuration and start a new chat.' });
         setSending(false);
-        openModal(logbookModal);
-        const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
-        if (settingsTabBtn) settingsTabBtn.click();
         return;
     }
     stopTTS();
@@ -801,13 +780,7 @@ async function handleFormSubmit(e: Event) {
       
       // WFGY-Lite: Semantic Memory Retrieval
       // Query the "Semantic Tree" for relevant past memories
-      // We wrap this in a try/catch just in case it fails, so it doesn't block the chat.
-      let relevantMemories: string[] = [];
-      try {
-          relevantMemories = await recallRelevantMemories(userInput, 3);
-      } catch (memErr) {
-          console.warn("Memory recall failed, proceeding without context.", memErr);
-      }
+      const relevantMemories = await recallRelevantMemories(userInput, 3);
       
       let messageWithContext = userInput;
       let contextBlock = "";
@@ -823,7 +796,7 @@ async function handleFormSubmit(e: Event) {
           messageWithContext = `(System: Context Injection:\n${contextBlock}\n)\n\n${userInput}`;
       }
 
-      const result = await retryOperation(() => geminiChat.sendMessageStream({ message: messageWithContext })) as any;
+      const result = await retryOperation(() => geminiChat.sendMessageStream({ message: messageWithContext })) as AsyncIterable<GenerateContentResponse>;
       let responseText = '';
       modelMessageEl.classList.remove('loading');
       modelMessageEl.innerHTML = '';
@@ -873,22 +846,12 @@ async function handleFormSubmit(e: Event) {
         });
       }
 
-    } catch (error: any) {
+    } catch (error) {
       console.error("Gemini API Error:", error);
       modelMessageContainer.remove();
       let errorMessage = 'The DM seems to be pondering deeply ... and has gone quiet. Please try again.';
-      if (error instanceof Error) {
-          errorMessage = `AI Connection Error: ${error.message}`;
-          if (error.message.includes('API Key') || error.message.includes('API key')) {
-              errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
-              openModal(logbookModal);
-              const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
-              if (settingsTabBtn) settingsTabBtn.click();
-          }
-      }
-      // Handle Rate Limit (429) specific message
-      if (error.status === 429 || (error.message && error.message.includes('429'))) {
-          errorMessage = "⚠️ System Overload (429): The 'Gemini 3.0 Pro' model is currently busy. Please go to Settings (in Logbook) and switch the AI Model to 'Gemini 2.5 Flash' for a smoother experience.";
+      if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
+          errorMessage = 'Error: API Key is missing or invalid. Please ensure it is correctly configured in your environment.';
       }
       appendMessage({ sender: 'error', text: errorMessage });
     }
@@ -933,14 +896,17 @@ async function handleFileUpload(event: Event) {
 
     const processFile = async (prompt: string) => {
       const base64Data = await fileToBase64(file);
-      const response = await retryOperation(() => ai.models.generateContent({
-        model: getUISettings().activeModel,
-        contents: { parts: [
-          { inlineData: { mimeType: file.type, data: base64Data } },
-          { text: prompt }
-        ]},
-      })) as GenerateContentResponse;
-      return response.text || '';
+      // Wrapped in retryOperation for stability
+      const response = await retryOperation(async () => {
+          return ai.models.generateContent({
+            model: getUISettings().activeModel,
+            contents: { parts: [
+              { inlineData: { mimeType: file.type, data: base64Data } },
+              { text: prompt }
+            ]},
+          });
+      });
+      return response.text;
     };
 
     if (file.type.startsWith('text/')) {
@@ -977,14 +943,10 @@ async function handleFileUpload(event: Event) {
     console.error("File processing failed:", error);
     let errorMessage = 'An error occurred during processing.';
     if (error instanceof Error) {
-        errorMessage = error.message;
         if (error.message.includes('Unsupported file type')) {
             errorMessage = `Unsupported file type: ${file.type}`;
         } else if (error.message.includes('API Key') || error.message.includes('API key')) {
-            errorMessage = 'API Key is missing or invalid. Please check your settings in the Logbook.';
-            openModal(logbookModal);
-            const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
-            if (settingsTabBtn) settingsTabBtn.click();
+            errorMessage = 'API Key is missing or invalid. Please check your configuration.';
         }
     }
     messageEl.classList.remove('loading');
@@ -1114,7 +1076,7 @@ function setupEventListeners() {
           
           const personaName = dmPersonas.find(p => p.id === setupSettings.personaId)?.name || 'DM';
           const userMessageText = `I've chosen the ${personaName} with a ${setupSettings.tone} tone and ${setupSettings.narration} narration. Now, let's create the world.`;
-          const result = await retryOperation(() => geminiChat.sendMessageStream({ message: userMessageText })) as any;
+          const result = await retryOperation(() => geminiChat.sendMessageStream({ message: userMessageText })) as AsyncIterable<GenerateContentResponse>;
           
           let responseText = '';
           modelMessageEl.classList.remove('loading');
@@ -1290,26 +1252,6 @@ function setupEventListeners() {
         loadChat(currentChat.id);
     }
   });
-  
-  // Add listener for Save API Key Button
-  if (saveApiKeyBtn) {
-      saveApiKeyBtn.addEventListener('click', () => {
-          if (apiKeyInput) {
-              getUISettings().apiKey = apiKeyInput.value.trim();
-              dbSet('dm-os-ui-settings', getUISettings());
-              resetAI(); // Reset the AI instance to use the new key immediately
-              
-              // Visual feedback
-              const originalText = saveApiKeyBtn.textContent;
-              saveApiKeyBtn.textContent = 'Saved!';
-              saveApiKeyBtn.classList.add('success');
-              setTimeout(() => {
-                  saveApiKeyBtn.textContent = originalText;
-                  saveApiKeyBtn.classList.remove('success');
-              }, 2000);
-          }
-      });
-  }
 
   changeUiBtn.addEventListener('click', () => openModal(themeModal));
   closeThemeBtn.addEventListener('click', () => closeModal(themeModal));
