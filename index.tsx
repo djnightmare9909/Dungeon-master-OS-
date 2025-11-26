@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 // Fix: Improved the 'generateContent' call for creating quick start characters by adding a 'responseSchema' to ensure valid JSON output.
-import { Type, GenerateContentResponse } from '@google/genai';
+import { Type } from '@google/genai';
 import {
   initDB,
   loadChatHistoryFromDB,
@@ -81,7 +81,6 @@ import {
   fontSizeControls,
   enterToSendToggle,
   experimentalUploadToggle,
-  modelSelect,
   changeUiBtn,
   themeModal,
   closeThemeBtn,
@@ -133,8 +132,6 @@ import {
   renderDiceGrid,
   renderThemeCards,
   fileToBase64,
-  recallRelevantMemories,
-  commitToSemanticMemory
 } from './features';
 import {
   ai,
@@ -144,7 +141,6 @@ import {
   getQuickStartCharacterPrompt,
   getChroniclerPrompt,
 } from './gemini';
-import { retryOperation } from './utils';
 // Fix: import UISettings type
 import type { Message, ChatSession, UISettings, GameSettings } from './types';
 
@@ -192,7 +188,7 @@ function runBootSequence(): Promise<void> {
 
     const lines = [
       'DM OS v2.1 Initializing...',
-      'Connecting to WFGY Core Flagship v2.0... OK',
+      'Connecting to WFGY Universal Unification Framework... OK',
       'Loading Semantic Tree... 1.2TB nodes loaded.',
       'Calibrating Collapse-Rebirth Cycle (BBCR)... STABLE',
       'Waking Dungeon Master Persona...',
@@ -266,9 +262,7 @@ async function startNewChat() {
     const kickoffMessage = "Let's begin the setup for our new game.";
     const firstUserMessage: Message = { sender: 'user', text: kickoffMessage, hidden: true };
 
-    // Wrapped in retryOperation to handle rate limits during setup
-    const result = await retryOperation(() => setupGeminiChat.sendMessageStream({ message: kickoffMessage })) as AsyncIterable<GenerateContentResponse>;
-    
+    const result = await setupGeminiChat.sendMessageStream({ message: kickoffMessage });
     let responseText = '';
     for await (const chunk of result) {
       responseText += chunk.text || '';
@@ -340,8 +334,8 @@ function loadChat(id: string) {
         const persona = dmPersonas.find(p => p.id === personaId) || dmPersonas[0];
         const instruction = persona.getInstruction(session.adminPassword || '');
         setGeminiChat(createNewChatInstance(geminiHistory, instruction));
-        // Initialize chronicler for existing games. Explicitly use 'gemini-2.5-flash' for cost/speed.
-        setChroniclerChat(createNewChatInstance([], getChroniclerPrompt(), 'gemini-2.5-flash'));
+        // Initialize chronicler for existing games
+        setChroniclerChat(createNewChatInstance([], getChroniclerPrompt()));
       }
     } catch (error) {
       console.error('Failed to create Gemini chat instance:', error);
@@ -447,18 +441,8 @@ async function runChroniclerTurn(session: ChatSession) {
 
   try {
     // 1. Get current state and last player action
-    // Filter out completed clocks to save tokens and context window
-    const activeClocks: Record<string, any> = {};
-    if (session.progressClocks) {
-        Object.entries(session.progressClocks).forEach(([key, clock]) => {
-            if (clock.current < clock.max) {
-                activeClocks[key] = clock;
-            }
-        });
-    }
-
     const currentState = {
-      progressClocks: activeClocks,
+      progressClocks: session.progressClocks || {},
       factions: session.factions || {}
     };
     // Find the last *user* message
@@ -471,28 +455,16 @@ async function runChroniclerTurn(session: ChatSession) {
       Player Action: "${playerAction}"
     `;
 
-    // 3. Talk to the Chronicler AI (with retry)
-    const result = await retryOperation(() => chronicler.sendMessage({ message: chroniclerPrompt })) as GenerateContentResponse;
+    // 3. Talk to the Chronicler AI
+    const result = await chronicler.sendMessage({ message: chroniclerPrompt });
     const responseText = result.text;
 
     // 4. Parse the JSON response
     const parsedData = JSON.parse(responseText);
 
     // 5. Save the new state to the current session object
-    // Merge new state into existing, respecting the filtered view.
-    // We iterate the response and update the master list.
-    if (parsedData.newState.progressClocks) {
-        if (!session.progressClocks) session.progressClocks = {};
-        Object.entries(parsedData.newState.progressClocks).forEach(([key, val]) => {
-             session.progressClocks![key] = val as any;
-        });
-    }
-    if (parsedData.newState.factions) {
-        if (!session.factions) session.factions = {};
-        Object.entries(parsedData.newState.factions).forEach(([key, val]) => {
-             session.factions![key] = val as any;
-        });
-    }
+    session.progressClocks = parsedData.newState.progressClocks;
+    session.factions = parsedData.newState.factions;
 
     // 6. Save the event log as a HIDDEN system message for RAG context
     const chroniclerEvent: Message = {
@@ -502,10 +474,7 @@ async function runChroniclerTurn(session: ChatSession) {
     };
     session.messages.push(chroniclerEvent);
     
-    // 7. Commit the event log to the Semantic Tree
-    await commitToSemanticMemory(parsedData.eventLog, 0.8); // High importance
-    
-    // 8. Persist the updated session to IndexedDB
+    // 7. Persist the updated session to IndexedDB
     saveChatHistoryToDB();
 
   } catch (error) {
@@ -555,11 +524,10 @@ async function finalizeSetupAndStartGame(session: ChatSession, title: string, fi
       .map(m => ({ role: m.sender as 'user' | 'model', parts: [{ text: m.text }] }));
 
     setGeminiChat(createNewChatInstance(geminiHistory, instruction));
-    // Initialize the Chronicler AI for the main game. Explicitly use 'gemini-2.5-flash' for cost/speed.
-    setChroniclerChat(createNewChatInstance([], getChroniclerPrompt(), 'gemini-2.5-flash'));
+    // Initialize the Chronicler AI for the main game
+    setChroniclerChat(createNewChatInstance([], getChroniclerPrompt()));
 
-    // Wrapped in retryOperation for robustness
-    const kickoffResult = await retryOperation(() => getGeminiChat()!.sendMessageStream({ message: "The setup is complete. Begin the adventure by narrating the opening scene." })) as AsyncIterable<GenerateContentResponse>;
+    const kickoffResult = await getGeminiChat()!.sendMessageStream({ message: "The setup is complete. Begin the adventure by narrating the opening scene." });
 
     let openingSceneText = '';
     gameLoadingMessage.classList.remove('loading');
@@ -656,7 +624,7 @@ async function handleFormSubmit(e: Event) {
             ? "Let's create my character."
             : userInput;
 
-        const result = await retryOperation(() => geminiChat.sendMessageStream({ message: messageToSend })) as AsyncIterable<GenerateContentResponse>;
+        const result = await geminiChat.sendMessageStream({ message: messageToSend });
         let responseText = '';
         modelMessageEl.classList.remove('loading');
         modelMessageEl.innerHTML = '';
@@ -695,18 +663,16 @@ async function handleFormSubmit(e: Event) {
           charLoadingMessage.textContent = 'Generating a party of adventurers...';
 
           try {
-            const charResponse = await retryOperation(async () => {
-                return ai.models.generateContent({
-                  model: getUISettings().activeModel,
-                  contents: getQuickStartCharacterPrompt(),
-                  config: {
-                    responseMimeType: 'application/json',
-                    responseSchema: {
-                      type: Type.ARRAY,
-                      items: quickStartCharacterSchema,
-                    },
-                  }
-                });
+            const charResponse = await ai.models.generateContent({
+              model: 'gemini-3-pro-preview',
+              contents: getQuickStartCharacterPrompt(),
+              config: {
+                responseMimeType: 'application/json',
+                responseSchema: {
+                  type: Type.ARRAY,
+                  items: quickStartCharacterSchema,
+                },
+              }
             });
             const chars = JSON.parse(charResponse.text);
             currentSession.quickStartChars = chars;
@@ -777,26 +743,11 @@ async function handleFormSubmit(e: Event) {
 
     try {
       const context = getUserContext();
-      
-      // WFGY-Lite: Semantic Memory Retrieval
-      // Query the "Semantic Tree" for relevant past memories
-      const relevantMemories = await recallRelevantMemories(userInput, 3);
-      
-      let messageWithContext = userInput;
-      let contextBlock = "";
-      
-      if (context.length > 0) {
-          contextBlock += `\nUser Notes:\n${context.join('\n')}`;
-      }
-      if (relevantMemories.length > 0) {
-          contextBlock += `\nRetrieved Memories from Semantic Tree:\n${relevantMemories.join('\n')}`;
-      }
-      
-      if (contextBlock) {
-          messageWithContext = `(System: Context Injection:\n${contextBlock}\n)\n\n${userInput}`;
-      }
+      const messageWithContext = context.length > 0
+        ? `(OOC: Use the following context to inform your response:\n${context.join('\n')}\n)\n\n${userInput}`
+        : userInput;
 
-      const result = await retryOperation(() => geminiChat.sendMessageStream({ message: messageWithContext })) as AsyncIterable<GenerateContentResponse>;
+      const result = await geminiChat.sendMessageStream({ message: messageWithContext });
       let responseText = '';
       modelMessageEl.classList.remove('loading');
       modelMessageEl.innerHTML = '';
@@ -896,15 +847,12 @@ async function handleFileUpload(event: Event) {
 
     const processFile = async (prompt: string) => {
       const base64Data = await fileToBase64(file);
-      // Wrapped in retryOperation for stability
-      const response = await retryOperation(async () => {
-          return ai.models.generateContent({
-            model: getUISettings().activeModel,
-            contents: { parts: [
-              { inlineData: { mimeType: file.type, data: base64Data } },
-              { text: prompt }
-            ]},
-          });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: { parts: [
+          { inlineData: { mimeType: file.type, data: base64Data } },
+          { text: prompt }
+        ]},
       });
       return response.text;
     };
@@ -1076,7 +1024,7 @@ function setupEventListeners() {
           
           const personaName = dmPersonas.find(p => p.id === setupSettings.personaId)?.name || 'DM';
           const userMessageText = `I've chosen the ${personaName} with a ${setupSettings.tone} tone and ${setupSettings.narration} narration. Now, let's create the world.`;
-          const result = await retryOperation(() => geminiChat.sendMessageStream({ message: userMessageText })) as AsyncIterable<GenerateContentResponse>;
+          const result = await geminiChat.sendMessageStream({ message: userMessageText });
           
           let responseText = '';
           modelMessageEl.classList.remove('loading');
@@ -1242,15 +1190,6 @@ function setupEventListeners() {
   experimentalUploadToggle.addEventListener('change', () => {
     getUISettings().experimentalUploadLimit = experimentalUploadToggle.checked;
     dbSet('dm-os-ui-settings', getUISettings());
-  });
-  modelSelect.addEventListener('change', () => {
-    getUISettings().activeModel = modelSelect.value;
-    dbSet('dm-os-ui-settings', getUISettings());
-    // Reload current chat to apply model change immediately if a chat is active
-    const currentChat = getCurrentChat();
-    if (currentChat) {
-        loadChat(currentChat.id);
-    }
   });
 
   changeUiBtn.addEventListener('click', () => openModal(themeModal));

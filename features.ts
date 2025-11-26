@@ -12,8 +12,7 @@ import {
   getUserContext,
   saveUserContextToDB,
   getChatHistory,
-  dbSet,
-  getUISettings
+  dbSet
 } from './state';
 import {
   updateSheetBtn,
@@ -38,9 +37,8 @@ import {
   contextList
 } from './ui';
 import { renderCharacterSheet, renderAchievements, renderUserContext, updateLogbook } from './ui';
-import { ai, generateEmbedding } from './gemini';
-import { calculateCosineSimilarity, retryOperation } from './utils';
-import type { CharacterSheetData, Achievement, NPCState, SemanticNode } from './types';
+import { ai } from './gemini';
+import type { CharacterSheetData, Achievement, NPCState } from './types';
 
 // =================================================================================
 // TTS (Re-architected for stability)
@@ -284,93 +282,11 @@ export async function handleTTS(rawHtml: string, button: HTMLButtonElement) {
 }
 
 // =================================================================================
-// SEMANTIC MEMORY (WFGY-Lite)
-// =================================================================================
-
-/**
- * Commits a piece of text to the session's long-term semantic memory.
- * It generates a vector embedding for the text and stores it in the Semantic Tree.
- * @param text The narrative event, fact, or memory to store.
- * @param importance A score (0-1) indicating how critical this memory is. Defaults to 0.5.
- */
-export async function commitToSemanticMemory(text: string, importance: number = 0.5) {
-    const session = getCurrentChat();
-    if (!session) return;
-
-    if (!session.semanticLog) {
-        session.semanticLog = [];
-    }
-
-    try {
-        const embedding = await generateEmbedding(text);
-        if (embedding.length === 0) return;
-
-        const node: SemanticNode = {
-            id: `mem-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            content: text,
-            embedding: embedding,
-            timestamp: Date.now(),
-            importance: importance
-        };
-
-        session.semanticLog.push(node);
-        // Limit the log size to prevent bloat, keeping the most important memories
-        // Simple FIFO for now, but could use importance weighting for retention later
-        if (session.semanticLog.length > 200) {
-             session.semanticLog.shift();
-        }
-        saveChatHistoryToDB();
-        console.debug(`[WFGY] Committed to memory: "${text.substring(0, 30)}..."`);
-    } catch (error) {
-        console.error("[WFGY] Failed to commit memory:", error);
-    }
-}
-
-/**
- * Recalls relevant memories from the Semantic Tree based on a query.
- * Uses cosine similarity to find the most semantically related nodes.
- * @param query The text to search for (e.g., user's current action).
- * @param limit Number of memories to return.
- * @returns Array of memory content strings.
- */
-export async function recallRelevantMemories(query: string, limit: number = 3): Promise<string[]> {
-    const session = getCurrentChat();
-    if (!session || !session.semanticLog || session.semanticLog.length === 0) {
-        return [];
-    }
-
-    try {
-        const queryEmbedding = await generateEmbedding(query);
-        if (queryEmbedding.length === 0) return [];
-
-        const scoredNodes = session.semanticLog.map(node => {
-            const similarity = calculateCosineSimilarity(queryEmbedding, node.embedding);
-            // Boost similarity by importance score to surface critical memories
-            const score = similarity * (1 + (node.importance * 0.2));
-            return { node, score };
-        });
-
-        // Sort by score descending
-        scoredNodes.sort((a, b) => b.score - a.score);
-
-        // Return the content of the top N nodes
-        return scoredNodes.slice(0, limit).map(item => item.node.content);
-
-    } catch (error) {
-        console.error("[WFGY] Memory recall failed:", error);
-        return [];
-    }
-}
-
-
-// =================================================================================
 // USER CONTEXT
 // =================================================================================
 
 export function addUserContext(text: string) {
   getUserContext().push(text);
-  // Also ingest into semantic memory for better auto-recall
-  commitToSemanticMemory(text, 1.0); 
   saveUserContextToDB();
   renderUserContext(getUserContext());
 }
@@ -524,18 +440,15 @@ export async function updateLogbookData(type: 'sheet' | 'inventory' | 'quests' |
         ? `Based on the D&D conversation history, extract the player character's information and return it as a JSON object. Conversation: ${conversationHistory}`
         : `Analyze the following D&D conversation history and generate a list of 3-5 creative, context-specific "achievements" based on the player's unique actions, decisions, or significant moments. Each achievement should have a cool, thematic name and a short description of how it was earned. Return this as a JSON array. History: ${conversationHistory}`;
 
-      // Wrapped in retryOperation for stability
-      const response = await retryOperation(async () => {
-          return ai.models.generateContent({
-            model: getUISettings().activeModel,
-            contents: prompt,
-            config: {
-              responseMimeType: "application/json",
-              responseSchema: isSheet
-                ? { type: Type.OBJECT, properties: { name: { type: Type.STRING }, race: { type: Type.STRING }, class: { type: Type.STRING }, level: { type: Type.INTEGER }, abilityScores: { type: Type.OBJECT, properties: { STR: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } }, DEX: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } }, CON: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } }, INT: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } }, WIS: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } }, CHA: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } }, } }, armorClass: { type: Type.INTEGER }, hitPoints: { type: Type.OBJECT, properties: { current: { type: Type.INTEGER }, max: { type: Type.INTEGER } } }, speed: { type: Type.STRING }, skills: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, proficient: { type: Type.BOOLEAN } } } }, featuresAndTraits: { type: Type.ARRAY, items: { type: Type.STRING } } } }
-                : { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, description: { type: Type.STRING } } } }
-            }
-          });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: isSheet
+            ? { type: Type.OBJECT, properties: { name: { type: Type.STRING }, race: { type: Type.STRING }, class: { type: Type.STRING }, level: { type: Type.INTEGER }, abilityScores: { type: Type.OBJECT, properties: { STR: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } }, DEX: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } }, CON: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } }, INT: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } }, WIS: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } }, CHA: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } }, } }, armorClass: { type: Type.INTEGER }, hitPoints: { type: Type.OBJECT, properties: { current: { type: Type.INTEGER }, max: { type: Type.INTEGER } } }, speed: { type: Type.STRING }, skills: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, proficient: { type: Type.BOOLEAN } } } }, featuresAndTraits: { type: Type.ARRAY, items: { type: Type.STRING } } } }
+            : { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, description: { type: Type.STRING } } } }
+        }
       });
 
       const jsonData = JSON.parse(response.text);
@@ -573,25 +486,23 @@ export async function updateLogbookData(type: 'sheet' | 'inventory' | 'quests' |
     try {
         const prompt = `Based on the following D&D conversation history, provide a list of significant Non-Player Characters (NPCs) the party has met. For each NPC, describe their current relationship with the party (e.g., Ally, Hostile, Neutral, Complicated) based on the history of interactions. Return this as a JSON array. History: ${conversationHistory}`;
         
-        const response = await retryOperation(async () => {
-            return ai.models.generateContent({
-                model: getUISettings().activeModel,
-                contents: prompt,
-                config: {
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                        type: Type.ARRAY,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                name: { type: Type.STRING },
-                                description: { type: Type.STRING },
-                                relationship: { type: Type.STRING }
-                            }
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-pro-preview',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            name: { type: Type.STRING },
+                            description: { type: Type.STRING },
+                            relationship: { type: Type.STRING }
                         }
                     }
                 }
-            });
+            }
         });
         
         const jsonData = JSON.parse(response.text);
@@ -627,9 +538,7 @@ export async function updateLogbookData(type: 'sheet' | 'inventory' | 'quests' |
   try {
     const prompt = `Based on the following D&D conversation history, provide a concise summary of the player character's current ${promptClause}. Format the output clearly with headings and bullet points where appropriate. Conversation History: ${conversationHistory}`;
 
-    const response = await retryOperation(async () => {
-        return ai.models.generateContent({ model: getUISettings().activeModel, contents: prompt });
-    });
+    const response = await ai.models.generateContent({ model: 'gemini-3-pro-preview', contents: prompt });
     const dataText = response.text;
 
     if (type === 'inventory') currentSession.inventory = dataText;
@@ -664,10 +573,7 @@ export async function generateCharacterImage() {
     const recentMessages = currentSession.messages.slice(-30);
     const conversationHistory = recentMessages.map(m => `${m.sender === 'user' ? 'Player' : 'DM'}: ${m.text}`).join('\n');
     const descriptionPrompt = `Based on the following D&D conversation, create a detailed visual description of the player character suitable for an AI image generator. Focus on physical appearance, race, class, clothing, equipment, and overall mood. Make it a rich, comma-separated list of keywords. Example: "elf ranger, long silver hair, green cloak, leather armor, holding a bow, standing in a dark forest, fantasy art, detailed". Conversation: ${conversationHistory}`;
-    
-    const descriptionResponse = await retryOperation(async () => {
-        return ai.models.generateContent({ model: getUISettings().activeModel, contents: descriptionPrompt });
-    });
+    const descriptionResponse = await ai.models.generateContent({ model: 'gemini-3-pro-preview', contents: descriptionPrompt });
     const imagePrompt = descriptionResponse.text;
 
     if (!imagePrompt || imagePrompt.trim() === '') throw new Error("The AI failed to create a visual description for the image generator.");
@@ -675,12 +581,10 @@ export async function generateCharacterImage() {
     const loadingParagraph = characterImageLoading.querySelector('p');
     if (loadingParagraph) loadingParagraph.textContent = 'Image prompt created. Generating portrait...';
 
-    const imageResponse = await retryOperation(async () => {
-        return ai.models.generateImages({
-          model: 'imagen-4.0-generate-001',
-          prompt: imagePrompt,
-          config: { numberOfImages: 1, outputMimeType: 'image/png', aspectRatio: '3:4' }
-        });
+    const imageResponse = await ai.models.generateImages({
+      model: 'imagen-4.0-generate-001',
+      prompt: imagePrompt,
+      config: { numberOfImages: 1, outputMimeType: 'image/png', aspectRatio: '3:4' }
     });
     const base64Image = imageResponse.generatedImages[0].image.imageBytes;
     const imageUrl = `data:image/png;base64,${base64Image}`;
@@ -721,19 +625,16 @@ export async function fetchAndRenderInventoryPopup() {
     const conversationHistory = recentMessages.map(m => `${m.sender === 'user' ? 'Player' : 'DM'}: ${m.text}`).join('\n');
     // Fix: Updated prompt to request JSON and added responseSchema for robust parsing.
     const prompt = `Based on the following D&D conversation, list the player character's current inventory items as a JSON array of strings. Only include the item names. Example: ["Health Potion", "Rope (50ft)", "Dagger", "Gold (25gp)"]. Conversation History: ${conversationHistory}`;
-    
-    const response = await retryOperation(async () => {
-        return ai.models.generateContent({
-          model: getUISettings().activeModel,
-          contents: prompt,
-          config: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-            },
-          },
-        });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+        },
+      },
     });
     const itemsText = response.text;
 

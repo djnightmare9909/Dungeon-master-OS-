@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -87,7 +86,6 @@ export const characterImageLoading = document.getElementById('character-image-lo
 export const fontSizeControls = document.getElementById('font-size-controls') as HTMLElement;
 export const enterToSendToggle = document.getElementById('setting-enter-send') as HTMLInputElement;
 export const experimentalUploadToggle = document.getElementById('setting-experimental-upload') as HTMLInputElement;
-export const modelSelect = document.getElementById('setting-model') as HTMLSelectElement;
 export const changeUiBtn = document.getElementById('change-ui-btn') as HTMLButtonElement;
 export const themeModal = document.getElementById('theme-modal') as HTMLElement;
 export const closeThemeBtn = document.getElementById('close-theme-btn') as HTMLButtonElement;
@@ -136,16 +134,6 @@ export function applyUISettings() {
   }
   if (experimentalUploadToggle) {
     experimentalUploadToggle.checked = uiSettings.experimentalUploadLimit;
-  }
-  if (modelSelect) {
-    // If the saved model isn't in the list (e.g., old 2.5-pro), default to 3.0-pro-preview
-    const options = Array.from(modelSelect.options).map(o => o.value);
-    if (options.includes(uiSettings.activeModel)) {
-      modelSelect.value = uiSettings.activeModel;
-    } else {
-      modelSelect.value = 'gemini-3-pro-preview';
-      uiSettings.activeModel = 'gemini-3-pro-preview';
-    }
   }
 }
 

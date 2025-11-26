@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -24,7 +23,6 @@ let uiSettings: UISettings = {
   enterToSend: true,
   fontSize: 'medium',
   experimentalUploadLimit: false,
-  activeModel: 'gemini-3-pro-preview',
 };
 
 // =================================================================================
