@@ -15,7 +15,6 @@ export let chatHistory: ChatSession[] = [];
 export let userContext: string[] = [];
 let currentChatId: string | null = null;
 let geminiChat: Chat | null = null;
-let chroniclerChat: Chat | null = null;
 let isSendingFlag = false;
 let isGeneratingDataFlag = false;
 let currentPersonaId: string = 'purist';
@@ -35,8 +34,6 @@ export const getCurrentChat = (): ChatSession | undefined => chatHistory.find(s 
 export const setCurrentChatId = (id: string | null) => { currentChatId = id; };
 export const getGeminiChat = () => geminiChat;
 export const setGeminiChat = (chat: Chat | null) => { geminiChat = chat; };
-export const getChroniclerChat = () => chroniclerChat;
-export const setChroniclerChat = (chat: Chat | null) => { chroniclerChat = chat; };
 export const isSending = () => isSendingFlag;
 export const setSending = (state: boolean) => { isSendingFlag = state; };
 export const isGeneratingData = () => isGeneratingDataFlag;

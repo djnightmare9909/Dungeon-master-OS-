@@ -1,4 +1,5 @@
 
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -441,7 +442,7 @@ export async function updateLogbookData(type: 'sheet' | 'inventory' | 'quests' |
         : `Analyze the following D&D conversation history and generate a list of 3-5 creative, context-specific "achievements" based on the player's unique actions, decisions, or significant moments. Each achievement should have a cool, thematic name and a short description of how it was earned. Return this as a JSON array. History: ${conversationHistory}`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -487,7 +488,7 @@ export async function updateLogbookData(type: 'sheet' | 'inventory' | 'quests' |
         const prompt = `Based on the following D&D conversation history, provide a list of significant Non-Player Characters (NPCs) the party has met. For each NPC, describe their current relationship with the party (e.g., Ally, Hostile, Neutral, Complicated) based on the history of interactions. Return this as a JSON array. History: ${conversationHistory}`;
         
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-2.5-flash',
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -538,7 +539,7 @@ export async function updateLogbookData(type: 'sheet' | 'inventory' | 'quests' |
   try {
     const prompt = `Based on the following D&D conversation history, provide a concise summary of the player character's current ${promptClause}. Format the output clearly with headings and bullet points where appropriate. Conversation History: ${conversationHistory}`;
 
-    const response = await ai.models.generateContent({ model: 'gemini-3-pro-preview', contents: prompt });
+    const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
     const dataText = response.text;
 
     if (type === 'inventory') currentSession.inventory = dataText;
@@ -573,7 +574,7 @@ export async function generateCharacterImage() {
     const recentMessages = currentSession.messages.slice(-30);
     const conversationHistory = recentMessages.map(m => `${m.sender === 'user' ? 'Player' : 'DM'}: ${m.text}`).join('\n');
     const descriptionPrompt = `Based on the following D&D conversation, create a detailed visual description of the player character suitable for an AI image generator. Focus on physical appearance, race, class, clothing, equipment, and overall mood. Make it a rich, comma-separated list of keywords. Example: "elf ranger, long silver hair, green cloak, leather armor, holding a bow, standing in a dark forest, fantasy art, detailed". Conversation: ${conversationHistory}`;
-    const descriptionResponse = await ai.models.generateContent({ model: 'gemini-3-pro-preview', contents: descriptionPrompt });
+    const descriptionResponse = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: descriptionPrompt });
     const imagePrompt = descriptionResponse.text;
 
     if (!imagePrompt || imagePrompt.trim() === '') throw new Error("The AI failed to create a visual description for the image generator.");
@@ -626,7 +627,7 @@ export async function fetchAndRenderInventoryPopup() {
     // Fix: Updated prompt to request JSON and added responseSchema for robust parsing.
     const prompt = `Based on the following D&D conversation, list the player character's current inventory items as a JSON array of strings. Only include the item names. Example: ["Health Potion", "Rope (50ft)", "Dagger", "Gold (25gp)"]. Conversation History: ${conversationHistory}`;
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
