@@ -1,5 +1,7 @@
 # DM OS: The Living World Engine
 
+https://gemini.google.com/gem/1myn5UYjjJ09ZDpIRoUwv_npV0wYZ__v1?usp=sharing
+
 **An advanced, AI-powered Dungeon Master for immersive, long-form Dungeons & Dragons campaigns, powered by Google Gemini.**
 
 DM OS is not just a chatbot; it is a sophisticated simulation engine designed to create a persistent, reactive, and deeply engaging role-playing experience. It combines a state-of-the-art AI with a rich user interface to deliver a D&D campaign where your choices have lasting, meaningful consequences.
