@@ -7,7 +7,7 @@ https://gemini.google.com/gem/1myn5UYjjJ09ZDpIRoUwv_npV0wYZ__v1?usp=sharing
 DM OS is not just a chatbot; it is a sophisticated simulation engine designed to create a persistent, reactive, and deeply engaging role-playing experience. It combines a state-of-the-art AI with a rich user interface to deliver a D&D campaign where your choices have lasting, meaningful consequences.
 
 ---
-
+to run game locally clone the repository and run using npm, add your API key in proccess.env.local using nano defined as GEMINI_API_KEY="your api here"
 ## Core Features
 
 ### 1. The Living World Engine
