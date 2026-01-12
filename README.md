@@ -1,3 +1,6 @@
+******This is a research project by a pioneer, not a service. I have commitment issues. I fix things when they're broken for ME. If you use it, you're a collaborator.
+
+
 # DM OS: The Living World Engine
 
 https://gemini.google.com/gem/1myn5UYjjJ09ZDpIRoUwv_npV0wYZ__v1?usp=sharing
