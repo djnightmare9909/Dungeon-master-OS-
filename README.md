@@ -1,5 +1,3 @@
-******This is a research project by a pioneer, not a service. I have commitment issues. this was originally just built to make something better than AI dungeon and Fable I wanted a space to prove that you don't need flagship products to get a good experience and you don't need to pay a subscription. If you use it, you're a collaborator.
-
 
 # DM OS: The Living World Engine
 
@@ -93,3 +91,7 @@ This collaboration was the final, critical piece. By integrating the proven WFGY
 
 ### A Call to Adventure
 DM OS has been battle-tested extensively by its creator and is considered a rock-solid platform for epic campaigns. However, its true test begins with you. As an independent project, it thrives on community engagement. We invite you to begin your adventure, push the boundaries of the simulation, and discover the stories waiting to be told.
+
+
+
+*****This is a research project by a pioneer, not a service. I have commitment issues. this was originally just built to make something better than AI dungeon and Fable I wanted a space to prove that you don't need flagship products to get a good experience and you don't need to pay a subscription. If you use it, you're a collaborator.
