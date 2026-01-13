@@ -1,4 +1,4 @@
-******This is a research project by a pioneer, not a service. I have commitment issues. I fix things when they're broken for ME. If you use it, you're a collaborator.
+******This is a research project by a pioneer, not a service. I have commitment issues. this was originally just built to make something better than AI dungeon and Fable I wanted a space to prove that you don't need flagship products to get a good experience and you don't need to pay a subscription. If you use it, you're a collaborator.
 
 
 # DM OS: The Living World Engine
