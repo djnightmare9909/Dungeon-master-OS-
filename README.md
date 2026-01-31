@@ -1,3 +1,29 @@
+To get DM OS running locally on your Linux machine, follow these steps to clone the repository and initialize the engine using npm.
+Installation & Setup
+ * Clone the Repository:
+   Open your terminal and use git to pull the source code:
+   git clone https://github.com/djnightmare9909/Dungeon-master-OS-
+cd dm-os
+
+ * Install Dependencies:
+   Use npm to install the required packages, including the Google GenAI SDK:
+   npm install
+
+ * Configure your API Key:
+   The application requires a Google Gemini API key to function. Create a local environment file and add your key:
+   nano .env.local
+
+   Inside the file, define your key as:
+   GEMINI_API_KEY="your_api_key_here"
+ * Launch the App:
+   Start the Vite development server:
+   npm run dev
+
+   Once the server is live, you can access the interface at http://localhost:3000.
+Requirements
+ * Node.js & NPM: Ensure you have a modern version of Node.js installed.
+ * Gemini API Key: You can obtain a key from the Google AI Studio to power the DM personas and the Chronicler world engine.
+
 # DM OS: The Living World Engine
 
 **An advanced, AI-powered Dungeon Master for immersive, long-form Dungeons & Dragons campaigns, powered by Google Gemini.**
