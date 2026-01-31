@@ -1168,11 +1168,8 @@ async function initApp() {
   await initDB();
 
   const [themeId, savedUiSettings, savedPersonaId] = await Promise.all([
-    // Fix: Cannot find name 'dbGet'.
     dbGet<string>('dm-os-theme'),
-    // Fix: Cannot find name 'dbGet' and 'UISettings'.
     dbGet<UISettings>('dm-os-ui-settings'),
-    // Fix: Cannot find name 'dbGet'.
     dbGet<string>('dm-os-persona'),
     loadChatHistoryFromDB(),
     loadUserContextFromDB(),
