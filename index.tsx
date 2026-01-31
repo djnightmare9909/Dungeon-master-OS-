@@ -819,7 +819,6 @@ function setupEventListeners() {
   let setupSettings: Partial<GameSettings & { personaId: string }> = {};
   
   chatForm.addEventListener('submit', handleFormSubmit);
-  // Fix: Cannot find name 'sendButton'.
   sendButton.addEventListener('click', handleFormSubmit);
 
   chatInput.addEventListener('focus', () => {
