@@ -1146,7 +1146,6 @@ function setupEventListeners() {
       }
   });
 
-  // Fix: Cannot find name 'inventoryPopupContent'.
   inventoryPopupContent.addEventListener('click', (e) => {
       const button = (e.target as HTMLElement).closest<HTMLButtonElement>('.use-item-btn');
       if (button?.dataset.itemName) {
