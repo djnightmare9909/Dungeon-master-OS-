@@ -1137,7 +1137,6 @@ function setupEventListeners() {
   closeInventoryBtn.addEventListener('click', () => inventoryPopup.classList.remove('visible'));
   refreshInventoryBtn.addEventListener('click', fetchAndRenderInventoryPopup);
   
-  // Fix: Cannot find name 'quickActionsBar'.
   quickActionsBar.addEventListener('click', (e) => {
       const button = (e.target as HTMLElement).closest<HTMLButtonElement>('.quick-action-btn');
       if (button?.dataset.command) {
