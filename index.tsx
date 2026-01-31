@@ -819,7 +819,6 @@ function setupEventListeners() {
   let setupSettings: Partial<GameSettings & { personaId: string }> = {};
   
   chatForm.addEventListener('submit', handleFormSubmit);
-  // Fix: Cannot find name 'sendButton'.
   sendButton.addEventListener('click', handleFormSubmit);
 
   chatInput.addEventListener('focus', () => {
@@ -1088,7 +1087,6 @@ function setupEventListeners() {
     const button = (e.target as HTMLElement).closest('button');
     if (button?.dataset.size) {
         getUISettings().fontSize = button.dataset.size as 'small' | 'medium' | 'large';
-        // Fix: Cannot find name 'dbSet'.
         dbSet('dm-os-ui-settings', getUISettings());
         applyUISettings();
     }
@@ -1112,7 +1110,6 @@ function setupEventListeners() {
     }
   });
 
-  // Fix: Cannot find name 'clearDiceResults'.
   clearResultsBtn.addEventListener('click', clearDiceResults);
   diceGrid.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
@@ -1137,7 +1134,6 @@ function setupEventListeners() {
   closeInventoryBtn.addEventListener('click', () => inventoryPopup.classList.remove('visible'));
   refreshInventoryBtn.addEventListener('click', fetchAndRenderInventoryPopup);
   
-  // Fix: Cannot find name 'quickActionsBar'.
   quickActionsBar.addEventListener('click', (e) => {
       const button = (e.target as HTMLElement).closest<HTMLButtonElement>('.quick-action-btn');
       if (button?.dataset.command) {
@@ -1146,7 +1142,6 @@ function setupEventListeners() {
       }
   });
 
-  // Fix: Cannot find name 'inventoryPopupContent'.
   inventoryPopupContent.addEventListener('click', (e) => {
       const button = (e.target as HTMLElement).closest<HTMLButtonElement>('.use-item-btn');
       if (button?.dataset.itemName) {
@@ -1168,11 +1163,8 @@ async function initApp() {
   await initDB();
 
   const [themeId, savedUiSettings, savedPersonaId] = await Promise.all([
-    // Fix: Cannot find name 'dbGet'.
     dbGet<string>('dm-os-theme'),
-    // Fix: Cannot find name 'dbGet' and 'UISettings'.
     dbGet<UISettings>('dm-os-ui-settings'),
-    // Fix: Cannot find name 'dbGet'.
     dbGet<string>('dm-os-persona'),
     loadChatHistoryFromDB(),
     loadUserContextFromDB(),
@@ -1189,11 +1181,8 @@ async function initApp() {
     setCurrentPersonaId(savedPersonaId);
   }
 
-  // Fix: Cannot find name 'renderDiceGrid'.
   renderDiceGrid();
-  // Fix: Cannot find name 'renderThemeCards'.
   renderThemeCards();
-  // Fix: Cannot find name 'renderUserContext' and it needs an argument.
   renderUserContext(getUserContext());
   renderChatHistory();
 
