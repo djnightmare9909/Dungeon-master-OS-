@@ -1189,11 +1189,8 @@ async function initApp() {
     setCurrentPersonaId(savedPersonaId);
   }
 
-  // Fix: Cannot find name 'renderDiceGrid'.
   renderDiceGrid();
-  // Fix: Cannot find name 'renderThemeCards'.
   renderThemeCards();
-  // Fix: Cannot find name 'renderUserContext' and it needs an argument.
   renderUserContext(getUserContext());
   renderChatHistory();
 
