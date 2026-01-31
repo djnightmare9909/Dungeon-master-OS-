@@ -1,6 +1,5 @@
 
 # DM OS: The Living World Engine
-
 https://gemini.google.com/gem/1myn5UYjjJ09ZDpIRoUwv_npV0wYZ__v1?usp=sharing
 
 **An advanced, AI-powered Dungeon Master for immersive, long-form Dungeons & Dragons campaigns, powered by Google Gemini.**
