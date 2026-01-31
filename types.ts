@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -18,6 +19,8 @@ export interface UISettings {
   enterToSend: boolean;
   fontSize: 'small' | 'medium' | 'large';
   experimentalUploadLimit: boolean;
+  activeModel: string;
+  apiKey: string;
 }
 
 export interface AbilityScore {
@@ -65,6 +68,25 @@ export interface NPCState {
     relationship: string;
 }
 
+export interface ProgressClock {
+  current: number;
+  max: number;
+  label: string;
+}
+
+export interface Faction {
+  status: string;
+  goal: string;
+}
+
+export interface SemanticNode {
+  id: string;
+  content: string;
+  embedding: number[];
+  timestamp: number;
+  importance: number; // 0-1 score
+}
+
 export interface ChatSession {
   id: string;
   title: string;
@@ -82,6 +104,9 @@ export interface ChatSession {
   achievements?: Achievement[];
   settings?: GameSettings;
   quickStartChars?: CharacterSheetData[];
+  progressClocks?: { [id: string]: ProgressClock };
+  factions?: { [id: string]: Faction };
+  semanticLog?: SemanticNode[];
 }
 
 export interface DMPersona {

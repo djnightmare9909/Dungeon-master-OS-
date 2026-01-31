@@ -1,13 +1,11 @@
-
 # DM OS: The Living World Engine
-https://gemini.google.com/gem/1myn5UYjjJ09ZDpIRoUwv_npV0wYZ__v1?usp=sharing
 
 **An advanced, AI-powered Dungeon Master for immersive, long-form Dungeons & Dragons campaigns, powered by Google Gemini.**
 
 DM OS is not just a chatbot; it is a sophisticated simulation engine designed to create a persistent, reactive, and deeply engaging role-playing experience. It combines a state-of-the-art AI with a rich user interface to deliver a D&D campaign where your choices have lasting, meaningful consequences.
 
 ---
-to run game locally clone the repository and run using npm, add your API key in proccess.env.local using nano defined as GEMINI_API_KEY="your api here"
+
 ## Core Features
 
 ### 1. The Living World Engine
@@ -90,7 +88,3 @@ This collaboration was the final, critical piece. By integrating the proven WFGY
 
 ### A Call to Adventure
 DM OS has been battle-tested extensively by its creator and is considered a rock-solid platform for epic campaigns. However, its true test begins with you. As an independent project, it thrives on community engagement. We invite you to begin your adventure, push the boundaries of the simulation, and discover the stories waiting to be told.
-
-
-
-*****This is a research project by a pioneer, not a service. I have commitment issues. this was originally just built to make something better than AI dungeon and Fable I wanted a space to prove that you don't need flagship products to get a good experience and you don't need to pay a subscription. If you use it, you're a collaborator.

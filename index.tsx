@@ -1,9 +1,10 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
 // Fix: Improved the 'generateContent' call for creating quick start characters by adding a 'responseSchema' to ensure valid JSON output.
-import { Type } from '@google/genai';
+import { Type, GenerateContentResponse } from '@google/genai';
 import {
   initDB,
   loadChatHistoryFromDB,
@@ -26,6 +27,8 @@ import {
   chatHistory,
   dbGet,
   dbSet,
+  getChroniclerChat,
+  setChroniclerChat,
 } from './state';
 import {
   chatContainer,
@@ -79,6 +82,9 @@ import {
   fontSizeControls,
   enterToSendToggle,
   experimentalUploadToggle,
+  modelSelect,
+  apiKeyInput,
+  saveApiKeyBtn,
   changeUiBtn,
   themeModal,
   closeThemeBtn,
@@ -130,6 +136,8 @@ import {
   renderDiceGrid,
   renderThemeCards,
   fileToBase64,
+  recallRelevantMemories,
+  commitToSemanticMemory
 } from './features';
 import {
   ai,
@@ -137,7 +145,10 @@ import {
   dmPersonas,
   getNewGameSetupInstruction,
   getQuickStartCharacterPrompt,
+  getChroniclerPrompt,
+  resetAI,
 } from './gemini';
+import { retryOperation } from './utils';
 // Fix: import UISettings type
 import type { Message, ChatSession, UISettings, GameSettings } from './types';
 
@@ -185,7 +196,7 @@ function runBootSequence(): Promise<void> {
 
     const lines = [
       'DM OS v2.1 Initializing...',
-      'Connecting to WFGY Universal Unification Framework... OK',
+      'Connecting to WFGY Core Flagship v2.0... OK',
       'Loading Semantic Tree... 1.2TB nodes loaded.',
       'Calibrating Collapse-Rebirth Cycle (BBCR)... STABLE',
       'Waking Dungeon Master Persona...',
@@ -259,7 +270,7 @@ async function startNewChat() {
     const kickoffMessage = "Let's begin the setup for our new game.";
     const firstUserMessage: Message = { sender: 'user', text: kickoffMessage, hidden: true };
 
-    const result = await setupGeminiChat.sendMessageStream({ message: kickoffMessage });
+    const result = await retryOperation(() => setupGeminiChat.sendMessageStream({ message: kickoffMessage })) as any;
     let responseText = '';
     for await (const chunk of result) {
       responseText += chunk.text || '';
@@ -282,18 +293,32 @@ async function startNewChat() {
         tone: 'heroic',
         narration: 'descriptive',
       },
+      progressClocks: {},
+      factions: {},
     };
 
     getChatHistory().push(newSession);
     saveChatHistoryToDB();
     loadChat(newId);
-  } catch (error) {
+  } catch (error: any) {
     console.error('New game setup failed:', error);
     loadingContainer.remove();
-    let errorMessage = 'Failed to start the game setup. Please try again.';
-    if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
-        errorMessage = 'Error: API Key is missing or invalid. Please ensure it is correctly configured in your environment.';
+    
+    let errorMessage = `Failed to start game. Error details: ${error.message || 'Unknown error'}`;
+    
+    // Handle Rate Limit (429) specific message
+    if (error.status === 429 || (error.message && error.message.includes('429'))) {
+        errorMessage = "⚠️ System Overload (429): The 'Gemini 3.0 Pro' model is currently busy. Please go to Settings (in Logbook) and switch the AI Model to 'Gemini 2.5 Flash' for a smoother experience.";
     }
+    
+    if (error.message && (error.message.includes('API Key') || error.message.includes('API key'))) {
+        errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
+        // Auto-open settings
+        openModal(logbookModal);
+        const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
+        if (settingsTabBtn) settingsTabBtn.click();
+    }
+    
     appendMessage({ sender: 'error', text: errorMessage });
   }
 }
@@ -323,18 +348,28 @@ function loadChat(id: string) {
       if (session.creationPhase) {
         const instruction = getNewGameSetupInstruction();
         setGeminiChat(createNewChatInstance(geminiHistory, instruction));
+        setChroniclerChat(null); // No chronicler during setup
       } else {
         const personaId = session.personaId || 'purist';
         const persona = dmPersonas.find(p => p.id === personaId) || dmPersonas[0];
         const instruction = persona.getInstruction(session.adminPassword || '');
         setGeminiChat(createNewChatInstance(geminiHistory, instruction));
+        // Initialize chronicler for existing games. Explicitly use 'gemini-2.5-flash' for cost/speed.
+        setChroniclerChat(createNewChatInstance([], getChroniclerPrompt(), 'gemini-2.5-flash'));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create Gemini chat instance:', error);
       renderMessages(session.messages);
       let errorMessage = 'Error initializing the AI. Please check your setup or start a new chat.';
-      if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
-          errorMessage = 'Error: API Key is missing or invalid. Please ensure it is correctly configured in your environment.';
+      if (error instanceof Error) {
+          errorMessage = `Error initializing AI: ${error.message}`;
+          if (error.message.includes('API Key') || error.message.includes('API key')) {
+              errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
+              // Auto-open settings
+              openModal(logbookModal);
+              const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
+              if (settingsTabBtn) settingsTabBtn.click();
+          }
       }
       appendMessage({ sender: 'error', text: errorMessage });
       setGeminiChat(null);
@@ -419,6 +454,92 @@ async function deleteChat() {
 }
 
 /**
+ * Runs a background "world turn" with the Chronicler AI.
+ * This function is fire-and-forget and should not block the UI.
+ * @param session The current chat session to update.
+ */
+async function runChroniclerTurn(session: ChatSession) {
+  const chronicler = getChroniclerChat();
+  // Note: We do NOT check isSending() here because this function is called 
+  // usually *while* the main DM response is finishing or just finished.
+  // If we block on isSending(), it might never run if the user types fast.
+  // Instead, we just run it. The AI instance is separate.
+  
+  if (!chronicler) return; 
+
+  try {
+    // 1. Get current state and last player action
+    // Filter out completed clocks to save tokens and context window
+    const activeClocks: Record<string, any> = {};
+    if (session.progressClocks) {
+        Object.entries(session.progressClocks).forEach(([key, clock]) => {
+            if (clock.current < clock.max) {
+                activeClocks[key] = clock;
+            }
+        });
+    }
+
+    const currentState = {
+      progressClocks: activeClocks,
+      factions: session.factions || {}
+    };
+    // Find the last *user* message
+    const lastUserMessage = [...session.messages].reverse().find(m => m.sender === 'user');
+    const playerAction = lastUserMessage ? lastUserMessage.text : "The player took a long rest.";
+
+    // 2. Build the prompt for the Chronicler
+    const chroniclerPrompt = `
+      Current State: ${JSON.stringify(currentState)}
+      Player Action: "${playerAction}"
+    `;
+
+    // 3. Talk to the Chronicler AI - With Retry
+    // We use a separate retry block here so if it fails, it just dies quietly
+    const result = await retryOperation(() => chronicler.sendMessage({ message: chroniclerPrompt })) as GenerateContentResponse;
+    const responseText = result.text;
+
+    // 4. Parse the JSON response
+    const parsedData = JSON.parse(responseText || '{}');
+
+    // 5. Save the new state to the current session object
+    // Merge new state into existing, respecting the filtered view.
+    // We iterate the response and update the master list.
+    if (parsedData.newState && parsedData.newState.progressClocks) {
+        if (!session.progressClocks) session.progressClocks = {};
+        Object.entries(parsedData.newState.progressClocks).forEach(([key, val]) => {
+             session.progressClocks![key] = val as any;
+        });
+    }
+    if (parsedData.newState && parsedData.newState.factions) {
+        if (!session.factions) session.factions = {};
+        Object.entries(parsedData.newState.factions).forEach(([key, val]) => {
+             session.factions![key] = val as any;
+        });
+    }
+
+    // 6. Save the event log as a HIDDEN system message for RAG context
+    const chroniclerEvent: Message = {
+      sender: 'system',
+      text: `[CHRONICLER EVENT]: ${parsedData.eventLog}`,
+      hidden: true // This won't be rendered, but will inform the main DM AI
+    };
+    session.messages.push(chroniclerEvent);
+    
+    // 7. Commit the event log to the Semantic Tree
+    await commitToSemanticMemory(parsedData.eventLog, 0.8); // High importance
+    
+    // 8. Persist the updated session to IndexedDB
+    saveChatHistoryToDB();
+
+  } catch (error) {
+    console.warn("Chronicler turn failed (background task):", error);
+    // Don't bother the user with a UI error, just log it.
+    // The game can continue without this background update.
+  } 
+}
+
+
+/**
  * A helper function to finalize the setup phase and transition to the main game.
  * @param session The current chat session.
  * @param title The title for the new adventure.
@@ -454,8 +575,10 @@ async function finalizeSetupAndStartGame(session: ChatSession, title: string, fi
       .map(m => ({ role: m.sender as 'user' | 'model', parts: [{ text: m.text }] }));
 
     setGeminiChat(createNewChatInstance(geminiHistory, instruction));
+    // Initialize the Chronicler AI for the main game. Explicitly use 'gemini-2.5-flash' for cost/speed.
+    setChroniclerChat(createNewChatInstance([], getChroniclerPrompt(), 'gemini-2.5-flash'));
 
-    const kickoffResult = await getGeminiChat()!.sendMessageStream({ message: "The setup is complete. Begin the adventure by narrating the opening scene." });
+    const kickoffResult = await retryOperation(() => getGeminiChat()!.sendMessageStream({ message: "The setup is complete. Begin the adventure by narrating the opening scene." })) as any;
 
     let openingSceneText = '';
     gameLoadingMessage.classList.remove('loading');
@@ -552,7 +675,7 @@ async function handleFormSubmit(e: Event) {
             ? "Let's create my character."
             : userInput;
 
-        const result = await geminiChat.sendMessageStream({ message: messageToSend });
+        const result = await retryOperation(() => geminiChat.sendMessageStream({ message: messageToSend })) as any;
         let responseText = '';
         modelMessageEl.classList.remove('loading');
         modelMessageEl.innerHTML = '';
@@ -591,8 +714,8 @@ async function handleFormSubmit(e: Event) {
           charLoadingMessage.textContent = 'Generating a party of adventurers...';
 
           try {
-            const charResponse = await ai.models.generateContent({
-              model: 'gemini-2.5-flash',
+            const charResponse = await retryOperation(() => ai.models.generateContent({
+              model: getUISettings().activeModel,
               contents: getQuickStartCharacterPrompt(),
               config: {
                 responseMimeType: 'application/json',
@@ -601,8 +724,8 @@ async function handleFormSubmit(e: Event) {
                   items: quickStartCharacterSchema,
                 },
               }
-            });
-            const chars = JSON.parse(charResponse.text);
+            })) as GenerateContentResponse;
+            const chars = JSON.parse(charResponse.text || '[]');
             currentSession.quickStartChars = chars;
             saveChatHistoryToDB();
             charLoadingContainer.remove();
@@ -651,8 +774,12 @@ async function handleFormSubmit(e: Event) {
 
     const geminiChat = getGeminiChat();
     if (!geminiChat) {
-        appendMessage({ sender: 'error', text: 'The connection to the AI has been lost. This can happen if the API Key is missing or invalid. Please check your configuration and start a new chat.' });
+        const errorMessage = 'The connection to the AI has been lost. This can happen if the API Key is missing or invalid. Please check your settings in the Logbook and start a new chat.';
+        appendMessage({ sender: 'error', text: errorMessage });
         setSending(false);
+        openModal(logbookModal);
+        const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
+        if (settingsTabBtn) settingsTabBtn.click();
         return;
     }
     stopTTS();
@@ -671,11 +798,32 @@ async function handleFormSubmit(e: Event) {
 
     try {
       const context = getUserContext();
-      const messageWithContext = context.length > 0
-        ? `(OOC: Use the following context to inform your response:\n${context.join('\n')}\n)\n\n${userInput}`
-        : userInput;
+      
+      // WFGY-Lite: Semantic Memory Retrieval
+      // Query the "Semantic Tree" for relevant past memories
+      // We wrap this in a try/catch just in case it fails, so it doesn't block the chat.
+      let relevantMemories: string[] = [];
+      try {
+          relevantMemories = await recallRelevantMemories(userInput, 3);
+      } catch (memErr) {
+          console.warn("Memory recall failed, proceeding without context.", memErr);
+      }
+      
+      let messageWithContext = userInput;
+      let contextBlock = "";
+      
+      if (context.length > 0) {
+          contextBlock += `\nUser Notes:\n${context.join('\n')}`;
+      }
+      if (relevantMemories.length > 0) {
+          contextBlock += `\nRetrieved Memories from Semantic Tree:\n${relevantMemories.join('\n')}`;
+      }
+      
+      if (contextBlock) {
+          messageWithContext = `(System: Context Injection:\n${contextBlock}\n)\n\n${userInput}`;
+      }
 
-      const result = await geminiChat.sendMessageStream({ message: messageWithContext });
+      const result = await retryOperation(() => geminiChat.sendMessageStream({ message: messageWithContext })) as any;
       let responseText = '';
       modelMessageEl.classList.remove('loading');
       modelMessageEl.innerHTML = '';
@@ -707,12 +855,40 @@ async function handleFormSubmit(e: Event) {
       const finalMessage: Message = { sender: 'model', text: responseText.replace(combatStatusRegex, '').trim() };
       currentSession.messages.push(finalMessage);
       saveChatHistoryToDB();
-    } catch (error) {
+      
+      // --- LIVING WORLD ENGINE TRIGGER ---
+      // Now, check if we need to run a "World Turn" in the background
+      const lowerCaseInputForTurn = userInput.toLowerCase();
+      const isWorldTurn = lowerCaseInputForTurn.includes(' rest') ||
+                            lowerCaseInputForTurn.includes('travel') ||
+                            lowerCaseInputForTurn.includes('make camp') ||
+                            lowerCaseInputForTurn.includes('days pass') ||
+                            lowerCaseInputForTurn.includes('sleep') ||
+                            lowerCaseInputForTurn.includes('wait');
+
+      if (isWorldTurn && getChroniclerChat()) {
+        // This runs in the background and does not block the UI.
+        runChroniclerTurn(currentSession).catch(err => {
+            console.error("Caught an error from the background chronicler turn:", err);
+        });
+      }
+
+    } catch (error: any) {
       console.error("Gemini API Error:", error);
       modelMessageContainer.remove();
       let errorMessage = 'The DM seems to be pondering deeply ... and has gone quiet. Please try again.';
-      if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
-          errorMessage = 'Error: API Key is missing or invalid. Please ensure it is correctly configured in your environment.';
+      if (error instanceof Error) {
+          errorMessage = `AI Connection Error: ${error.message}`;
+          if (error.message.includes('API Key') || error.message.includes('API key')) {
+              errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
+              openModal(logbookModal);
+              const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
+              if (settingsTabBtn) settingsTabBtn.click();
+          }
+      }
+      // Handle Rate Limit (429) specific message
+      if (error.status === 429 || (error.message && error.message.includes('429'))) {
+          errorMessage = "⚠️ System Overload (429): The 'Gemini 3.0 Pro' model is currently busy. Please go to Settings (in Logbook) and switch the AI Model to 'Gemini 2.5 Flash' for a smoother experience.";
       }
       appendMessage({ sender: 'error', text: errorMessage });
     }
@@ -757,14 +933,14 @@ async function handleFileUpload(event: Event) {
 
     const processFile = async (prompt: string) => {
       const base64Data = await fileToBase64(file);
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+      const response = await retryOperation(() => ai.models.generateContent({
+        model: getUISettings().activeModel,
         contents: { parts: [
           { inlineData: { mimeType: file.type, data: base64Data } },
           { text: prompt }
         ]},
-      });
-      return response.text;
+      })) as GenerateContentResponse;
+      return response.text || '';
     };
 
     if (file.type.startsWith('text/')) {
@@ -801,10 +977,14 @@ async function handleFileUpload(event: Event) {
     console.error("File processing failed:", error);
     let errorMessage = 'An error occurred during processing.';
     if (error instanceof Error) {
+        errorMessage = error.message;
         if (error.message.includes('Unsupported file type')) {
             errorMessage = `Unsupported file type: ${file.type}`;
         } else if (error.message.includes('API Key') || error.message.includes('API key')) {
-            errorMessage = 'API Key is missing or invalid. Please check your configuration.';
+            errorMessage = 'API Key is missing or invalid. Please check your settings in the Logbook.';
+            openModal(logbookModal);
+            const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
+            if (settingsTabBtn) settingsTabBtn.click();
         }
     }
     messageEl.classList.remove('loading');
@@ -819,8 +999,7 @@ function setupEventListeners() {
   let setupSettings: Partial<GameSettings & { personaId: string }> = {};
   
   chatForm.addEventListener('submit', handleFormSubmit);
-  // Fix: Cannot find name 'sendButton'.
-  sendButton.addEventListener('click', handleFormSubmit);
+  if(sendButton) sendButton.addEventListener('click', handleFormSubmit);
 
   chatInput.addEventListener('focus', () => {
     setTimeout(() => {
@@ -934,7 +1113,7 @@ function setupEventListeners() {
           
           const personaName = dmPersonas.find(p => p.id === setupSettings.personaId)?.name || 'DM';
           const userMessageText = `I've chosen the ${personaName} with a ${setupSettings.tone} tone and ${setupSettings.narration} narration. Now, let's create the world.`;
-          const result = await geminiChat.sendMessageStream({ message: userMessageText });
+          const result = await retryOperation(() => geminiChat.sendMessageStream({ message: userMessageText })) as any;
           
           let responseText = '';
           modelMessageEl.classList.remove('loading');
@@ -959,256 +1138,316 @@ function setupEventListeners() {
     }
   });
 
-  menuBtn.addEventListener('click', toggleSidebar);
-  overlay.addEventListener('click', closeSidebar);
-  newChatBtn.addEventListener('click', startNewChat);
+  if (menuBtn) menuBtn.addEventListener('click', toggleSidebar);
+  if (overlay) overlay.addEventListener('click', closeSidebar);
+  if (newChatBtn) newChatBtn.addEventListener('click', startNewChat);
 
   // Delegated event listener for chat history items
-  chatHistoryContainer.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    const chatHistoryItem = target.closest<HTMLElement>('.chat-history-item');
+  if (chatHistoryContainer) {
+      chatHistoryContainer.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        const chatHistoryItem = target.closest<HTMLElement>('.chat-history-item');
 
-    // Check if a chat item was clicked, but not the options button within it
-    if (chatHistoryItem && !target.closest('.options-btn')) {
-      const sessionId = chatHistoryItem.dataset.id;
-      if (sessionId) {
-        closeChatOptionsMenu();
-        loadChat(sessionId);
-      }
-    }
-  });
-
-  helpBtn.addEventListener('click', () => openModal(helpModal));
-  closeHelpBtn.addEventListener('click', () => closeModal(helpModal));
-  dndHelpBtn.addEventListener('click', () => openModal(dndHelpModal));
-  closeDndHelpBtn.addEventListener('click', () => closeModal(dndHelpModal));
-  logbookBtn.addEventListener('click', () => openModal(logbookModal));
-  closeLogbookBtn.addEventListener('click', () => closeModal(logbookModal));
-  diceRollerBtn.addEventListener('click', () => openModal(diceModal));
-  closeDiceBtn.addEventListener('click', () => closeModal(diceModal));
-  closeRenameBtn.addEventListener('click', closeRenameModal);
-  closeDeleteConfirmBtn.addEventListener('click', closeDeleteConfirmModal);
-  cancelDeleteBtn.addEventListener('click', closeDeleteConfirmModal);
-  confirmDeleteBtn.addEventListener('click', deleteChat);
-  closeWelcomeBtn.addEventListener('click', () => closeModal(welcomeModal));
-  combatTrackerHeader.addEventListener('click', () => {
-    combatTracker.classList.toggle('expanded');
-  });
-  contextHeader.addEventListener('click', () => {
-    contextManager.classList.toggle('expanded');
-  });
-
-  renameForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    if (chatIdToRename) {
-      const session = getChatHistory().find(s => s.id === chatIdToRename);
-      if (session) {
-        session.title = renameInput.value;
-        saveChatHistoryToDB();
-        renderChatHistory();
-      }
-    }
-    closeRenameModal();
-  });
-
-  contextForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const text = contextInput.value.trim();
-    if (text) { addUserContext(text); contextInput.value = ''; }
-  });
-
-  contextList.addEventListener('click', (e) => {
-    const deleteBtn = (e.target as HTMLElement).closest('.delete-context-btn');
-    if (deleteBtn) {
-      const index = parseInt(deleteBtn.getAttribute('data-index')!, 10);
-      if (!isNaN(index)) { deleteUserContext(index); }
-    }
-  });
-  
-  importAllBtn.addEventListener('click', () => importAllFileInput.click());
-  importAllFileInput.addEventListener('change', handleImportAll);
-  exportAllBtn.addEventListener('click', exportAllChats);
-  
-  chatOptionsMenu.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    const menuItem = target.closest('li');
-    if (menuItem) {
-        const sessionId = chatOptionsMenu.dataset.sessionId;
-        if (!sessionId) return;
-        const action = menuItem.dataset.action;
-
-        switch (action) {
-            case 'pin':
-                togglePinChat(sessionId);
-                break;
-            case 'rename':
-                openRenameModal(sessionId);
-                break;
-            case 'export':
-                exportChatToLocal(sessionId);
-                break;
-            case 'delete':
-                openDeleteConfirmModal(sessionId);
-                break;
+        // Check if a chat item was clicked, but not the options button within it
+        if (chatHistoryItem && !target.closest('.options-btn')) {
+          const sessionId = chatHistoryItem.dataset.id;
+          if (sessionId) {
+            closeChatOptionsMenu();
+            loadChat(sessionId);
+          }
         }
-        // The menu will be closed by a separate document-level click listener,
-        // which is set when the menu is opened. This handles all cases gracefully.
-    }
-  });
-
-  logbookNav.addEventListener('click', (e) => {
-    const button = (e.target as HTMLElement).closest<HTMLElement>('.logbook-nav-btn');
-    if (button?.dataset.tab) {
-      const tab = button.dataset.tab;
-      // Update active state for buttons
-      logbookNav.querySelectorAll('.logbook-nav-btn').forEach(btn => btn.classList.remove('active'));
-      button.classList.add('active');
-
-      // Show the correct content pane
-      logbookPanes.forEach(pane => {
-        pane.classList.toggle('active', pane.id === `${tab}-content`);
       });
+  }
 
-      // Jump to the top of the content pane when switching tabs.
-      const logbookContent = logbookNav.nextElementSibling as HTMLElement;
-      if (logbookContent) {
-        logbookContent.scrollTop = 0;
-      }
-    }
-  });
+  if (helpBtn) helpBtn.addEventListener('click', () => openModal(helpModal));
+  if (closeHelpBtn) closeHelpBtn.addEventListener('click', () => closeModal(helpModal));
+  if (dndHelpBtn) dndHelpBtn.addEventListener('click', () => openModal(dndHelpModal));
+  if (closeDndHelpBtn) closeDndHelpBtn.addEventListener('click', () => closeModal(dndHelpModal));
+  if (logbookBtn) logbookBtn.addEventListener('click', () => openModal(logbookModal));
+  if (closeLogbookBtn) closeLogbookBtn.addEventListener('click', () => closeModal(logbookModal));
+  if (diceRollerBtn) diceRollerBtn.addEventListener('click', () => openModal(diceModal));
+  if (closeDiceBtn) closeDiceBtn.addEventListener('click', () => closeModal(diceModal));
+  if (closeRenameBtn) closeRenameBtn.addEventListener('click', closeRenameModal);
+  if (closeDeleteConfirmBtn) closeDeleteConfirmBtn.addEventListener('click', closeDeleteConfirmModal);
+  if (cancelDeleteBtn) cancelDeleteBtn.addEventListener('click', closeDeleteConfirmModal);
+  if (confirmDeleteBtn) confirmDeleteBtn.addEventListener('click', deleteChat);
+  if (closeWelcomeBtn) closeWelcomeBtn.addEventListener('click', () => closeModal(welcomeModal));
+  if (combatTrackerHeader) {
+      combatTrackerHeader.addEventListener('click', () => {
+        combatTracker.classList.toggle('expanded');
+      });
+  }
+  if (contextHeader) {
+      contextHeader.addEventListener('click', () => {
+        contextManager.classList.toggle('expanded');
+      });
+  }
 
-  updateSheetBtn.addEventListener('click', () => updateLogbookData('sheet'));
-  updateInventoryBtn.addEventListener('click', () => updateLogbookData('inventory'));
-  updateQuestsBtn.addEventListener('click', () => updateLogbookData('quests'));
-  updateNpcsBtn.addEventListener('click', () => updateLogbookData('npcs'));
-  updateAchievementsBtn.addEventListener('click', () => updateLogbookData('achievements'));
-  generateImageBtn.addEventListener('click', generateCharacterImage);
+  if (renameForm) {
+      renameForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (chatIdToRename) {
+          const session = getChatHistory().find(s => s.id === chatIdToRename);
+          if (session) {
+            session.title = renameInput.value;
+            saveChatHistoryToDB();
+            renderChatHistory();
+          }
+        }
+        closeRenameModal();
+      });
+  }
+
+  if (contextForm) {
+      contextForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = contextInput.value.trim();
+        if (text) { addUserContext(text); contextInput.value = ''; }
+      });
+  }
+
+  if (contextList) {
+      contextList.addEventListener('click', (e) => {
+        const deleteBtn = (e.target as HTMLElement).closest('.delete-context-btn');
+        if (deleteBtn) {
+          const index = parseInt(deleteBtn.getAttribute('data-index')!, 10);
+          if (!isNaN(index)) { deleteUserContext(index); }
+        }
+      });
+  }
   
-  fontSizeControls.addEventListener('click', (e) => {
-    const button = (e.target as HTMLElement).closest('button');
-    if (button?.dataset.size) {
-        getUISettings().fontSize = button.dataset.size as 'small' | 'medium' | 'large';
-        // Fix: Cannot find name 'dbSet'.
+  if (importAllBtn) importAllBtn.addEventListener('click', () => importAllFileInput.click());
+  if (importAllFileInput) importAllFileInput.addEventListener('change', handleImportAll);
+  if (exportAllBtn) exportAllBtn.addEventListener('click', exportAllChats);
+  
+  if (chatOptionsMenu) {
+      chatOptionsMenu.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        const menuItem = target.closest('li');
+        if (menuItem) {
+            const sessionId = chatOptionsMenu.dataset.sessionId;
+            if (!sessionId) return;
+            const action = menuItem.dataset.action;
+
+            switch (action) {
+                case 'pin':
+                    togglePinChat(sessionId);
+                    break;
+                case 'rename':
+                    openRenameModal(sessionId);
+                    break;
+                case 'export':
+                    exportChatToLocal(sessionId);
+                    break;
+                case 'delete':
+                    openDeleteConfirmModal(sessionId);
+                    break;
+            }
+        }
+      });
+  }
+
+  if (logbookNav) {
+      logbookNav.addEventListener('click', (e) => {
+        const button = (e.target as HTMLElement).closest<HTMLElement>('.logbook-nav-btn');
+        if (button?.dataset.tab) {
+          const tab = button.dataset.tab;
+          // Update active state for buttons
+          logbookNav.querySelectorAll('.logbook-nav-btn').forEach(btn => btn.classList.remove('active'));
+          button.classList.add('active');
+
+          // Show the correct content pane
+          logbookPanes.forEach(pane => {
+            pane.classList.toggle('active', pane.id === `${tab}-content`);
+          });
+
+          // Jump to the top of the content pane when switching tabs.
+          const logbookContent = logbookNav.nextElementSibling as HTMLElement;
+          if (logbookContent) {
+            logbookContent.scrollTop = 0;
+          }
+        }
+      });
+  }
+
+  if (updateSheetBtn) updateSheetBtn.addEventListener('click', () => updateLogbookData('sheet'));
+  if (updateInventoryBtn) updateInventoryBtn.addEventListener('click', () => updateLogbookData('inventory'));
+  if (updateQuestsBtn) updateQuestsBtn.addEventListener('click', () => updateLogbookData('quests'));
+  if (updateNpcsBtn) updateNpcsBtn.addEventListener('click', () => updateLogbookData('npcs'));
+  if (updateAchievementsBtn) updateAchievementsBtn.addEventListener('click', () => updateLogbookData('achievements'));
+  if (generateImageBtn) generateImageBtn.addEventListener('click', generateCharacterImage);
+  
+  if (fontSizeControls) {
+      fontSizeControls.addEventListener('click', (e) => {
+        const button = (e.target as HTMLElement).closest('button');
+        if (button?.dataset.size) {
+            getUISettings().fontSize = button.dataset.size as 'small' | 'medium' | 'large';
+            dbSet('dm-os-ui-settings', getUISettings());
+            applyUISettings();
+        }
+      });
+  }
+  if (enterToSendToggle) {
+      enterToSendToggle.addEventListener('change', () => {
+        getUISettings().enterToSend = enterToSendToggle.checked;
         dbSet('dm-os-ui-settings', getUISettings());
-        applyUISettings();
-    }
-  });
-  enterToSendToggle.addEventListener('change', () => {
-    getUISettings().enterToSend = enterToSendToggle.checked;
-    dbSet('dm-os-ui-settings', getUISettings());
-  });
-  experimentalUploadToggle.addEventListener('change', () => {
-    getUISettings().experimentalUploadLimit = experimentalUploadToggle.checked;
-    dbSet('dm-os-ui-settings', getUISettings());
-  });
-
-  changeUiBtn.addEventListener('click', () => openModal(themeModal));
-  closeThemeBtn.addEventListener('click', () => closeModal(themeModal));
-  themeGrid.addEventListener('click', (e) => {
-    const card = (e.target as HTMLElement).closest<HTMLElement>('.theme-card');
-    if (card?.dataset.theme) {
-      applyTheme(card.dataset.theme);
-      closeModal(themeModal);
-    }
-  });
-
-  // Fix: Cannot find name 'clearDiceResults'.
-  clearResultsBtn.addEventListener('click', clearDiceResults);
-  diceGrid.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    const dieItem = target.closest('.die-item') as HTMLElement;
-    if (!dieItem) return;
-    if (target.closest('.die-visual')) { handleDieRoll(dieItem); }
-    const quantityInput = dieItem.querySelector('.quantity-input') as HTMLInputElement;
-    let value = parseInt(quantityInput.value, 10);
-    if (target.classList.contains('plus')) {
-      quantityInput.value = String(Math.min(99, value + 1));
-    } else if (target.classList.contains('minus')) {
-      quantityInput.value = String(Math.max(1, value - 1));
-    }
-  });
+      });
+  }
+  if (experimentalUploadToggle) {
+      experimentalUploadToggle.addEventListener('change', () => {
+        getUISettings().experimentalUploadLimit = experimentalUploadToggle.checked;
+        dbSet('dm-os-ui-settings', getUISettings());
+      });
+  }
+  if (modelSelect) {
+      modelSelect.addEventListener('change', () => {
+        getUISettings().activeModel = modelSelect.value;
+        dbSet('dm-os-ui-settings', getUISettings());
+        const currentChat = getCurrentChat();
+        if (currentChat) {
+            loadChat(currentChat.id);
+        }
+      });
+  }
   
-  inventoryBtn.addEventListener('click', () => {
-      inventoryPopup.classList.toggle('visible');
-      if (inventoryPopup.classList.contains('visible')) {
-          fetchAndRenderInventoryPopup();
-      }
-  });
-  closeInventoryBtn.addEventListener('click', () => inventoryPopup.classList.remove('visible'));
-  refreshInventoryBtn.addEventListener('click', fetchAndRenderInventoryPopup);
+  if (saveApiKeyBtn) {
+      saveApiKeyBtn.addEventListener('click', () => {
+          if (apiKeyInput) {
+              getUISettings().apiKey = apiKeyInput.value.trim();
+              dbSet('dm-os-ui-settings', getUISettings());
+              resetAI(); 
+              
+              const originalText = saveApiKeyBtn.textContent;
+              saveApiKeyBtn.textContent = 'Saved!';
+              saveApiKeyBtn.classList.add('success');
+              setTimeout(() => {
+                  saveApiKeyBtn.textContent = originalText;
+                  saveApiKeyBtn.classList.remove('success');
+              }, 2000);
+          }
+      });
+  }
+
+  if (changeUiBtn) changeUiBtn.addEventListener('click', () => openModal(themeModal));
+  if (closeThemeBtn) closeThemeBtn.addEventListener('click', () => closeModal(themeModal));
+  if (themeGrid) {
+      themeGrid.addEventListener('click', (e) => {
+        const card = (e.target as HTMLElement).closest<HTMLElement>('.theme-card');
+        if (card?.dataset.theme) {
+          applyTheme(card.dataset.theme);
+          closeModal(themeModal);
+        }
+      });
+  }
+
+  if (clearResultsBtn) clearResultsBtn.addEventListener('click', clearDiceResults);
+  if (diceGrid) {
+      diceGrid.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        const dieItem = target.closest('.die-item') as HTMLElement;
+        if (!dieItem) return;
+        if (target.closest('.die-visual')) { handleDieRoll(dieItem); }
+        const quantityInput = dieItem.querySelector('.quantity-input') as HTMLInputElement;
+        let value = parseInt(quantityInput.value, 10);
+        if (target.classList.contains('plus')) {
+          quantityInput.value = String(Math.min(99, value + 1));
+        } else if (target.classList.contains('minus')) {
+          quantityInput.value = String(Math.max(1, value - 1));
+        }
+      });
+  }
   
-  // Fix: Cannot find name 'quickActionsBar'.
-  quickActionsBar.addEventListener('click', (e) => {
-      const button = (e.target as HTMLElement).closest<HTMLButtonElement>('.quick-action-btn');
-      if (button?.dataset.command) {
-          chatInput.value += button.dataset.command;
-          chatInput.focus();
-      }
-  });
+  if (inventoryBtn) {
+      inventoryBtn.addEventListener('click', () => {
+          inventoryPopup.classList.toggle('visible');
+          if (inventoryPopup.classList.contains('visible')) {
+              fetchAndRenderInventoryPopup();
+          }
+      });
+  }
+  if (closeInventoryBtn) closeInventoryBtn.addEventListener('click', () => inventoryPopup.classList.remove('visible'));
+  if (refreshInventoryBtn) refreshInventoryBtn.addEventListener('click', fetchAndRenderInventoryPopup);
+  
+  if (quickActionsBar) {
+      quickActionsBar.addEventListener('click', (e) => {
+          const button = (e.target as HTMLElement).closest<HTMLButtonElement>('.quick-action-btn');
+          if (button?.dataset.command) {
+              chatInput.value += button.dataset.command;
+              chatInput.focus();
+          }
+      });
+  }
 
-  // Fix: Cannot find name 'inventoryPopupContent'.
-  inventoryPopupContent.addEventListener('click', (e) => {
-      const button = (e.target as HTMLElement).closest<HTMLButtonElement>('.use-item-btn');
-      if (button?.dataset.itemName) {
-          chatInput.value = `I use ${button.dataset.itemName}`;
-          inventoryPopup.classList.remove('visible');
-          chatForm.requestSubmit();
-      }
-  });
+  if (inventoryPopupContent) {
+      inventoryPopupContent.addEventListener('click', (e) => {
+          const button = (e.target as HTMLElement).closest<HTMLButtonElement>('.use-item-btn');
+          if (button?.dataset.itemName) {
+              chatInput.value = `I use ${button.dataset.itemName}`;
+              inventoryPopup.classList.remove('visible');
+              chatForm.requestSubmit();
+          }
+      });
+  }
 
-  fileUploadBtn.addEventListener('click', () => fileUploadInput.click());
-  fileUploadInput.addEventListener('change', handleFileUpload);
+  if (fileUploadBtn) fileUploadBtn.addEventListener('click', () => fileUploadInput.click());
+  if (fileUploadInput) fileUploadInput.addEventListener('change', handleFileUpload);
 }
 
 /**
  * Initializes the application.
  */
 async function initApp() {
-  await runBootSequence();
-  await initDB();
+  try {
+      await runBootSequence();
+      await initDB();
 
-  const [themeId, savedUiSettings, savedPersonaId] = await Promise.all([
-    dbGet<string>('dm-os-theme'),
-    dbGet<UISettings>('dm-os-ui-settings'),
-    dbGet<string>('dm-os-persona'),
-    loadChatHistoryFromDB(),
-    loadUserContextFromDB(),
-  ]);
+      // Ensure history and context are fully loaded into state before proceeding.
+      // This sequential load prevents potential race conditions in initial session recovery.
+      await loadChatHistoryFromDB();
+      await loadUserContextFromDB();
 
-  applyTheme(themeId || 'high-fantasy-dark');
+      const [themeId, savedUiSettings, savedPersonaId] = await Promise.all([
+        dbGet<string>('dm-os-theme'),
+        dbGet<UISettings>('dm-os-ui-settings'),
+        dbGet<string>('dm-os-persona'),
+      ]);
 
-  if (savedUiSettings) {
-    setUISettings({ ...getUISettings(), ...savedUiSettings });
+      applyTheme(themeId || 'high-fantasy-dark');
+
+      if (savedUiSettings) {
+        setUISettings({ ...getUISettings(), ...savedUiSettings });
+      }
+      applyUISettings();
+
+      if (savedPersonaId && dmPersonas.some(p => p.id === savedPersonaId)) {
+        setCurrentPersonaId(savedPersonaId);
+      }
+
+      renderDiceGrid();
+      renderThemeCards();
+      renderUserContext(getUserContext());
+      renderChatHistory();
+
+      const history = getChatHistory();
+      if (history.length > 0) {
+        const mostRecentChat = [...history].sort((a, b) => b.createdAt - a.createdAt)[0];
+        loadChat(mostRecentChat.id);
+      } else {
+        await startNewChat();
+      }
+
+      setupEventListeners();
+      showWelcomeModalIfNeeded();
+  } catch (err) {
+      console.error("Fatal error during application initialization:", err);
+      document.body.innerHTML = `<div style="color: white; padding: 2rem; text-align: center; font-family: sans-serif;">
+            <h1>Oops! Something went wrong.</h1>
+            <p>DM OS could not start.</p>
+            <p>Details: ${err instanceof Error ? err.message : String(err)}</p>
+            <button onclick="location.reload()" style="margin-top: 1rem; padding: 0.5rem 1rem; cursor: pointer;">Reload</button>
+        </div>`;
   }
-  applyUISettings();
-
-  if (savedPersonaId && dmPersonas.some(p => p.id === savedPersonaId)) {
-    setCurrentPersonaId(savedPersonaId);
-  }
-
-  // Fix: Cannot find name 'renderDiceGrid'.
-  renderDiceGrid();
-  renderThemeCards();
-  // Fix: Cannot find name 'renderUserContext' and it needs an argument.
-  renderUserContext(getUserContext());
-  renderChatHistory();
-
-  if (getChatHistory().length > 0) {
-    const mostRecentChat = [...getChatHistory()].sort((a, b) => b.createdAt - a.createdAt)[0];
-    loadChat(mostRecentChat.id);
-  } else {
-    await startNewChat();
-  }
-
-  setupEventListeners();
-  showWelcomeModalIfNeeded();
 }
 
 // Start the application
-initApp().catch(err => {
-  console.error("Fatal error during application initialization:", err);
-  document.body.innerHTML = `<div style="color: white; padding: 2rem; text-align: center;">
-        <h1>Oops! Something went wrong.</h1>
-        <p>DM OS could not start. Please try refreshing the page. If the problem persists, you may need to clear your browser's site data for this page.</p>
-    </div>`;
-});
+initApp();

@@ -1,10 +1,11 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import { getChatHistory, getCurrentChat, getUISettings } from './state';
+import { getChatHistory, getCurrentChat, getUISettings, dbSet } from './state';
 import type { Message, ChatSession, CharacterSheetData, Achievement, NPCState } from './types';
-import { dmPersonas } from './gemini';
+import { dmPersonas, resetAI } from './gemini';
 
 // =================================================================================
 // DOM ELEMENT SELECTORS
@@ -13,7 +14,7 @@ import { dmPersonas } from './gemini';
 export const chatContainer = document.getElementById('chat-container') as HTMLElement;
 export const chatForm = document.getElementById('chat-form') as HTMLFormElement;
 export const chatInput = document.getElementById('chat-input') as HTMLTextAreaElement;
-export const sendButton = chatForm.querySelector('button[type="submit"]') as HTMLButtonElement;
+export const sendButton = chatForm?.querySelector('button[type="submit"]') as HTMLButtonElement;
 export const menuBtn = document.getElementById('menu-btn') as HTMLButtonElement;
 export const newChatBtn = document.getElementById('new-chat-btn') as HTMLButtonElement;
 export const sidebar = document.getElementById('sidebar') as HTMLElement;
@@ -63,15 +64,10 @@ export const logbookModal = document.getElementById('logbook-modal') as HTMLElem
 export const closeLogbookBtn = document.getElementById('close-logbook-btn') as HTMLButtonElement;
 export const logbookNav = document.querySelector('.logbook-nav') as HTMLElement;
 export const logbookPanes = document.querySelectorAll('.logbook-pane') as NodeListOf<HTMLElement>;
-// Fix: Export characterSheetDisplay for use in other modules
 export const characterSheetDisplay = document.getElementById('character-sheet-display') as HTMLElement;
-// Fix: Export inventoryDisplay for use in other modules
 export const inventoryDisplay = document.getElementById('inventory-display') as HTMLElement;
-// Fix: Export questsDisplay for use in other modules
 export const questsDisplay = document.getElementById('quests-display') as HTMLElement;
-// Fix: Export npcsDisplay for use in other modules
 export const npcsDisplay = document.getElementById('npcs-display') as HTMLElement;
-// Fix: Export achievementsDisplay for use in other modules
 export const achievementsDisplay = document.getElementById('achievements-display') as HTMLElement;
 export const updateSheetBtn = document.getElementById('update-sheet-btn') as HTMLButtonElement;
 export const updateInventoryBtn = document.getElementById('update-inventory-btn') as HTMLButtonElement;
@@ -79,13 +75,15 @@ export const updateQuestsBtn = document.getElementById('update-quests-btn') as H
 export const updateNpcsBtn = document.getElementById('update-npcs-btn') as HTMLButtonElement;
 export const updateAchievementsBtn = document.getElementById('update-achievements-btn') as HTMLButtonElement;
 export const generateImageBtn = document.getElementById('generate-image-btn') as HTMLButtonElement;
-// Fix: Export characterImageDisplay for use in other modules
 export const characterImageDisplay = document.getElementById('character-image-display') as HTMLImageElement;
 export const characterImagePlaceholder = document.getElementById('character-image-placeholder') as HTMLElement;
 export const characterImageLoading = document.getElementById('character-image-loading') as HTMLElement;
 export const fontSizeControls = document.getElementById('font-size-controls') as HTMLElement;
 export const enterToSendToggle = document.getElementById('setting-enter-send') as HTMLInputElement;
 export const experimentalUploadToggle = document.getElementById('setting-experimental-upload') as HTMLInputElement;
+export const modelSelect = document.getElementById('setting-model') as HTMLSelectElement;
+export const apiKeyInput = document.getElementById('setting-api-key') as HTMLInputElement;
+export const saveApiKeyBtn = document.getElementById('save-api-key-btn') as HTMLButtonElement;
 export const changeUiBtn = document.getElementById('change-ui-btn') as HTMLButtonElement;
 export const themeModal = document.getElementById('theme-modal') as HTMLElement;
 export const closeThemeBtn = document.getElementById('close-theme-btn') as HTMLButtonElement;
@@ -113,11 +111,11 @@ export function closeSidebar() {
 }
 
 export function openModal(modal: HTMLElement) {
-  modal.style.display = 'flex';
+  if (modal) modal.style.display = 'flex';
 }
 
 export function closeModal(modal: HTMLElement) {
-  modal.style.display = 'none';
+  if (modal) modal.style.display = 'none';
 }
 
 export function applyUISettings() {
@@ -135,6 +133,18 @@ export function applyUISettings() {
   if (experimentalUploadToggle) {
     experimentalUploadToggle.checked = uiSettings.experimentalUploadLimit;
   }
+  if (modelSelect) {
+    const options = Array.from(modelSelect.options).map(o => o.value);
+    if (options.includes(uiSettings.activeModel)) {
+      modelSelect.value = uiSettings.activeModel;
+    } else {
+      modelSelect.value = 'gemini-2.5-flash'; // Fallback to flash for safety
+      uiSettings.activeModel = 'gemini-2.5-flash';
+    }
+  }
+  if (apiKeyInput) {
+      apiKeyInput.value = uiSettings.apiKey || '';
+  }
 }
 
 // =================================================================================
@@ -142,6 +152,7 @@ export function applyUISettings() {
 // =================================================================================
 
 export function renderChatHistory() {
+  if (!pinnedChatsList || !recentChatsList) return;
   pinnedChatsList.innerHTML = '';
   recentChatsList.innerHTML = '';
 
@@ -175,10 +186,12 @@ export function renderChatHistory() {
     }
   });
 
-  (document.getElementById('pinned-chats') as HTMLElement).style.display = pinnedChatsList.children.length > 0 ? 'block' : 'none';
+  const pinnedContainer = document.getElementById('pinned-chats');
+  if (pinnedContainer) pinnedContainer.style.display = pinnedChatsList.children.length > 0 ? 'block' : 'none';
 }
 
 export function openChatOptionsMenu(sessionId: string, buttonEl: HTMLElement) {
+  if (!chatOptionsMenu) return;
   if (chatOptionsMenu.style.display === 'block' && chatOptionsMenu.dataset.sessionId === sessionId) {
     closeChatOptionsMenu();
     return;
@@ -204,11 +217,13 @@ export function openChatOptionsMenu(sessionId: string, buttonEl: HTMLElement) {
 }
 
 export function closeChatOptionsMenu() {
+  if (!chatOptionsMenu) return;
   chatOptionsMenu.style.display = 'none';
   chatOptionsMenu.removeAttribute('data-session-id');
 }
 
 export function renderMessages(messages: Message[], container: HTMLElement = chatContainer) {
+  if (!container) return;
   container.innerHTML = '';
   messages.forEach(msg => {
     if (!msg.hidden) {
@@ -218,6 +233,8 @@ export function renderMessages(messages: Message[], container: HTMLElement = cha
 }
 
 export function appendMessage(message: Message, container: HTMLElement = chatContainer) {
+  if (!container) return document.createElement('div'); // dummy return if container missing
+
   if (message.sender === 'user') {
     const messageElement = document.createElement('div');
     messageElement.classList.add('message', 'user');
@@ -238,9 +255,8 @@ export function appendMessage(message: Message, container: HTMLElement = chatCon
     msgContainer.appendChild(messageElement);
 
     if (message.sender === 'model' && message.text && container === chatContainer) {
-      const ttsControls = ttsTemplate.content.cloneNode(true) as DocumentFragment;
-      // Event listener for this will be in features.ts, attached by the main controller
-      msgContainer.appendChild(ttsControls);
+      const ttsControls = ttsTemplate?.content.cloneNode(true) as DocumentFragment;
+      if (ttsControls) msgContainer.appendChild(ttsControls);
     }
     container.appendChild(msgContainer);
   }
@@ -253,8 +269,10 @@ export function appendFileProcessingMessage(fileName: string): HTMLElement {
   const messageElement = document.createElement('div');
   messageElement.classList.add('message', 'system-file', 'loading');
   messageElement.innerHTML = `<span>Processing <strong>${fileName}</strong>...</span>`;
-  chatContainer.appendChild(messageElement);
-  chatContainer.scrollTop = chatContainer.scrollHeight;
+  if (chatContainer) {
+      chatContainer.appendChild(messageElement);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+  }
   return messageElement;
 }
 
@@ -278,7 +296,6 @@ export function renderQuickStartChoices(characters: CharacterSheetData[]) {
   const choiceMessage: Message = { sender: 'model', text: choiceHtml };
   appendMessage(choiceMessage);
   currentSession.messages.push(choiceMessage);
-  // save handled by controller
 }
 
 export function renderSetupChoices() {
@@ -330,6 +347,7 @@ export function renderSetupChoices() {
 }
 
 export function renderCharacterSheet(data: CharacterSheetData) {
+  if (!characterSheetDisplay) return;
   characterSheetDisplay.innerHTML = `
       <header class="sheet-header">
           <div><h3 class="sheet-char-name">${data.name || 'Character Name'}</h3></div>
@@ -370,6 +388,7 @@ export function renderCharacterSheet(data: CharacterSheetData) {
 }
 
 export function renderAchievements(achievements: Achievement[]) {
+  if (!achievementsDisplay) return;
   if (!achievements || achievements.length === 0) {
     achievementsDisplay.innerHTML = `<div class="sheet-placeholder"><p>No achievements unlocked yet. Go make your mark on the world!</p></div>`;
     return;
@@ -392,44 +411,50 @@ export function renderAchievements(achievements: Achievement[]) {
 export function updateLogbook(session: ChatSession | undefined) {
   if (!session) return;
 
-  if (typeof session.characterSheet === 'object' && session.characterSheet !== null) {
-    renderCharacterSheet(session.characterSheet as CharacterSheetData);
-  } else if (typeof session.characterSheet === 'string') {
-    characterSheetDisplay.innerHTML = `<div class="sheet-placeholder"><p>${session.characterSheet}</p></div>`;
-  } else {
-    characterSheetDisplay.innerHTML = `<div class="sheet-placeholder"><p>No data. Click below to generate your character sheet from the adventure log.</p></div>`;
+  if (characterSheetDisplay) {
+      if (typeof session.characterSheet === 'object' && session.characterSheet !== null) {
+        renderCharacterSheet(session.characterSheet as CharacterSheetData);
+      } else if (typeof session.characterSheet === 'string') {
+        characterSheetDisplay.innerHTML = `<div class="sheet-placeholder"><p>${session.characterSheet}</p></div>`;
+      } else {
+        characterSheetDisplay.innerHTML = `<div class="sheet-placeholder"><p>No data. Click below to generate your character sheet from the adventure log.</p></div>`;
+      }
   }
 
-  inventoryDisplay.textContent = session.inventory || "No data. Ask the DM to summarize your inventory.";
-  questsDisplay.textContent = session.questLog || "No quest data. Ask the DM to update your journal.";
+  if (inventoryDisplay) inventoryDisplay.textContent = session.inventory || "No data. Ask the DM to summarize your inventory.";
+  if (questsDisplay) questsDisplay.textContent = session.questLog || "No quest data. Ask the DM to update your journal.";
   
-  if (session.npcList && session.npcList.length > 0) {
-    npcsDisplay.innerHTML = session.npcList.map(npc => `
-        <div class="npc-log-entry">
-            <h4>${npc.name}</h4>
-            <p><strong>Description:</strong> ${npc.description}</p>
-            <p><strong>Relationship:</strong> ${npc.relationship}</p>
-        </div>
-    `).join('');
-  } else {
-      npcsDisplay.innerHTML = "<p>No NPC data. Ask the DM for a list of characters you've met.</p>";
+  if (npcsDisplay) {
+      if (session.npcList && session.npcList.length > 0) {
+        npcsDisplay.innerHTML = session.npcList.map(npc => `
+            <div class="npc-log-entry">
+                <h4>${npc.name}</h4>
+                <p><strong>Description:</strong> ${npc.description}</p>
+                <p><strong>Relationship:</strong> ${npc.relationship}</p>
+            </div>
+        `).join('');
+      } else {
+          npcsDisplay.innerHTML = "<p>No NPC data. Ask the DM for a list of characters you've met.</p>";
+      }
   }
-
 
   renderAchievements(session.achievements || []);
 
-  if (session.characterImageUrl) {
-    characterImageDisplay.src = session.characterImageUrl;
-    characterImageDisplay.classList.remove('hidden');
-    characterImagePlaceholder.classList.add('hidden');
-  } else {
-    characterImageDisplay.src = '';
-    characterImageDisplay.classList.add('hidden');
-    characterImagePlaceholder.classList.remove('hidden');
+  if (characterImageDisplay && characterImagePlaceholder) {
+      if (session.characterImageUrl) {
+        characterImageDisplay.src = session.characterImageUrl;
+        characterImageDisplay.classList.remove('hidden');
+        characterImagePlaceholder.classList.add('hidden');
+      } else {
+        characterImageDisplay.src = '';
+        characterImageDisplay.classList.add('hidden');
+        characterImagePlaceholder.classList.remove('hidden');
+      }
   }
 }
 
 export function renderUserContext(userContext: string[]) {
+    if (!contextList) return;
     contextList.innerHTML = '';
     userContext.forEach((item, index) => {
         const li = document.createElement('li');
@@ -445,6 +470,8 @@ export function renderUserContext(userContext: string[]) {
 }
 
 export function updateCombatTracker(enemies: { name: string, status: string }[]) {
+  if (!combatTracker || !combatEnemyList) return;
+  
   if (!enemies || enemies.length === 0) {
     combatTracker.classList.add('hidden');
     combatTracker.classList.remove('expanded');

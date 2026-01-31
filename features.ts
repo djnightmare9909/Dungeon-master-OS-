@@ -1,10 +1,9 @@
 
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import { Type } from '@google/genai';
+import { Type, GenerateContentResponse } from '@google/genai';
 import {
   isGeneratingData,
   setGeneratingData,
@@ -13,7 +12,8 @@ import {
   getUserContext,
   saveUserContextToDB,
   getChatHistory,
-  dbSet
+  dbSet,
+  getUISettings
 } from './state';
 import {
   updateSheetBtn,
@@ -35,11 +35,16 @@ import {
   diceTotalValue,
   diceGrid,
   themeGrid,
-  contextList
+  contextList,
+  renderCharacterSheet, 
+  renderAchievements, 
+  renderUserContext, 
+  updateLogbook,
+  appendMessage
 } from './ui';
-import { renderCharacterSheet, renderAchievements, renderUserContext, updateLogbook } from './ui';
-import { ai } from './gemini';
-import type { CharacterSheetData, Achievement, NPCState } from './types';
+import { ai, generateEmbedding } from './gemini';
+import { calculateCosineSimilarity, retryOperation } from './utils';
+import type { CharacterSheetData, Achievement, NPCState, SemanticNode } from './types';
 
 // =================================================================================
 // TTS (Re-architected for stability)
@@ -67,7 +72,9 @@ function getAvailableVoices(): Promise<SpeechSynthesisVoice[]> {
             if (speechSynthesis.getVoices().length > 0) {
               resolve(speechSynthesis.getVoices());
             } else {
-              reject(new Error('Speech synthesis voice loading timed out.'));
+              // Fallback: resolve with empty array rather than rejecting, 
+              // so the app doesn't crash if TTS isn't supported/ready.
+              resolve([]);
             }
         }, 2000);
 
@@ -203,573 +210,646 @@ function chunkText(text: string, maxLength = 180): string[] {
                 chunks.push(currentChunk);
                 currentChunk = word;
             } else {
-                currentChunk += (currentChunk ? ' ' : '') + word;
+                currentChunk = (currentChunk + ' ' + word).trim();
             }
         }
-        if (currentChunk) {
-            chunks.push(currentChunk);
-        }
+        if (currentChunk.length > 0) chunks.push(currentChunk);
     }
-    return chunks.filter(c => c.length > 0);
+    return chunks;
 }
 
 /**
- * Main entry point for TTS requests. Manages the state machine.
+ * Main entry point for the TTS button click.
  */
-export async function handleTTS(rawHtml: string, button: HTMLButtonElement) {
-    if (button === ttsCurrentButton) {
+export async function handleTTS(htmlContent: string, button: HTMLButtonElement) {
+    const currentGeneration = ttsGeneration;
+
+    // If clicking the same button that is currently active
+    if (ttsCurrentButton === button) {
         if (ttsState === 'PLAYING') {
             speechSynthesis.pause();
             ttsState = 'PAUSED';
+            updateTTS_UI();
         } else if (ttsState === 'PAUSED') {
             speechSynthesis.resume();
             ttsState = 'PLAYING';
+            updateTTS_UI();
         }
-        updateTTS_UI();
         return;
     }
 
-    stopTTS(); // This performs a full, clean reset and increments the generation.
-
-    const currentGeneration = ttsGeneration; // Capture the new, valid generation.
-    ttsCurrentButton = button;
+    // If clicking a new button, stop everything first.
+    stopTTS();
     
-    const plainText = new DOMParser().parseFromString(rawHtml, 'text/html').body.textContent || '';
-    if (!plainText.trim()) {
-        stopTTS();
-        return;
-    }
+    // Update the generation after stopTTS increments it, to ensure we own this sequence.
+    // Wait, stopTTS increments generation. So the generation we captured at the start is now old.
+    // We need to capture the NEW generation ID.
+    const myGeneration = ttsGeneration; 
+
+    ttsCurrentButton = button;
+    // Strip HTML tags for speech
+    const text = htmlContent.replace(/<[^>]*>/g, '');
+    const chunks = chunkText(text);
 
     try {
-        await getAvailableVoices();
+        const voices = await getAvailableVoices();
+        // Prefer a female voice, or Google US English, or default
+        const voice = voices.find(v => v.name.includes('Google US English') || v.name.includes('Female')) || voices[0];
+
+        ttsQueue = chunks.map(chunk => {
+            const u = new SpeechSynthesisUtterance(chunk);
+            if (voice) u.voice = voice;
+            u.rate = 1.0;
+            u.pitch = 1.0;
+            u.onend = () => handleUtteranceEnd(myGeneration);
+            u.onerror = (e) => {
+                console.error("TTS Error", e);
+                // Only stop if it wasn't a cancel event
+                if (e.error !== 'canceled' && e.error !== 'interrupted') {
+                    stopTTS();
+                }
+            };
+            return u;
+        });
+
+        playQueue(myGeneration);
+
     } catch (e) {
-        console.error("Could not load speech synthesis voices.", e);
+        console.error("Failed to initialize TTS", e);
         stopTTS();
-        return;
     }
-    
-    const chunks = chunkText(plainText);
-    if (chunks.length === 0) {
-        stopTTS();
-        return;
-    }
-
-    ttsQueue = chunks.map(chunk => {
-        const utterance = new SpeechSynthesisUtterance(chunk);
-        const defaultVoice = ttsVoices.find(v => v.default) || ttsVoices[0];
-        if (defaultVoice) {
-            utterance.voice = defaultVoice;
-        } else {
-            console.warn("No speech synthesis voices found to assign.");
-        }
-        
-        utterance.onend = () => handleUtteranceEnd(currentGeneration); // Pass generation to handler
-        
-        utterance.onerror = (e) => {
-            // Abort if this error is from a stale, cancelled playback.
-            if (currentGeneration !== ttsGeneration) return;
-            
-            if (e.error !== 'canceled') {
-                console.error("Speech Synthesis Error:", e.error);
-            }
-            // Still try to continue to the next chunk even if one fails.
-            handleUtteranceEnd(currentGeneration);
-        };
-        return utterance;
-    });
-    
-    ttsCurrentUtteranceIndex = 0;
-    playQueue(currentGeneration);
-}
-
-// =================================================================================
-// USER CONTEXT
-// =================================================================================
-
-export function addUserContext(text: string) {
-  getUserContext().push(text);
-  saveUserContextToDB();
-  renderUserContext(getUserContext());
-}
-
-export function deleteUserContext(index: number) {
-  getUserContext().splice(index, 1);
-  saveUserContextToDB();
-  renderUserContext(getUserContext());
 }
 
 // =================================================================================
 // DICE ROLLER
 // =================================================================================
-const DICE_TYPES = [
-  { name: 'd4', sides: 4 }, { name: 'd6', sides: 6 }, { name: 'd8', sides: 8 },
-  { name: 'd10', sides: 10 }, { name: 'd12', sides: 12 }, { name: 'd20', sides: 20 },
-  { name: 'd100', sides: 100 },
-];
-const SQUARE_SVG_DATA = {
-  viewBox: '0 0 100 100',
-  paths: [
-    { d: 'M50 20 L85 37.5 L50 55 L15 37.5 Z', fill: '#585858' },
-    { d: 'M15 37.5 L15 72.5 L50 90 L50 55 Z', fill: '#3c3c3c' },
-    { d: 'M85 37.5 L85 72.5 L50 90 L50 55 Z', fill: '#4a4a4a' }
-  ],
-  textY: '55%',
-};
-const DICE_SVG_DATA = { 'd4': SQUARE_SVG_DATA, 'd6': SQUARE_SVG_DATA, 'd8': SQUARE_SVG_DATA, 'd10': SQUARE_SVG_DATA, 'd12': SQUARE_SVG_DATA, 'd20': SQUARE_SVG_DATA, 'd100': SQUARE_SVG_DATA };
 
 export function renderDiceGrid() {
-  diceGrid.innerHTML = '';
-  DICE_TYPES.forEach(die => {
-    const dieItem = document.createElement('div');
-    dieItem.className = 'die-item';
-    dieItem.dataset.sides = die.sides.toString();
-    dieItem.dataset.name = die.name;
-    const dieData = DICE_SVG_DATA[die.name as keyof typeof DICE_SVG_DATA];
-    dieItem.innerHTML = `
-        <div class="die-visual" role="button" aria-label="Roll ${die.name}">
-            <svg viewBox="${dieData.viewBox}">
-                ${dieData.paths.map(p => `<path d="${p.d}" fill="${p.fill}"></path>`).join('')}
-                <text x="50%" y="${dieData.textY}" class="die-text">${die.name}</text>
-            </svg>
-        </div>
-        <div class="quantity-control">
-            <button class="quantity-btn minus" aria-label="Decrease quantity">-</button>
-            <input type="number" class="quantity-input" value="1" min="1" max="99" aria-label="Number of dice">
-            <button class="quantity-btn plus" aria-label="Increase quantity">+</button>
-        </div>`;
-    diceGrid.appendChild(dieItem);
-  });
+  const diceTypes = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100'];
+  diceGrid.innerHTML = diceTypes.map(die => `
+    <div class="die-item" data-die="${die}">
+      <div class="die-visual ${die}">${die.substring(1)}</div>
+      <div class="die-controls">
+        <button class="minus">-</button>
+        <input type="number" class="quantity-input" value="1" min="1" max="99">
+        <button class="plus">+</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+export function rollDice(expression: string): { success: boolean; resultText: string; total: number } {
+  try {
+    // Basic parsing for "d20", "2d6", "1d8+2"
+    const match = expression.match(/(\d*)d(\d+)(?:\s*([+-])\s*(\d+))?/i);
+    if (!match) return { success: false, resultText: '', total: 0 };
+
+    const count = parseInt(match[1] || '1', 10);
+    const sides = parseInt(match[2], 10);
+    const op = match[3];
+    const modifier = parseInt(match[4] || '0', 10);
+
+    if (count > 100) return { success: false, resultText: 'Too many dice!', total: 0 };
+
+    let rolls = [];
+    let subTotal = 0;
+    for (let i = 0; i < count; i++) {
+      const roll = Math.floor(Math.random() * sides) + 1;
+      rolls.push(roll);
+      subTotal += roll;
+    }
+
+    let total = subTotal;
+    if (op === '+') total += modifier;
+    if (op === '-') total -= modifier;
+
+    const rollStr = `[${rolls.join(', ')}]`;
+    const modStr = modifier > 0 ? ` ${op} ${modifier}` : '';
+    const resultText = `Rolled ${count}d${sides}${modStr}: **${total}** ${rollStr}`;
+
+    return { success: true, resultText, total };
+  } catch (e) {
+    return { success: false, resultText: '', total: 0 };
+  }
 }
 
 export function handleDieRoll(dieItem: HTMLElement) {
-  const sides = parseInt(dieItem.dataset.sides || '0', 10);
-  const name = dieItem.dataset.name || 'die';
+  const dieType = dieItem.dataset.die; // e.g., "d20"
   const quantityInput = dieItem.querySelector('.quantity-input') as HTMLInputElement;
-  const count = parseInt(quantityInput.value, 10);
+  const quantity = parseInt(quantityInput.value, 10) || 1;
 
-  if (sides === 0 || count <= 0) return;
+  const visual = dieItem.querySelector('.die-visual');
+  visual?.classList.add('rolling');
+  setTimeout(() => visual?.classList.remove('rolling'), 500);
 
-  const visual = dieItem.querySelector('.die-visual') as HTMLElement;
-  visual.classList.add('rolling');
-  visual.addEventListener('animationend', () => visual.classList.remove('rolling'), { once: true });
+  const command = `${quantity}${dieType}`; // e.g. "2d20"
+  const { success, resultText, total } = rollDice(command);
 
-  let rolls = [];
-  let total = 0;
-  for (let i = 0; i < count; i++) {
-    const roll = Math.floor(Math.random() * sides) + 1;
-    rolls.push(roll);
-    total += roll;
+  if (success) {
+    const p = document.createElement('p');
+    p.innerHTML = resultText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    diceResultsLog.prepend(p);
+    
+    // Update running total
+    const currentTotal = parseInt(diceTotalValue.textContent || '0', 10);
+    diceTotalValue.textContent = String(currentTotal + total);
   }
-
-  const resultElement = document.createElement('p');
-  resultElement.innerHTML = `<strong>${count}${name}:</strong> [${rolls.join(', ')}] = <strong>${total}</strong>`;
-  resultElement.dataset.total = total.toString();
-  diceResultsLog.appendChild(resultElement);
-  diceResultsLog.scrollTop = diceResultsLog.scrollHeight;
-  updateDiceTotal();
-}
-
-export function updateDiceTotal() {
-  let grandTotal = 0;
-  diceResultsLog.querySelectorAll('p').forEach(p => {
-    grandTotal += parseInt(p.dataset.total || '0', 10);
-  });
-  diceTotalValue.textContent = grandTotal.toString();
 }
 
 export function clearDiceResults() {
-  diceResultsLog.innerHTML = '';
-  updateDiceTotal();
+    diceResultsLog.innerHTML = '';
+    diceTotalValue.textContent = '0';
 }
 
-export function rollDice(command: string): { success: boolean; resultText: string } {
-  const regex = /(?:roll|r)\s+(\d+)d(\d+)(?:\s*([+-])\s*(\d+))?/i;
-  const match = command.match(regex);
-  if (!match) return { success: false, resultText: '' };
-
-  const [, numDiceStr, numSidesStr, operator, modifierStr] = match;
-  const numDice = parseInt(numDiceStr, 10);
-  const numSides = parseInt(numSidesStr, 10);
-  const modifier = parseInt(modifierStr, 10) || 0;
-
-  if (numDice <= 0 || numSides <= 0 || numDice > 100 || numSides > 1000) {
-    return { success: true, resultText: 'Invalid dice roll parameters.' };
-  }
-
-  const rolls = Array.from({ length: numDice }, () => Math.floor(Math.random() * numSides) + 1);
-  const sum = rolls.reduce((a, b) => a + b, 0);
-  let total = sum;
-  let resultText = `Rolling ${numDice}d${numSides}`;
-
-  if (operator && modifier) {
-    resultText += ` ${operator} ${modifier}`;
-    total = operator === '+' ? sum + modifier : sum - modifier;
-  }
-  resultText += `: [${rolls.join(', ')}]`;
-  if (operator && modifier) {
-    resultText += ` ${operator} ${modifier}`;
-  }
-  resultText += ` = <strong>${total}</strong>`;
-
-  return { success: true, resultText };
-}
-
-
 // =================================================================================
-// LOG BOOK
+// LOGBOOK & DATA GENERATION
 // =================================================================================
-export async function updateLogbookData(type: 'sheet' | 'inventory' | 'quests' | 'npcs' | 'achievements') {
-  const currentSession = getCurrentChat();
-  if (!currentSession || isGeneratingData()) return;
-  setGeneratingData(true);
 
-  // Use the last 30 messages for context to prevent overly long prompts
-  const recentMessages = currentSession.messages.slice(-30);
-  const conversationHistory = recentMessages.map(m => `${m.sender === 'user' ? 'Player' : 'DM'}: ${m.text}`).join('\n');
+async function generateLogbookSection(section: 'sheet' | 'inventory' | 'quests' | 'npcs' | 'achievements') {
+  const session = getCurrentChat();
+  if (!session) return;
 
-  if (type === 'sheet' || type === 'achievements') {
-    const isSheet = type === 'sheet';
-    const button = isSheet ? updateSheetBtn : updateAchievementsBtn;
-    const display = isSheet ? characterSheetDisplay : achievementsDisplay;
-    const originalText = button.textContent;
-    button.disabled = true;
-    button.textContent = 'Generating...';
-    display.innerHTML = `<div class="sheet-placeholder"><p>The DM is reviewing your adventure to update your ${isSheet ? 'character sheet' : 'achievements'}...</p><div class="spinner"></div></div>`;
+  // Construct a history string for context
+  const historyText = session.messages
+    .filter(m => !m.hidden && m.sender !== 'error' && m.sender !== 'system')
+    .slice(-20) // Look at last 20 messages for context
+    .map(m => `${m.sender.toUpperCase()}: ${m.text}`)
+    .join('\n');
 
-    try {
-      const prompt = isSheet
-        ? `Based on the D&D conversation history, extract the player character's information and return it as a JSON object. Conversation: ${conversationHistory}`
-        : `Analyze the following D&D conversation history and generate a list of 3-5 creative, context-specific "achievements" based on the player's unique actions, decisions, or significant moments. Each achievement should have a cool, thematic name and a short description of how it was earned. Return this as a JSON array. History: ${conversationHistory}`;
+  let prompt = '';
+  let schema: any = null;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: isSheet
-            ? { type: Type.OBJECT, properties: { name: { type: Type.STRING }, race: { type: Type.STRING }, class: { type: Type.STRING }, level: { type: Type.INTEGER }, abilityScores: { type: Type.OBJECT, properties: { STR: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } }, DEX: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } }, CON: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } }, INT: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } }, WIS: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } }, CHA: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } }, } }, armorClass: { type: Type.INTEGER }, hitPoints: { type: Type.OBJECT, properties: { current: { type: Type.INTEGER }, max: { type: Type.INTEGER } } }, speed: { type: Type.STRING }, skills: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, proficient: { type: Type.BOOLEAN } } } }, featuresAndTraits: { type: Type.ARRAY, items: { type: Type.STRING } } } }
-            : { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, description: { type: Type.STRING } } } }
-        }
-      });
-
-      const jsonData = JSON.parse(response.text);
-      if (isSheet) {
-        currentSession.characterSheet = jsonData as CharacterSheetData;
-        renderCharacterSheet(jsonData as CharacterSheetData);
-      } else {
-        currentSession.achievements = jsonData as Achievement[];
-        renderAchievements(jsonData as Achievement[]);
-      }
-      saveChatHistoryToDB();
-    } catch (error) {
-        console.error(`${type} generation failed:`, error);
-        let errorMessage = `Failed to generate ${type} data. Please try again.`;
-        if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
-            errorMessage = `Failed to generate data: API Key is missing or invalid.`;
-        }
-        display.innerHTML = `<div class="sheet-placeholder"><p>${errorMessage}</p></div>`;
-    } finally {
-      button.disabled = false;
-      button.textContent = originalText;
-      setGeneratingData(false);
-    }
-    return;
-  }
-  
-  if (type === 'npcs') {
-    const button = updateNpcsBtn;
-    const display = npcsDisplay;
-    const originalText = button.textContent;
-    button.disabled = true;
-    button.textContent = 'Generating...';
-    display.innerHTML = `<div class="sheet-placeholder"><p>The DM is recalling the characters you've met...</p><div class="spinner"></div></div>`;
-    
-    try {
-        const prompt = `Based on the following D&D conversation history, provide a list of significant Non-Player Characters (NPCs) the party has met. For each NPC, describe their current relationship with the party (e.g., Ally, Hostile, Neutral, Complicated) based on the history of interactions. Return this as a JSON array. History: ${conversationHistory}`;
-        
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.ARRAY,
-                    items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            name: { type: Type.STRING },
-                            description: { type: Type.STRING },
-                            relationship: { type: Type.STRING }
-                        }
-                    }
-                }
+  switch (section) {
+    case 'sheet':
+      prompt = `Based on the following chat history, generate a JSON object representing the user's character sheet (D&D 5e). Fill in as much detail as possible from context. If unknown, use defaults.
+      History:
+      ${historyText}`;
+      schema = {
+        type: Type.OBJECT,
+        properties: {
+          name: { type: Type.STRING },
+          race: { type: Type.STRING },
+          class: { type: Type.STRING },
+          level: { type: Type.INTEGER },
+          abilityScores: {
+            type: Type.OBJECT,
+            properties: {
+              STR: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } },
+              DEX: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } },
+              CON: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } },
+              INT: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } },
+              WIS: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } },
+              CHA: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, modifier: { type: Type.STRING } } }
             }
-        });
-        
-        const jsonData = JSON.parse(response.text);
-        currentSession.npcList = jsonData as NPCState[];
-        updateLogbook(currentSession); // This will call the updated render function in ui.ts
-        saveChatHistoryToDB();
-    } catch (error) {
-        console.error("NPC list generation failed:", error);
-        let errorMessage = 'Failed to generate NPC data. Please try again.';
-        if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
-            errorMessage = `Failed to generate data: API Key is missing or invalid.`;
+          },
+          armorClass: { type: Type.INTEGER },
+          hitPoints: { type: Type.OBJECT, properties: { current: { type: Type.INTEGER }, max: { type: Type.INTEGER } } },
+          speed: { type: Type.STRING },
+          skills: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, proficient: { type: Type.BOOLEAN } } } },
+          featuresAndTraits: { type: Type.ARRAY, items: { type: Type.STRING } }
         }
-        display.innerHTML = `<div class="sheet-placeholder"><p>${errorMessage}</p></div>`;
-    } finally {
-        button.disabled = false;
-        button.textContent = originalText;
-        setGeneratingData(false);
-    }
-    return;
+      };
+      break;
+    case 'inventory':
+      prompt = `Based on the chat history, list the character's inventory as a simple text list. Include quantities. History: ${historyText}`;
+      break;
+    case 'quests':
+      prompt = `Based on the chat history, write a concise quest journal. List active quests and their current status. History: ${historyText}`;
+      break;
+    case 'npcs':
+      prompt = `Identify the key NPCs met in the recent history. Return a JSON array.
+      History: ${historyText}`;
+      schema = {
+          type: Type.ARRAY,
+          items: {
+              type: Type.OBJECT,
+              properties: {
+                  name: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                  relationship: { type: Type.STRING, description: "Friendly, Hostile, Neutral, etc." }
+              }
+          }
+      };
+      break;
+    case 'achievements':
+      prompt = `Generate a list of 3-5 'achievements' or milestones the player has recently accomplished based on the history. Be creative. JSON format. History: ${historyText}`;
+      schema = {
+          type: Type.ARRAY,
+          items: {
+              type: Type.OBJECT,
+              properties: {
+                  name: { type: Type.STRING },
+                  description: { type: Type.STRING }
+              }
+          }
+      };
+      break;
   }
-
-
-  const { button, display, promptClause } = {
-    inventory: { button: updateInventoryBtn, display: inventoryDisplay, promptClause: "inventory" },
-    quests: { button: updateQuestsBtn, display: questsDisplay, promptClause: "quest journal, separating active and completed quests" },
-  }[type];
-
-  const originalText = button.textContent;
-  button.disabled = true;
-  button.textContent = 'Generating...';
-  display.textContent = 'The DM is consulting their notes...';
 
   try {
-    const prompt = `Based on the following D&D conversation history, provide a concise summary of the player character's current ${promptClause}. Format the output clearly with headings and bullet points where appropriate. Conversation History: ${conversationHistory}`;
+    const response = await retryOperation(() => ai.models.generateContent({
+      model: getUISettings().activeModel,
+      contents: prompt,
+      config: {
+        responseMimeType: schema ? 'application/json' : 'text/plain',
+        responseSchema: schema,
+      }
+    })) as GenerateContentResponse;
 
-    const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
-    const dataText = response.text;
+    const text = response.text || '';
 
-    if (type === 'inventory') currentSession.inventory = dataText;
-    else if (type === 'quests') currentSession.questLog = dataText;
-
-    display.textContent = dataText;
-    saveChatHistoryToDB();
-  } catch (error) {
-    console.error(`${type} generation failed:`, error);
-    let errorMessage = `Failed to generate ${type}. Please try again.`;
-    if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
-        errorMessage = `Failed to generate data: API Key is missing or invalid.`;
+    if (section === 'sheet') {
+      session.characterSheet = JSON.parse(text) as CharacterSheetData;
+    } else if (section === 'inventory') {
+      session.inventory = text;
+    } else if (section === 'quests') {
+      session.questLog = text;
+    } else if (section === 'npcs') {
+        session.npcList = JSON.parse(text) as NPCState[];
+    } else if (section === 'achievements') {
+      session.achievements = JSON.parse(text) as Achievement[];
     }
-    display.textContent = errorMessage;
+
+    saveChatHistoryToDB();
+    updateLogbook(session);
+
+  } catch (error) {
+    console.error(`Failed to update ${section}:`, error);
+    alert(`Failed to update ${section}. API Error.`);
+  }
+}
+
+export async function updateLogbookData(section: 'sheet' | 'inventory' | 'quests' | 'npcs' | 'achievements') {
+  if (isGeneratingData()) return;
+  setGeneratingData(true);
+
+  const btnMap = {
+    sheet: updateSheetBtn,
+    inventory: updateInventoryBtn,
+    quests: updateQuestsBtn,
+    npcs: updateNpcsBtn,
+    achievements: updateAchievementsBtn
+  };
+  const btn = btnMap[section];
+  const originalText = btn.textContent;
+  btn.textContent = 'Updating...';
+  btn.disabled = true;
+
+  try {
+    await generateLogbookSection(section);
   } finally {
-    button.disabled = false;
-    button.textContent = originalText;
+    btn.textContent = 'Updated!';
+    setTimeout(() => {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }, 2000);
     setGeneratingData(false);
   }
 }
 
 export async function generateCharacterImage() {
-  const currentSession = getCurrentChat();
-  if (!currentSession || isGeneratingData()) return;
+    const session = getCurrentChat();
+    if (!session || isGeneratingData()) return;
+    
+    setGeneratingData(true);
+    generateImageBtn.disabled = true;
+    characterImagePlaceholder.classList.add('hidden');
+    characterImageDisplay.classList.add('hidden');
+    characterImageLoading.classList.remove('hidden');
 
-  setGeneratingData(true);
-  generateImageBtn.disabled = true;
-  characterImagePlaceholder.classList.add('hidden');
-  characterImageLoading.classList.remove('hidden');
-
-  try {
-    const recentMessages = currentSession.messages.slice(-30);
-    const conversationHistory = recentMessages.map(m => `${m.sender === 'user' ? 'Player' : 'DM'}: ${m.text}`).join('\n');
-    const descriptionPrompt = `Based on the following D&D conversation, create a detailed visual description of the player character suitable for an AI image generator. Focus on physical appearance, race, class, clothing, equipment, and overall mood. Make it a rich, comma-separated list of keywords. Example: "elf ranger, long silver hair, green cloak, leather armor, holding a bow, standing in a dark forest, fantasy art, detailed". Conversation: ${conversationHistory}`;
-    const descriptionResponse = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: descriptionPrompt });
-    const imagePrompt = descriptionResponse.text;
-
-    if (!imagePrompt || imagePrompt.trim() === '') throw new Error("The AI failed to create a visual description for the image generator.");
-
-    const loadingParagraph = characterImageLoading.querySelector('p');
-    if (loadingParagraph) loadingParagraph.textContent = 'Image prompt created. Generating portrait...';
-
-    const imageResponse = await ai.models.generateImages({
-      model: 'imagen-4.0-generate-001',
-      prompt: imagePrompt,
-      config: { numberOfImages: 1, outputMimeType: 'image/png', aspectRatio: '3:4' }
-    });
-    const base64Image = imageResponse.generatedImages[0].image.imageBytes;
-    const imageUrl = `data:image/png;base64,${base64Image}`;
-
-    currentSession.characterImageUrl = imageUrl;
-    characterImageDisplay.src = imageUrl;
-    characterImageDisplay.classList.remove('hidden');
-    saveChatHistoryToDB();
-  } catch (error) {
-    console.error("Image generation failed:", error);
-    characterImagePlaceholder.classList.remove('hidden');
-    const placeholderParagraph = characterImagePlaceholder.querySelector('p');
-    if (placeholderParagraph) {
-        let errorMessage = 'Image generation failed. Please try again.';
-        if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
-            errorMessage = 'Image generation failed: API Key is missing or invalid.';
+    try {
+        // 1. Generate a prompt for the image
+        let description = "";
+        if (typeof session.characterSheet === 'object' && session.characterSheet) {
+            const s = session.characterSheet;
+            description = `A ${s.race} ${s.class}, level ${s.level}. Features: ${s.featuresAndTraits?.slice(0,3).join(', ')}.`;
+        } else {
+            description = "A D&D adventurer.";
         }
-        placeholderParagraph.textContent = errorMessage;
+
+        const promptResponse = await retryOperation(() => ai.models.generateContent({
+            model: getUISettings().activeModel,
+            contents: `Create a detailed visual description for an image generation model of this character: ${description}. The style should be digital fantasy art, detailed, dramatic lighting. Output ONLY the description.`,
+        })) as GenerateContentResponse;
+        
+        const imagePrompt = promptResponse.text || description;
+
+        // 2. Generate the Image using Imagen
+        // Use 'any' as the response type for generateImages isn't explicitly imported
+        const imageResponse = await retryOperation(() => ai.models.generateImages({
+            model: 'imagen-4.0-generate-001', // Explicitly use Imagen
+            prompt: imagePrompt,
+            config: {
+                numberOfImages: 1,
+                aspectRatio: '1:1',
+                outputMimeType: 'image/jpeg'
+            }
+        })) as any;
+
+        const base64Image = imageResponse.generatedImages[0].image.imageBytes;
+        const imageUrl = `data:image/jpeg;base64,${base64Image}`;
+
+        session.characterImageUrl = imageUrl;
+        saveChatHistoryToDB();
+        updateLogbook(session);
+
+    } catch (error) {
+        console.error("Image generation failed:", error);
+        alert("Failed to generate image. Please try again.");
+        characterImagePlaceholder.classList.remove('hidden');
+    } finally {
+        characterImageLoading.classList.add('hidden');
+        generateImageBtn.disabled = false;
+        setGeneratingData(false);
     }
-  } finally {
-    setGeneratingData(false);
-    generateImageBtn.disabled = false;
-    characterImageLoading.classList.add('hidden');
-  }
 }
 
-// =================================================================================
-// INVENTORY POPUP
-// =================================================================================
 export async function fetchAndRenderInventoryPopup() {
-  const currentSession = getCurrentChat();
-  if (!currentSession || isGeneratingData()) return;
-  setGeneratingData(true);
-  inventoryPopupContent.innerHTML = `<div class="placeholder">Checking your pouches...</div>`;
+    const session = getCurrentChat();
+    if (!session) return;
+    
+    inventoryPopupContent.innerHTML = '<div class="placeholder">Checking bag...</div>';
+    
+    try {
+        // Reuse the existing inventory logic or fetch new structured data
+        // For the popup, we want a structured list if possible.
+        // If session.inventory is text, we might need to parse it or ask AI to structure it.
+        // To be fast, let's just ask AI for a quick JSON list.
+        
+        const historyText = session.messages
+            .slice(-20)
+            .map(m => `${m.sender}: ${m.text}`)
+            .join('\n');
 
-  try {
-    const recentMessages = currentSession.messages.slice(-30);
-    const conversationHistory = recentMessages.map(m => `${m.sender === 'user' ? 'Player' : 'DM'}: ${m.text}`).join('\n');
-    // Fix: Updated prompt to request JSON and added responseSchema for robust parsing.
-    const prompt = `Based on the following D&D conversation, list the player character's current inventory items as a JSON array of strings. Only include the item names. Example: ["Health Potion", "Rope (50ft)", "Dagger", "Gold (25gp)"]. Conversation History: ${conversationHistory}`;
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
-        },
-      },
-    });
-    const itemsText = response.text;
+        const response = await retryOperation(() => ai.models.generateContent({
+            model: 'gemini-2.5-flash', // Use Flash for speed in UI elements
+            contents: `Based on this history, list the character's inventory items as a JSON list of strings. Be concise. History: ${historyText}`,
+            config: {
+                responseMimeType: 'application/json',
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING }
+                }
+            }
+        })) as GenerateContentResponse;
+        
+        const items = JSON.parse(response.text || '[]');
+        
+        if (items.length === 0) {
+            inventoryPopupContent.innerHTML = '<div class="placeholder">Bag is empty.</div>';
+        } else {
+            inventoryPopupContent.innerHTML = `
+                <ul>
+                    ${items.map((item: string) => `
+                        <li>
+                            <span class="inventory-item-name">${item}</span>
+                            <button class="use-item-btn" data-item-name="${item.replace(/"/g, '&quot;')}">Use</button>
+                        </li>
+                    `).join('')}
+                </ul>
+            `;
+        }
 
-    if (!itemsText || itemsText.trim() === '') {
-      inventoryPopupContent.innerHTML = `<div class="placeholder">Your pockets are empty.</div>`;
-      setGeneratingData(false);
-      return;
+    } catch (error) {
+        console.error("Inventory fetch failed:", error);
+        inventoryPopupContent.innerHTML = `<div class="placeholder" style="color: var(--danger-color);">Failed to load inventory.</div>`;
     }
-
-    const items = JSON.parse(itemsText);
-    if (items.length > 0) {
-      const ul = document.createElement('ul');
-      items.forEach((item: string) => {
-        const li = document.createElement('li');
-        li.innerHTML = `<span class="inventory-item-name">${item}</span><button class="use-item-btn" data-item-name="${item}">Use</button>`;
-        ul.appendChild(li);
-      });
-      inventoryPopupContent.innerHTML = '';
-      inventoryPopupContent.appendChild(ul);
-    } else {
-      inventoryPopupContent.innerHTML = `<div class="placeholder">Your pockets are empty.</div>`;
-    }
-  } catch (error) {
-    console.error("Inventory fetch failed:", error);
-    let errorMessage = `Failed to get inventory.`;
-    if (error instanceof Error && (error.message.includes('API Key') || error.message.includes('API key'))) {
-        errorMessage = 'Failed to get inventory: API Key is missing or invalid.';
-    }
-    inventoryPopupContent.innerHTML = `<div class="placeholder">${errorMessage}</div>`;
-  } finally {
-    setGeneratingData(false);
-  }
 }
 
 // =================================================================================
-// UI THEMEING
+// WFGY-LITE: SEMANTIC MEMORY SYSTEM
 // =================================================================================
-const themes = [
-    { id: 'high-fantasy-dark', name: 'High Fantasy (Dark)', colors: ['#131314', '#1e1f20', '#2a3a4a', '#c5b358'] },
-    { id: 'high-fantasy-light', name: 'High Fantasy (Light)', colors: ['#fdf6e3', '#f5ead5', '#e9dbc2', '#8b4513'] },
-    { id: 'dark-fantasy-crimson', name: 'Dark Fantasy (Crimson)', colors: ['#0a0a0a', '#1f1f1f', '#4a0e1a', '#b71c1c'] },
-    { id: 'classic-rpg-parchment', name: 'Classic RPG (Parchment)', colors: ['#4d3c2a', '#3b2e21', '#6b543b', '#e5c100'] },
-    { id: 'cyberpunk-hud-advanced', name: 'Cyberpunk (Advanced HUD)', colors: ['#0d0221', '#140c2b', '#c72cff', '#00f0ff'] },
-    { id: 'cyberpunk-bladerunner', name: 'Cyberpunk (Bladerunner)', colors: ['#040a18', '#0b132b', '#1c2541', '#ff9900'] },
-    { id: 'glitch-terminal', name: 'Glitch (Terminal)', colors: ['#000000', '#111111', '#222222', '#ffffff'] },
-    { id: 'glitch-terminal-crt', name: 'Glitch (CRT)', colors: ['#000000', '#111111', '#555555', '#e0e0e0'] },
-    { id: 'hacker-terminal', name: 'Hacker (Terminal)', colors: ['#0d0d0d', '#001a00', '#003300', '#00ff00'] },
-    { id: 'hacker-terminal-glitch', name: 'Hacker (Glitch)', colors: ['#0d0d0d', '#001a00', '#003300', '#00ff00'] },
-    { id: 'hacker-terminal-amber', name: 'Hacker (Amber)', colors: ['#000000', '#1a0a00', '#331f00', '#ffb400'] },
-    { id: 'hacker-terminal-vault-tec', name: 'Hacker (Vault-Tec)', colors: ['#0a141f', '#0f1c2d', '#142a40', '#27bce0'] },
-    { id: 'vampire-gothic-terminal', name: 'Vampire (Gothic Terminal)', colors: ['#050101', '#1a0303', '#3b0f0f', '#ff4d4d'] },
-    { id: 'text-adventure-dark', name: 'Text Adventure (Dark)', colors: ['#000000', '#0a0a0a', '#111111', '#cccccc'] },
-    { id: 'outer-space-starship', name: 'Outer Space (Starship)', colors: ['#eef2f5', '#ffffff', '#d7dfe5', '#007bff'] },
-    { id: 'outer-space-alert', name: 'Outer Space (Alert)', colors: ['#3d0000', '#2e0000', '#5c0000', '#ff4444'] },
-    { id: 'pirate-sea', name: 'Pirates (High Seas)', colors: ['#f0e5d1', '#faeedb', '#e6d9c1', '#008b8b'] },
-    { id: 'steampunk', name: 'Steampunk', colors: ['#5a3e2b', '#3d2b1f', '#8c6742', '#d4ac0d'] },
-    { id: 'art-deco', name: 'Art Deco', colors: ['#0d2c2c', '#041f1f', '#1a4d4d', '#d4af37'] },
-    { id: 'solarpunk', name: 'Solarpunk', colors: ['#f0f5e6', '#ffffff', '#d9e6cc', '#ff9900'] },
-    { id: 'aquatic', name: 'Aquatic', colors: ['#0a1f3a', '#061528', '#1a3960', '#33d4ff'] },
-    { id: 'apocalyptic', name: 'Apocalyptic', colors: ['#3b3a35', '#2b2a26', '#4f4d48', '#a3955a'] },
-    { id: '8-bit-arcade', name: '8-Bit Arcade', colors: ['#000000', '#0d0d0d', '#2a004a', '#00ffff'] },
-    { id: 'celestial', name: 'Celestial', colors: ['#100f1a', '#191829', '#3c3a59', '#d8b8ff'] },
-];
 
-export function renderThemeCards() {
-  themeGrid.innerHTML = '';
-  themes.forEach(theme => {
-    const card = document.createElement('div');
-    card.className = 'theme-card';
-    card.dataset.theme = theme.id;
-    card.innerHTML = `
-        <div class="theme-preview">${theme.colors.map(color => `<span style="background-color: ${color};"></span>`).join('')}</div>
-        <div class="theme-name">${theme.name}</div>`;
-    themeGrid.appendChild(card);
-  });
+export async function commitToSemanticMemory(text: string, importance: number = 0.5) {
+    const session = getCurrentChat();
+    if (!session) return;
+    if (!session.semanticLog) session.semanticLog = [];
+
+    try {
+        // Rate limit protection: If embedding fails (e.g., 429), we just skip adding memory.
+        // This prevents the game from crashing due to background tasks.
+        const embedding = await generateEmbedding(text);
+        const node: SemanticNode = {
+            id: `mem-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            content: text,
+            embedding: embedding,
+            timestamp: Date.now(),
+            importance: importance
+        };
+        session.semanticLog.push(node);
+        saveChatHistoryToDB();
+        // console.log("Committed to Semantic Tree:", text.substring(0, 30) + "...");
+    } catch (e) {
+        console.warn("Failed to commit to semantic memory (skipped):", e);
+    }
 }
 
-export function applyTheme(themeId: string) {
-  document.body.dataset.theme = themeId;
-  dbSet('dm-os-theme', themeId);
+export async function recallRelevantMemories(query: string, topK: number = 3): Promise<string[]> {
+    const session = getCurrentChat();
+    if (!session || !session.semanticLog || session.semanticLog.length === 0) return [];
+
+    try {
+        const queryEmbedding = await generateEmbedding(query);
+        
+        // Calculate cosine similarity for all nodes
+        const scoredNodes = session.semanticLog.map(node => ({
+            content: node.content,
+            score: calculateCosineSimilarity(queryEmbedding, node.embedding) * (1 + node.importance * 0.1) // Weight by importance slightly
+        }));
+
+        // Sort descending
+        scoredNodes.sort((a, b) => b.score - a.score);
+
+        // Filter for reasonable relevance (e.g., > 0.4 similarity)
+        const relevant = scoredNodes
+            .filter(n => n.score > 0.45)
+            .slice(0, topK)
+            .map(n => n.content);
+            
+        return relevant;
+    } catch (e) {
+        console.warn("Memory recall failed (skipped):", e);
+        return [];
+    }
 }
 
+
 // =================================================================================
-// FILE HANDLING
+// EXPORT / IMPORT / THEME / ETC
 // =================================================================================
 
 export function exportChatToLocal(sessionId: string) {
-  const session = getChatHistory().find(s => s.id === sessionId);
-  if (!session) return;
-  const sessionJson = JSON.stringify(session, null, 2);
-  const blob = new Blob([sessionJson], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${session.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+    const session = getChatHistory().find(s => s.id === sessionId);
+    if (!session) return;
+    
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(session, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", `dmos_export_${session.title.replace(/[^a-z0-9]/gi, '_')}.json`);
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
 }
 
 export function exportAllChats() {
-  if (getChatHistory().length === 0) {
-    alert("No chats to export.");
-    return;
-  }
-  const historyJson = JSON.stringify(getChatHistory(), null, 2);
-  const blob = new Blob([historyJson], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const date = new Date().toISOString().slice(0, 10);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `dm_os_all_chats_backup_${date}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
+        version: 2,
+        chats: getChatHistory(),
+        userContext: getUserContext()
+    }, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", `dmos_full_backup_${new Date().toISOString().split('T')[0]}.json`);
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
 }
 
-export function handleImportAll(event: Event) {
-    // This function is complex and has side effects, so it will live in the main controller (index.tsx)
-    // to avoid circular dependencies with `loadChat` and `startNewChat`.
-    // This is a placeholder; the real implementation is in the main controller.
+export async function handleImportAll(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+    
+    const file = input.files[0];
+    const reader = new FileReader();
+    
+    reader.onload = async (e) => {
+        try {
+            const json = JSON.parse(e.target?.result as string);
+            
+            // Handle both single session export and full backup
+            if (json.chats && Array.isArray(json.chats)) {
+                // Full backup
+                // Merge strategy: append new, don't overwrite existing IDs unless prompted?
+                // For simplicity, we'll filter out duplicates by ID.
+                const existingIds = new Set(getChatHistory().map(c => c.id));
+                let importedCount = 0;
+                
+                for (const chat of json.chats) {
+                    if (!existingIds.has(chat.id)) {
+                        getChatHistory().push(chat);
+                        importedCount++;
+                    }
+                }
+                
+                if (json.userContext && Array.isArray(json.userContext)) {
+                    const currentContext = new Set(getUserContext());
+                    json.userContext.forEach((c: string) => currentContext.add(c));
+                    // Fix: Cannot assign to 'userContext' because it is an import.
+                    // We need to use a mutator or direct array manipulation if exported as const.
+                    // Since state.ts exports 'userContext' as 'let', we can't reassign it here directly via import.
+                    // We must use the accessor or modify the array in place.
+                    // state.ts exports it as 'export let userContext'.
+                    // We'll clear and refill it to be safe, or add to it.
+                    // Let's use a helper in state.ts ideally, but here we can just empty and push.
+                    const newContextArray = Array.from(currentContext);
+                    const stateContext = getUserContext();
+                    stateContext.length = 0;
+                    stateContext.push(...newContextArray);
+                    saveUserContextToDB();
+                }
+                
+                saveChatHistoryToDB();
+                alert(`Imported ${importedCount} new chats.`);
+                window.location.reload(); // Reload to render
+                
+            } else if (json.messages && Array.isArray(json.messages)) {
+                // Single chat
+                const existing = getChatHistory().find(c => c.id === json.id);
+                if (existing) {
+                    if (confirm(`Chat "${json.title}" already exists. Overwrite?`)) {
+                        Object.assign(existing, json);
+                        saveChatHistoryToDB();
+                        window.location.reload();
+                    }
+                } else {
+                    getChatHistory().push(json);
+                    saveChatHistoryToDB();
+                    window.location.reload();
+                }
+            } else {
+                throw new Error("Invalid file format");
+            }
+            
+        } catch (err) {
+            console.error("Import failed", err);
+            alert("Failed to import file. Invalid JSON.");
+        }
+    };
+    
+    reader.readAsText(file);
+    input.value = ''; // Reset
 }
 
+export function addUserContext(text: string) {
+    getUserContext().push(text);
+    saveUserContextToDB();
+    renderUserContext(getUserContext());
+}
+
+export function deleteUserContext(index: number) {
+    getUserContext().splice(index, 1);
+    saveUserContextToDB();
+    renderUserContext(getUserContext());
+}
+
+// --- Theme Logic ---
+const themes = [
+  { id: 'high-fantasy-dark', name: 'High Fantasy (Dark)' },
+  { id: 'high-fantasy-light', name: 'High Fantasy (Light)' },
+  { id: 'dark-fantasy-crimson', name: 'Dark Fantasy Crimson' },
+  { id: 'classic-rpg-parchment', name: 'Classic RPG Parchment' },
+  { id: 'cyberpunk-hud-advanced', name: 'Cyberpunk HUD' },
+  { id: 'cyberpunk-bladerunner', name: 'Blade Runner Neon' },
+  { id: 'glitch-terminal', name: 'Glitch Terminal' },
+  { id: 'glitch-terminal-crt', name: 'Retro CRT Terminal' },
+  { id: 'hacker-terminal', name: 'Matrix Green' },
+  { id: 'hacker-terminal-glitch', name: 'Hacker Glitch' },
+  { id: 'hacker-terminal-amber', name: 'Retro Amber' },
+  { id: 'hacker-terminal-vault-tec', name: 'Vault-Tec Blue/Yellow' },
+  { id: 'vampire-gothic-terminal', name: 'Vampire Gothic' },
+  { id: 'text-adventure-dark', name: 'Minimalist Text Adventure' },
+  { id: 'outer-space-starship', name: 'Sci-Fi Starship' },
+  { id: 'outer-space-alert', name: 'Red Alert' },
+  { id: 'pirate-sea', name: 'Pirate Map' },
+  { id: 'steampunk', name: 'Steampunk Brass' },
+  { id: 'art-deco', name: 'BioShock Art Deco' },
+  { id: 'solarpunk', name: 'Solarpunk Utopia' },
+  { id: 'aquatic', name: 'Deep Sea' },
+  { id: 'apocalyptic', name: 'Wasteland Log' },
+  { id: '8-bit-arcade', name: '8-Bit Dungeon' },
+  { id: 'celestial', name: 'Celestial Void' },
+];
+
+export function renderThemeCards() {
+    themeGrid.innerHTML = themes.map(theme => `
+        <div class="theme-card" data-theme="${theme.id}">
+            <div class="theme-preview" style="background: var(--background-color); color: var(--text-color); border: 1px solid var(--border-color);">
+                <span style="padding: 10px; font-family: var(--primary-font);">Abc</span>
+            </div>
+            <div class="theme-name">${theme.name}</div>
+        </div>
+    `).join('');
+}
+
+export function applyTheme(themeId: string) {
+    document.body.setAttribute('data-theme', themeId);
+    dbSet('dm-os-theme', themeId);
+    
+    // Re-render cards to show selection state if we wanted to, 
+    // but mostly we just update the body attr.
+}
+
+// --- File Helper ---
 export function fileToBase64(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => {
-            const result = reader.result as string;
-            // remove 'data:mime/type;base64,' part
-            resolve(result.split(',')[1]);
-        };
-        reader.onerror = error => reject(error);
-    });
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      const result = reader.result as string;
+      // Remove Data-URL declaration (e.g. "data:image/png;base64,")
+      const base64 = result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = error => reject(error);
+  });
 }

@@ -1,8 +1,9 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { ChatSession, GameSettings, Message, CharacterSheetData, Achievement, NPCState } from './types';
+import type { ChatSession, GameSettings, Message, CharacterSheetData, Achievement, NPCState, ProgressClock, Faction, SemanticNode } from './types';
 
 /**
  * Takes any object and safely migrates it into a valid ChatSession object.
@@ -80,7 +81,6 @@ export function migrateAndValidateSession(session: any): ChatSession {
   }
 
   const defaultSettings: GameSettings = {
-    // Fix: Removed 'difficulty' as it is not a known property in GameSettings type.
     tone: 'heroic',
     narration: 'descriptive',
   };
@@ -96,5 +96,70 @@ export function migrateAndValidateSession(session: any): ChatSession {
     newSession.quickStartChars = undefined;
   }
 
+  newSession.progressClocks = typeof session.progressClocks === 'object' && session.progressClocks !== null ? session.progressClocks as { [id: string]: ProgressClock } : {};
+  newSession.factions = typeof session.factions === 'object' && session.factions !== null ? session.factions as { [id: string]: Faction } : {};
+
+  // Initialize semanticLog if missing
+  if (Array.isArray(session.semanticLog)) {
+    newSession.semanticLog = session.semanticLog as SemanticNode[];
+  } else {
+    newSession.semanticLog = [];
+  }
+
   return newSession as ChatSession;
+}
+
+/**
+ * Calculates the cosine similarity between two vectors.
+ * @param vecA First vector.
+ * @param vecB Second vector.
+ * @returns A score between -1 and 1, where 1 is identical.
+ */
+export function calculateCosineSimilarity(vecA: number[], vecB: number[]): number {
+    if (vecA.length !== vecB.length) {
+        console.warn("Vectors have different lengths in cosine similarity calculation.");
+        return 0;
+    }
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+    for (let i = 0; i < vecA.length; i++) {
+        dotProduct += vecA[i] * vecB[i];
+        normA += vecA[i] * vecA[i];
+        normB += vecB[i] * vecB[i];
+    }
+    if (normA === 0 || normB === 0) return 0;
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+/**
+ * Retries an async operation with exponential backoff.
+ * Useful for handling API rate limits (429 errors).
+ * @param operation A function that returns a promise.
+ * @param maxRetries Maximum number of retries.
+ * @param baseDelay Base delay in milliseconds.
+ */
+export async function retryOperation<T>(operation: () => Promise<T>, maxRetries = 3, baseDelay = 2000): Promise<T> {
+  let lastError: any;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+      // Check for various 429 signatures (status code, error code, or message content)
+      const isRateLimit = 
+        error.status === 429 || 
+        error.code === 429 || 
+        (error.message && (error.message.includes('429') || error.message.includes('quota') || error.message.includes('Too Many Requests')));
+      
+      if (isRateLimit) {
+        const delay = baseDelay * Math.pow(2, i);
+        console.warn(`Rate limit hit. Retrying in ${delay}ms... (Attempt ${i + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      throw error; // Not a rate limit error, rethrow immediately
+    }
+  }
+  throw lastError;
 }

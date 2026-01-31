@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -15,6 +16,7 @@ export let chatHistory: ChatSession[] = [];
 export let userContext: string[] = [];
 let currentChatId: string | null = null;
 let geminiChat: Chat | null = null;
+let chroniclerChat: Chat | null = null;
 let isSendingFlag = false;
 let isGeneratingDataFlag = false;
 let currentPersonaId: string = 'purist';
@@ -22,6 +24,8 @@ let uiSettings: UISettings = {
   enterToSend: true,
   fontSize: 'medium',
   experimentalUploadLimit: false,
+  activeModel: 'gemini-2.5-flash', // SAFE DEFAULT to prevent 429 loops
+  apiKey: '',
 };
 
 // =================================================================================
@@ -34,6 +38,8 @@ export const getCurrentChat = (): ChatSession | undefined => chatHistory.find(s 
 export const setCurrentChatId = (id: string | null) => { currentChatId = id; };
 export const getGeminiChat = () => geminiChat;
 export const setGeminiChat = (chat: Chat | null) => { geminiChat = chat; };
+export const getChroniclerChat = () => chroniclerChat;
+export const setChroniclerChat = (chat: Chat | null) => { chroniclerChat = chat; };
 export const isSending = () => isSendingFlag;
 export const setSending = (state: boolean) => { isSendingFlag = state; };
 export const isGeneratingData = () => isGeneratingDataFlag;
@@ -89,7 +95,9 @@ export function dbSet(key: string, value: any): Promise<void> {
 
 export async function loadChatHistoryFromDB() {
   const storedHistory = await dbGet<any[]>('dm-os-chat-history');
-  chatHistory = (storedHistory || []).map(migrateAndValidateSession);
+  const validated = (storedHistory || []).map(migrateAndValidateSession);
+  // Mutate the array to maintain reference stability
+  chatHistory.splice(0, chatHistory.length, ...validated);
 }
 
 export function saveChatHistoryToDB() {
@@ -98,7 +106,9 @@ export function saveChatHistoryToDB() {
 
 export async function loadUserContextFromDB() {
   const storedContext = await dbGet<string[]>('dm-os-user-context');
-  userContext = storedContext || [];
+  const loadedContext = storedContext || [];
+  // Mutate the array to maintain reference stability
+  userContext.splice(0, userContext.length, ...loadedContext);
 }
 
 export function saveUserContextToDB() {
