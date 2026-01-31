@@ -1112,7 +1112,6 @@ function setupEventListeners() {
     }
   });
 
-  // Fix: Cannot find name 'clearDiceResults'.
   clearResultsBtn.addEventListener('click', clearDiceResults);
   diceGrid.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
