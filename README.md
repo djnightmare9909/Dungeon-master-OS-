@@ -1,3 +1,29 @@
+To get DM OS running locally on your Linux machine, follow these steps to clone the repository and initialize the engine using npm.
+Installation & Setup
+ * Clone the Repository:
+   Open your terminal and use git to pull the source code:
+   git clone https://github.com/djnightmare9909/Dungeon-master-OS-
+cd dm-os
+
+ * Install Dependencies:
+   Use npm to install the required packages, including the Google GenAI SDK:
+   npm install
+
+ * Configure your API Key:
+   The application requires a Google Gemini API key to function. Create a local environment file and add your key:
+   nano .env.local
+
+   Inside the file, define your key as:
+   GEMINI_API_KEY="your_api_key_here"
+ * Launch the App:
+   Start the Vite development server:
+   npm run dev
+
+   Once the server is live, you can access the interface at http://localhost:3000.
+Requirements
+ * Node.js & NPM: Ensure you have a modern version of Node.js installed.
+ * Gemini API Key: You can obtain a key from the Google AI Studio to power the DM personas and the Chronicler world engine.
+
 # DM OS: The Living World Engine
 
 **An advanced, AI-powered Dungeon Master for immersive, long-form Dungeons & Dragons campaigns, powered by Google Gemini.**
@@ -88,3 +114,21 @@ This collaboration was the final, critical piece. By integrating the proven WFGY
 
 ### A Call to Adventure
 DM OS has been battle-tested extensively by its creator and is considered a rock-solid platform for epic campaigns. However, its true test begins with you. As an independent project, it thrives on community engagement. We invite you to begin your adventure, push the boundaries of the simulation, and discover the stories waiting to be told.
+
+
+Troubleshooting
+1. API Key Issues (undefined Errors)
+VITE Prefixing: Vite only exposes environment variables to your client-side code if they are prefixed with VITE_.
+Project Root: Ensure your .env.local file is located in the root directory of the project, at the same level as package.json.
+Restart Required: You must restart the development server (npm run dev) after making any changes to your environment files for them to take effect.
+2. Permissions Errors (EACCES)
+Avoid Sudo: If you see "permission denied" during npm install, avoid using sudo npm install.
+Recommended Fix: Use a Node version manager like nvm to reinstall Node.js and npm; this is the most effective way to avoid permission issues on Linux.
+Manual Fix: Alternatively, change ownership of your node_modules directory: sudo chown -R $(whoami) ..
+3. Server or Connection Failures
+File Descriptor Limits: If the server stalls on Linux, it may be due to low inotify or file descriptor limits.
+How to Fix: You can increase the temporary limit using ulimit -Sn 10000 or increase inotify limits via sysctl.
+Port Availability: Ensure port 3000 is not being used by another process. If you are running inside a container or remote server, you may need to use the --host flag to make the server accessible.
+4. Dependency Issues
+Clean Install: If you encounter MODULE_NOT_FOUND errors, try deleting your node_modules and package-lock.json files, then run npm install again.
+Node Version: Verify your Node.js version is up to date (node -v). DM OS requires a modern version of Node.js for ESM (ECMAScript Modules) support
