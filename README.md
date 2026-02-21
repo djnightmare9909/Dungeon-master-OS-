@@ -1,3 +1,5 @@
+hello everyone welcome to Dungeon Master OS to get started You can go over to the releases page and there's a PDF file You can download that and drop it into any large language model and run it with /start, I have also provided a link to my custom gym environment that already has everything set up, when you use the PDF file form You upload it to the AI along with your 5th edition rules and notes if you want and it will handle all the logic, I also linked the AI studio environment which is the full app but it is better to run it on your machine yourself virtual machines are a little bit buggy when it comes to AI studio 
+
 To get DM OS running locally on your Linux machine, follow these steps to clone the repository and initialize the engine using npm.
 Installation & Setup
  * Clone the Repository:
