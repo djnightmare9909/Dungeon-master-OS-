@@ -1,4 +1,4 @@
-Here's a revised README that clearly presents all the ways to run DM OS, making it accessible for both technical and non‑technical users. I've restructured it so that the first thing people see is a choice of how to start.
+
 
 ---
 
