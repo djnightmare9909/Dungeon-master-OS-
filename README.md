@@ -1,17 +1,15 @@
-hello everyone welcome to Dungeon Master OS to get started You can go over to the releases page and there's a PDF file You can download that and drop it into any large language model and run it with /start, I have also provided a link to my custom gym environment that already has everything set up, when you use the PDF file form You upload it to the AI along with your 5th edition rules and notes if you want and it will handle all the logic, I also linked the AI studio environment which is the full app but it is better to run it on your machine yourself virtual machines are a little bit buggy when it comes to AI studio 
+
 
 To get DM OS running locally on your Linux machine, follow these steps to clone the repository and initialize the engine using npm.
 Installation & Setup
 
-git clone https://github.com/djnightmare9909/Dungeon-master-OS-
-cd dm-os
-npm install
-
-
  * Clone the Repository:
    Open your terminal and use git to pull the source code:
    git clone https://github.com/djnightmare9909/Dungeon-master-OS-
-cd dm-os
+
+Go to the folder that just now was installed 
+
+cd Dungeon-master-OS-
 
  * Install Dependencies:
    Use npm to install the required packages, including the Google GenAI SDK:
@@ -23,6 +21,7 @@ cd dm-os
 
    Inside the file, define your key as:
    GEMINI_API_KEY="your_api_key_here"
+ 
  * Launch the App:
    Start the Vite development server:
    npm run dev
