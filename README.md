@@ -2,6 +2,12 @@ hello everyone welcome to Dungeon Master OS to get started You can go over to th
 
 To get DM OS running locally on your Linux machine, follow these steps to clone the repository and initialize the engine using npm.
 Installation & Setup
+
+git clone https://github.com/djnightmare9909/Dungeon-master-OS-
+cd dm-os
+npm install
+
+
  * Clone the Repository:
    Open your terminal and use git to pull the source code:
    git clone https://github.com/djnightmare9909/Dungeon-master-OS-
