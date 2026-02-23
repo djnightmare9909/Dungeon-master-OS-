@@ -8,6 +8,14 @@ An advanced, AI‑powered Dungeon Master for immersive, long‑form Dungeons & D
 
 DM OS is not just a chatbot; it is a sophisticated simulation engine designed to create a persistent, reactive, and deeply engaging role‑playing experience. It combines a state‑of‑the‑art AI with a rich user interface to deliver a D&D campaign where your choices have lasting, meaningful consequences.
 
+
+[![Watch the video](https://img.youtube.com/vi/https:/f0dCEIK2l0Q/hqdefault.jpg)](https://www.youtube.com/embed/f0dCEIK2l0Q)
+
+[<img src="https://img.youtube.com/vi/f0dCEIK2l0Q/hqdefault.jpg" width="600" height="300"
+/>](https://www.youtube.com/embed/f0dCEIK2l0Q)
+
+
+
 ---
 
 Getting Started – Choose Your Path
