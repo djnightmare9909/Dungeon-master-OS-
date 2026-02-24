@@ -26,6 +26,7 @@ let uiSettings: UISettings = {
   experimentalUploadLimit: false,
   activeModel: 'gemini-2.5-flash', // SAFE DEFAULT to prevent 429 loops
   apiKey: '',
+  systemVersion: '2.0',
 };
 
 // =================================================================================

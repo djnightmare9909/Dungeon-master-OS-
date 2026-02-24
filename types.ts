@@ -21,6 +21,7 @@ export interface UISettings {
   experimentalUploadLimit: boolean;
   activeModel: string;
   apiKey: string;
+  systemVersion: '2.0' | '3.0';
 }
 
 export interface AbilityScore {
@@ -107,11 +108,12 @@ export interface ChatSession {
   progressClocks?: { [id: string]: ProgressClock };
   factions?: { [id: string]: Faction };
   semanticLog?: SemanticNode[];
+  systemVersion?: '2.0' | '3.0';
 }
 
 export interface DMPersona {
   id: string;
   name: string;
   description: string;
-  getInstruction: (password: string) => string;
+  getInstruction: (password: string, version?: '2.0' | '3.0') => string;
 }

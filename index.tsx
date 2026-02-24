@@ -83,6 +83,7 @@ import {
   enterToSendToggle,
   experimentalUploadToggle,
   modelSelect,
+  systemVersionSelect,
   apiKeyInput,
   saveApiKeyBtn,
   changeUiBtn,
@@ -185,7 +186,7 @@ const quickStartCharacterSchema = {
 /**
  * Displays a boot sequence animation on first load.
  */
-function runBootSequence(): Promise<void> {
+function runBootSequence(version: string = '2.0'): Promise<void> {
   return new Promise((resolve) => {
     const bootScreen = document.getElementById('boot-screen');
     const bootTextContainer = document.getElementById('boot-text');
@@ -195,8 +196,8 @@ function runBootSequence(): Promise<void> {
     }
 
     const lines = [
-      'DM OS v2.1 Initializing...',
-      'Connecting to WFGY Core Flagship v2.0... OK',
+      `DM OS v${version === '3.0' ? '3.0' : '2.1'} Initializing...`,
+      `Connecting to WFGY Core Flagship v${version}... OK`,
       'Loading Semantic Tree... 1.2TB nodes loaded.',
       'Calibrating Collapse-Rebirth Cycle (BBCR)... STABLE',
       'Waking Dungeon Master Persona...',
@@ -242,10 +243,10 @@ function runBootSequence(): Promise<void> {
  * Checks if the v2 welcome modal has been shown and displays it if not.
  */
 function showWelcomeModalIfNeeded() {
-    const welcomeShown = localStorage.getItem('dm-os-v2-welcome-shown');
+    const welcomeShown = localStorage.getItem('dm-os-v3-welcome-shown');
     if (!welcomeShown) {
         openModal(welcomeModal);
-        localStorage.setItem('dm-os-v2-welcome-shown', 'true');
+        localStorage.setItem('dm-os-v3-welcome-shown', 'true');
     }
 }
 
@@ -264,7 +265,8 @@ async function startNewChat() {
   loadingMessage.textContent = 'Starting new game setup...';
 
   try {
-    const instruction = getNewGameSetupInstruction();
+    const version = getUISettings().systemVersion || '3.0';
+    const instruction = getNewGameSetupInstruction(version);
     const setupGeminiChat = createNewChatInstance([], instruction);
 
     const kickoffMessage = "Let's begin the setup for our new game.";
@@ -288,6 +290,7 @@ async function startNewChat() {
       isPinned: false,
       createdAt: Date.now(),
       personaId: 'purist', // Default persona
+      systemVersion: getUISettings().systemVersion || '3.0',
       creationPhase: 'guided',
       settings: {
         tone: 'heroic',
@@ -346,13 +349,15 @@ function loadChat(id: string) {
 
     try {
       if (session.creationPhase) {
-        const instruction = getNewGameSetupInstruction();
+        const version = session.systemVersion || '2.0';
+        const instruction = getNewGameSetupInstruction(version);
         setGeminiChat(createNewChatInstance(geminiHistory, instruction));
         setChroniclerChat(null); // No chronicler during setup
       } else {
         const personaId = session.personaId || 'purist';
         const persona = dmPersonas.find(p => p.id === personaId) || dmPersonas[0];
-        const instruction = persona.getInstruction(session.adminPassword || '');
+        const version = session.systemVersion || '2.0';
+        const instruction = persona.getInstruction(session.adminPassword || '', version);
         setGeminiChat(createNewChatInstance(geminiHistory, instruction));
         // Initialize chronicler for existing games. Explicitly use 'gemini-2.5-flash' for cost/speed.
         setChroniclerChat(createNewChatInstance([], getChroniclerPrompt(), 'gemini-2.5-flash'));
@@ -568,7 +573,8 @@ async function finalizeSetupAndStartGame(session: ChatSession, title: string, fi
   try {
     const personaId = session.personaId || 'purist';
     const persona = dmPersonas.find(p => p.id === personaId) || dmPersonas[0];
-    const instruction = persona.getInstruction(session.adminPassword || `dnd${Date.now()}`);
+    const version = session.systemVersion || '3.0';
+    const instruction = persona.getInstruction(session.adminPassword || `dnd${Date.now()}`, version);
 
     const geminiHistory = session.messages
       .filter(m => m.sender !== 'error' && m.sender !== 'system')
@@ -1309,6 +1315,20 @@ function setupEventListeners() {
         }
       });
   }
+  if (systemVersionSelect) {
+    systemVersionSelect.addEventListener('change', () => {
+      const newVersion = systemVersionSelect.value as '2.0' | '3.0';
+      getUISettings().systemVersion = newVersion;
+      dbSet('dm-os-ui-settings', getUISettings());
+      
+      const currentChat = getCurrentChat();
+      if (currentChat) {
+          currentChat.systemVersion = newVersion;
+          saveChatHistoryToDB();
+          loadChat(currentChat.id);
+      }
+    });
+  }
   
   if (saveApiKeyBtn) {
       saveApiKeyBtn.addEventListener('click', () => {
@@ -1398,7 +1418,6 @@ function setupEventListeners() {
  */
 async function initApp() {
   try {
-      await runBootSequence();
       await initDB();
 
       // Ensure history and context are fully loaded into state before proceeding.
@@ -1412,11 +1431,14 @@ async function initApp() {
         dbGet<string>('dm-os-persona'),
       ]);
 
-      applyTheme(themeId || 'high-fantasy-dark');
-
       if (savedUiSettings) {
         setUISettings({ ...getUISettings(), ...savedUiSettings });
       }
+      
+      const version = getUISettings().systemVersion || '2.0';
+      await runBootSequence(version);
+
+      applyTheme(themeId || 'high-fantasy-dark');
       applyUISettings();
 
       if (savedPersonaId && dmPersonas.some(p => p.id === savedPersonaId)) {

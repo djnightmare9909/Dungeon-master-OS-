@@ -82,6 +82,7 @@ export const fontSizeControls = document.getElementById('font-size-controls') as
 export const enterToSendToggle = document.getElementById('setting-enter-send') as HTMLInputElement;
 export const experimentalUploadToggle = document.getElementById('setting-experimental-upload') as HTMLInputElement;
 export const modelSelect = document.getElementById('setting-model') as HTMLSelectElement;
+export const systemVersionSelect = document.getElementById('setting-system-version') as HTMLSelectElement;
 export const apiKeyInput = document.getElementById('setting-api-key') as HTMLInputElement;
 export const saveApiKeyBtn = document.getElementById('save-api-key-btn') as HTMLButtonElement;
 export const changeUiBtn = document.getElementById('change-ui-btn') as HTMLButtonElement;
@@ -141,6 +142,9 @@ export function applyUISettings() {
       modelSelect.value = 'gemini-2.5-flash'; // Fallback to flash for safety
       uiSettings.activeModel = 'gemini-2.5-flash';
     }
+  }
+  if (systemVersionSelect) {
+    systemVersionSelect.value = uiSettings.systemVersion || '2.0';
   }
   if (apiKeyInput) {
       apiKeyInput.value = uiSettings.apiKey || '';
