@@ -786,9 +786,9 @@ body.app-visible .chat-view {
   visibility: visible;
 }
 
-body.font-size-small { --base-font-size: 14px; }
-body.font-size-medium { --base-font-size: 16px; }
-body.font-size-large { --base-font-size: 18px; }
+:root.font-size-small { --base-font-size: 14px; }
+:root.font-size-medium { --base-font-size: 16px; }
+:root.font-size-large { --base-font-size: 18px; }
 
 .sr-only {
   position: absolute;
@@ -2012,6 +2012,7 @@ footer {
     display: flex;
     flex-grow: 1;
     overflow: hidden;
+    min-height: 0; /* Allow flex item to shrink below content height */
 }
 
 .logbook-nav {
@@ -2048,6 +2049,7 @@ footer {
     flex-grow: 1;
     padding: 1rem 1.5rem;
     overflow-y: auto;
+    min-height: 0; /* Allow flex item to shrink below content height */
 }
 
 .logbook-pane {
@@ -2796,6 +2798,20 @@ input:checked + .slider:before {
     overflow-x: auto;
     border-right: none;
     border-bottom: 1px solid var(--border-color);
+    padding: 0.5rem;
+    gap: 0.5rem;
+    scrollbar-width: none; /* Hide scrollbar for cleaner look */
+  }
+  .logbook-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .logbook-nav-btn {
+    width: auto;
+    white-space: nowrap;
+    margin-bottom: 0;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    flex-shrink: 0;
   }
   .sheet-main-content {
     grid-template-columns: 1fr;

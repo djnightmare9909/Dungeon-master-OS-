@@ -121,8 +121,8 @@ export function closeModal(modal: HTMLElement) {
 
 export function applyUISettings() {
   const uiSettings = getUISettings();
-  document.body.classList.remove('font-size-small', 'font-size-medium', 'font-size-large');
-  document.body.classList.add(`font-size-${uiSettings.fontSize}`);
+  document.documentElement.classList.remove('font-size-small', 'font-size-medium', 'font-size-large');
+  document.documentElement.classList.add(`font-size-${uiSettings.fontSize}`);
 
   if (fontSizeControls) {
     (fontSizeControls.querySelector('.active') as HTMLElement)?.classList.remove('active');
