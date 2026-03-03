@@ -88,6 +88,13 @@ export interface SemanticNode {
   importance: number; // 0-1 score
 }
 
+export interface Scar {
+  vector: number[];
+  depth: number;
+  timestamp: number;
+  B_total: number;
+}
+
 export interface ChatSession {
   id: string;
   title: string;
@@ -108,7 +115,13 @@ export interface ChatSession {
   progressClocks?: { [id: string]: ProgressClock };
   factions?: { [id: string]: Faction };
   semanticLog?: SemanticNode[];
+  storySummary?: string;
   systemVersion?: '2.0' | '3.0';
+  scarLedger?: Scar[];
+  currentVector?: number[];
+  prevVector?: number[];
+  Bc?: number;
+  lambdaState?: 'Convergent' | 'Recursive' | 'Divergent' | 'Chaotic';
 }
 
 export interface DMPersona {

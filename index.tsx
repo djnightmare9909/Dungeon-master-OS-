@@ -138,7 +138,9 @@ import {
   renderThemeCards,
   fileToBase64,
   recallRelevantMemories,
-  commitToSemanticMemory
+  commitToSemanticMemory,
+  pruneAndSummarizeHistory,
+  runWFGYAudit
 } from './features';
 import {
   ai,
@@ -824,6 +826,9 @@ async function handleFormSubmit(e: Event) {
       if (relevantMemories.length > 0) {
           contextBlock += `\nRetrieved Memories from Semantic Tree:\n${relevantMemories.join('\n')}`;
       }
+      if (currentSession.storySummary) {
+          contextBlock += `\nStory Summary (Long-term Memory):\n${currentSession.storySummary}`;
+      }
       
       if (contextBlock) {
           messageWithContext = `(System: Context Injection:\n${contextBlock}\n)\n\n${userInput}`;
@@ -862,6 +867,12 @@ async function handleFormSubmit(e: Event) {
       currentSession.messages.push(finalMessage);
       saveChatHistoryToDB();
       
+      // --- WFGY AUDIT TRIGGER ---
+      // This calculates Semantic Tension and Scar Potential to maintain the world's stability.
+      runWFGYAudit(userInput, finalMessage.text).catch(err => {
+          console.error("WFGY Audit failed:", err);
+      });
+
       // --- LIVING WORLD ENGINE TRIGGER ---
       // Now, check if we need to run a "World Turn" in the background
       const lowerCaseInputForTurn = userInput.toLowerCase();
@@ -878,6 +889,12 @@ async function handleFormSubmit(e: Event) {
             console.error("Caught an error from the background chronicler turn:", err);
         });
       }
+
+      // --- MEMORY COMPRESSION TRIGGER ---
+      // Periodically summarize old messages to keep the context window clean.
+      pruneAndSummarizeHistory().catch(err => {
+          console.error("Memory compression failed:", err);
+      });
 
     } catch (error: any) {
       console.error("Gemini API Error:", error);

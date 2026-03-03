@@ -43,8 +43,15 @@ import {
   appendMessage
 } from './ui';
 import { ai, generateEmbedding } from './gemini';
-import { calculateCosineSimilarity, retryOperation } from './utils';
-import type { CharacterSheetData, Achievement, NPCState, SemanticNode } from './types';
+import { 
+  calculateCosineSimilarity, 
+  retryOperation,
+  calculateSemanticTension,
+  calculateScarPotential,
+  calculateTotalB,
+  updateVectorBBPF
+} from './utils';
+import type { CharacterSheetData, Achievement, NPCState, SemanticNode, Scar, Message } from './types';
 
 // =================================================================================
 // TTS (Re-architected for stability)
@@ -852,4 +859,154 @@ export function fileToBase64(file: File): Promise<string> {
     };
     reader.onerror = error => reject(error);
   });
+}
+
+// =================================================================================
+// MEMORY COMPRESSION: STORY SUMMARIZER
+// =================================================================================
+
+/**
+ * Periodically prunes the message history and creates a rolling summary.
+ * This ensures the context window doesn't overflow while maintaining long-term memory.
+ */
+export async function pruneAndSummarizeHistory() {
+  const session = getCurrentChat();
+  if (!session || isGeneratingData()) return;
+
+  // Only trigger if we have a significant number of messages (e.g., > 50)
+  if (session.messages.length < 50) return;
+
+  console.log("Memory Compression Triggered: Summarizing old messages...");
+
+  try {
+    // 1. Identify messages to prune (e.g., the oldest 30)
+    // We keep the very first message if it's a setup message, but usually we just prune the oldest.
+    const messagesToSummarize = session.messages.slice(0, 30);
+    const remainingMessages = session.messages.slice(30);
+
+    const historyText = messagesToSummarize
+      .filter(m => !m.hidden && m.sender !== 'error' && m.sender !== 'system')
+      .map(m => `${m.sender.toUpperCase()}: ${m.text}`)
+      .join('\n');
+
+    if (!historyText.trim()) {
+        // If there's nothing meaningful to summarize, just prune and return
+        session.messages = remainingMessages;
+        saveChatHistoryToDB();
+        return;
+    }
+
+    // 2. Generate a summary using a fast model
+    const currentSummary = session.storySummary || "No previous summary.";
+    const prompt = `
+      You are a specialized story summarizer for a D&D campaign. 
+      Your task is to integrate new events into an existing "Story Summary".
+      
+      EXISTING SUMMARY:
+      ${currentSummary}
+      
+      NEW EVENTS TO INTEGRATE:
+      ${historyText}
+      
+      INSTRUCTIONS:
+      - Create a single, cohesive, and concise paragraph that summarizes the entire story so far.
+      - Focus on key plot points, character developments, and major locations.
+      - Keep it under 300 words.
+      - Maintain the tone of the adventure.
+      
+      NEW COHESIVE SUMMARY:
+    `;
+
+    const response = await retryOperation(() => ai.models.generateContent({
+      model: 'gemini-2.5-flash', // Use Flash for speed/cost
+      contents: prompt,
+    })) as GenerateContentResponse;
+
+    const newSummary = response.text || currentSummary;
+
+    // 3. Update the session
+    session.storySummary = newSummary;
+    session.messages = remainingMessages;
+
+    // 4. Persist changes
+    saveChatHistoryToDB();
+    console.log("Memory Compression Complete. New Summary Length:", newSummary.length);
+
+  } catch (error) {
+    console.warn("Memory compression failed (skipped):", error);
+  }
+}
+
+// =================================================================================
+// WFGY CORE: SEMANTIC AUDIT & COLLAPSE TRIGGER
+// =================================================================================
+
+/**
+ * Runs the WFGY Semantic Audit on every turn.
+ * Calculates ΔS and Ψ_scar to detect potential "Collapse-Rebirth" events.
+ */
+export async function runWFGYAudit(userInput: string, dmOutput: string): Promise<boolean> {
+    const session = getCurrentChat();
+    if (!session) return false;
+
+    // Initialize vectors if missing
+    if (!session.currentVector) {
+        session.currentVector = Array(64).fill(0).map(() => (Math.random() - 0.5) * 0.2);
+        session.prevVector = [...session.currentVector];
+    }
+
+    try {
+        // We use embeddings as proxies for the latent space position
+        const userEmbedding = await generateEmbedding(userInput);
+        const dmEmbedding = await generateEmbedding(dmOutput);
+        
+        const deltaS = calculateSemanticTension(userEmbedding, dmEmbedding);
+        const scarPot = calculateScarPotential(session.currentVector, session.scarLedger || []);
+        const B_total = calculateTotalB(deltaS, scarPot);
+
+        const Bc = session.Bc || 0.85;
+
+        console.log(`WFGY Audit [ΔS: ${deltaS.toFixed(3)}, Ψ: ${scarPot.toFixed(3)}, B: ${B_total.toFixed(3)}]`);
+
+        if (B_total > Bc || scarPot > 2.0) {
+            console.warn("WFGY COLLAPSE TRIGGERED!", { B_total, Bc, scarPot });
+            
+            // Log Scar in the Ledger
+            const scar: Scar = {
+                vector: [...session.currentVector],
+                depth: 1.0 + 0.5 * (session.scarLedger?.length || 0),
+                timestamp: Date.now(),
+                B_total: B_total
+            };
+            if (!session.scarLedger) session.scarLedger = [];
+            session.scarLedger.push(scar);
+
+            // Revert to prev vector + noise (Collapse-Rebirth)
+            session.currentVector = session.prevVector!.map(v => v + (Math.random() - 0.5) * 0.05);
+            
+            // Trigger World Event via Chronicler or Tone Shift
+            const collapseMsg: Message = {
+                sender: 'system',
+                text: `[WFGY COLLAPSE]: Semantic Tension reached critical threshold (${B_total.toFixed(2)}). The world shudders as a Scar is formed in the latent space.`,
+                hidden: true
+            };
+            session.messages.push(collapseMsg);
+            
+            // Adjust Bc using Bayesian-like update
+            session.Bc = (Bc * 0.8) + (B_total * 0.2);
+            
+            saveChatHistoryToDB();
+            return true; // Collapse occurred
+        }
+
+        // Update vectors using BBPF rule
+        session.prevVector = [...session.currentVector];
+        session.currentVector = updateVectorBBPF(session.currentVector, session.scarLedger || []);
+        
+        saveChatHistoryToDB();
+        return false;
+    } catch (e) {
+        console.warn("WFGY Audit failed (skipped):", e);
+        return false;
+    }
 }

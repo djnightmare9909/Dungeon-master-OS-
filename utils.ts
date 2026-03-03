@@ -3,7 +3,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { ChatSession, GameSettings, Message, CharacterSheetData, Achievement, NPCState, ProgressClock, Faction, SemanticNode } from './types';
+import type { ChatSession, GameSettings, Message, CharacterSheetData, Achievement, NPCState, ProgressClock, Faction, SemanticNode, Scar } from './types';
 
 /**
  * Takes any object and safely migrates it into a valid ChatSession object.
@@ -106,6 +106,14 @@ export function migrateAndValidateSession(session: any): ChatSession {
     newSession.semanticLog = [];
   }
 
+  newSession.storySummary = typeof session.storySummary === 'string' ? session.storySummary : '';
+
+  newSession.scarLedger = Array.isArray(session.scarLedger) ? session.scarLedger : [];
+  newSession.currentVector = Array.isArray(session.currentVector) ? session.currentVector : undefined;
+  newSession.prevVector = Array.isArray(session.prevVector) ? session.prevVector : undefined;
+  newSession.Bc = typeof session.Bc === 'number' ? session.Bc : 0.85;
+  newSession.lambdaState = (['Convergent', 'Recursive', 'Divergent', 'Chaotic'].includes(session.lambdaState)) ? session.lambdaState : 'Convergent';
+
   return newSession as ChatSession;
 }
 
@@ -130,6 +138,85 @@ export function calculateCosineSimilarity(vecA: number[], vecB: number[]): numbe
     }
     if (normA === 0 || normB === 0) return 0;
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+/**
+ * WFGY Math: Semantic Tension (ΔS)
+ * ΔS = 1 - cos(I, G)
+ */
+export function calculateSemanticTension(vecA: number[], vecB: number[]): number {
+    const similarity = calculateCosineSimilarity(vecA, vecB);
+    return 1 - similarity;
+}
+
+/**
+ * WFGY Math: Scar Potential (Ψ_scar)
+ * Ψ_scar(x) = Σ D_k / ||x - x_k||²
+ */
+export function calculateScarPotential(x: number[], scarLedger: Scar[]): number {
+    if (!scarLedger || scarLedger.length === 0) return 0;
+    let potential = 0;
+    const epsilon = 1e-6;
+    for (const scar of scarLedger) {
+        if (x.length !== scar.vector.length) continue;
+        let distSq = 0;
+        for (let i = 0; i < x.length; i++) {
+            distSq += Math.pow(x[i] - scar.vector[i], 2);
+        }
+        if (distSq < epsilon) return 100; // Cap at 100 instead of Infinity for stability
+        potential += scar.depth / distSq;
+    }
+    return potential;
+}
+
+/**
+ * WFGY Math: Total B (B_total)
+ * B_total = ΔS + ∇Ψ_scar
+ */
+export function calculateTotalB(deltaS: number, scarPot: number): number {
+    return deltaS + (scarPot * 0.1);
+}
+
+/**
+ * WFGY Math: BBPF Update Rule (Simplified)
+ * x_{t+1} = x_t - η ∇Φ(x) - α ∇Ψ_scar(x)
+ */
+export function updateVectorBBPF(x: number[], scarLedger: Scar[], eta: number = 0.05, alpha: number = 0.3): number[] {
+    if (!x || x.length === 0) return Array(64).fill(0).map(() => (Math.random() - 0.5) * 0.2);
+    
+    const newX = [...x];
+    // Gradient of Φ (semantic tension) approximated by small random noise
+    const grad = x.map(() => (Math.random() - 0.5) * 0.01);
+    
+    let scarGrad = Array(x.length).fill(0);
+    if (scarLedger.length > 0) {
+        // Find nearest scar
+        let nearestScar = scarLedger[0];
+        let minDistSq = Infinity;
+        for (const scar of scarLedger) {
+            if (scar.vector.length !== x.length) continue;
+            let d2 = 0;
+            for (let i = 0; i < x.length; i++) d2 += Math.pow(x[i] - scar.vector[i], 2);
+            if (d2 < minDistSq) {
+                minDistSq = d2;
+                nearestScar = scar;
+            }
+        }
+        
+        if (minDistSq > 0) {
+            for (let i = 0; i < x.length; i++) {
+                scarGrad[i] = (x[i] - nearestScar.vector[i]) / minDistSq;
+            }
+        }
+    }
+
+    for (let i = 0; i < x.length; i++) {
+        newX[i] = x[i] - (eta * grad[i]) - (alpha * scarGrad[i]);
+    }
+
+    // Normalize
+    const norm = Math.sqrt(newX.reduce((sum, v) => sum + v * v, 0)) || 1;
+    return newX.map(v => (v / norm) * 5.0);
 }
 
 /**
