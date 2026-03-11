@@ -801,37 +801,38 @@ export function deleteUserContext(index: number) {
 
 // --- Theme Logic ---
 const themes = [
-  { id: 'high-fantasy-dark', name: 'High Fantasy (Dark)' },
-  { id: 'high-fantasy-light', name: 'High Fantasy (Light)' },
-  { id: 'dark-fantasy-crimson', name: 'Dark Fantasy Crimson' },
-  { id: 'classic-rpg-parchment', name: 'Classic RPG Parchment' },
-  { id: 'cyberpunk-hud-advanced', name: 'Cyberpunk HUD' },
-  { id: 'cyberpunk-bladerunner', name: 'Blade Runner Neon' },
-  { id: 'glitch-terminal', name: 'Glitch Terminal' },
-  { id: 'glitch-terminal-crt', name: 'Retro CRT Terminal' },
-  { id: 'hacker-terminal', name: 'Matrix Green' },
-  { id: 'hacker-terminal-glitch', name: 'Hacker Glitch' },
-  { id: 'hacker-terminal-amber', name: 'Retro Amber' },
-  { id: 'hacker-terminal-vault-tec', name: 'Vault-Tec Blue/Yellow' },
-  { id: 'vampire-gothic-terminal', name: 'Vampire Gothic' },
-  { id: 'text-adventure-dark', name: 'Minimalist Text Adventure' },
-  { id: 'outer-space-starship', name: 'Sci-Fi Starship' },
-  { id: 'outer-space-alert', name: 'Red Alert' },
-  { id: 'pirate-sea', name: 'Pirate Map' },
-  { id: 'steampunk', name: 'Steampunk Brass' },
-  { id: 'art-deco', name: 'BioShock Art Deco' },
-  { id: 'solarpunk', name: 'Solarpunk Utopia' },
-  { id: 'aquatic', name: 'Deep Sea' },
-  { id: 'apocalyptic', name: 'Wasteland Log' },
-  { id: '8-bit-arcade', name: '8-Bit Dungeon' },
-  { id: 'celestial', name: 'Celestial Void' },
+  { id: 'high-fantasy-dark', name: 'High Fantasy (Dark)', palette: ['#131314', '#c5b358', '#e3e3e3'] },
+  { id: 'high-fantasy-light', name: 'High Fantasy (Light)', palette: ['#fdf6e3', '#8b4513', '#3a2e2c'] },
+  { id: 'dark-fantasy-crimson', name: 'Dark Fantasy Crimson', palette: ['#0a0a0a', '#b71c1c', '#d1d1d1'] },
+  { id: 'classic-rpg-parchment', name: 'Classic RPG Parchment', palette: ['#4d3c2a', '#e5c100', '#d5c8b8'] },
+  { id: 'cyberpunk-hud-advanced', name: 'Cyberpunk HUD', palette: ['#0d0221', '#00f0ff', '#c72cff'] },
+  { id: 'cyberpunk-bladerunner', name: 'Blade Runner Neon', palette: ['#040a18', '#ff9900', '#90b4ce'] },
+  { id: 'glitch-terminal', name: 'Glitch Terminal', palette: ['#000', '#fff', '#888'] },
+  { id: 'glitch-terminal-crt', name: 'Retro CRT Terminal', palette: ['#000', '#e0e0e0', '#555'] },
+  { id: 'hacker-terminal', name: 'Matrix Green', palette: ['#0d0d0d', '#00ff00', '#008000'] },
+  { id: 'hacker-terminal-glitch', name: 'Hacker Glitch', palette: ['#0d0d0d', '#00ff00', '#ff3333'] },
+  { id: 'hacker-terminal-amber', name: 'Retro Amber', palette: ['#000', '#ffb400', '#b37e00'] },
+  { id: 'hacker-terminal-vault-tec', name: 'Vault-Tec Blue/Yellow', palette: ['#0a141f', '#ffe832', '#27bce0'] },
+  { id: 'vampire-gothic-terminal', name: 'Vampire Gothic', palette: ['#050101', '#ff4d4d', '#e0baba'] },
+  { id: 'text-adventure-dark', name: 'Minimalist Text Adventure', palette: ['#000', '#ccc', '#333'] },
+  { id: 'outer-space-starship', name: 'Sci-Fi Starship', palette: ['#eef2f5', '#007bff', '#1c2a38'] },
+  { id: 'outer-space-alert', name: 'Red Alert', palette: ['#3d0000', '#ff4444', '#ffdddd'] },
+  { id: 'pirate-sea', name: 'Pirate Map', palette: ['#f0e5d1', '#008b8b', '#2a201c'] },
+  { id: 'steampunk', name: 'Steampunk Brass', palette: ['#5a3e2b', '#d4ac0d', '#e6d8c9'] },
+  { id: 'art-deco', name: 'BioShock Art Deco', palette: ['#0d2c2c', '#d4af37', '#c5b8a5'] },
+  { id: 'solarpunk', name: 'Solarpunk Utopia', palette: ['#f0f5e6', '#ff9900', '#2b4138'] },
+  { id: 'aquatic', name: 'Deep Sea', palette: ['#0a1f3a', '#33d4ff', '#bfeaff'] },
+  { id: 'apocalyptic', name: 'Wasteland Log', palette: ['#3b3a35', '#a3955a', '#adaa9d'] },
+  { id: '8-bit-arcade', name: '8-Bit Dungeon', palette: ['#000', '#00ffff', '#ff00ff'] },
+  { id: 'celestial', name: 'Celestial Void', palette: ['#100f1a', '#d8b8ff', '#d8d8e8'] },
 ];
 
 export function renderThemeCards() {
     themeGrid.innerHTML = themes.map(theme => `
         <div class="theme-card" data-theme="${theme.id}">
-            <div class="theme-preview" style="background: var(--background-color); color: var(--text-color); border: 1px solid var(--border-color);">
-                <span style="padding: 10px; font-family: var(--primary-font);">Abc</span>
+            <div class="theme-preview" style="background: ${theme.palette[0]}; border: 1px solid rgba(255,255,255,0.1);">
+                <div class="palette-swatch" style="background: ${theme.palette[1]};"></div>
+                <div class="palette-swatch" style="background: ${theme.palette[2]};"></div>
             </div>
             <div class="theme-name">${theme.name}</div>
         </div>
