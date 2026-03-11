@@ -1239,7 +1239,12 @@ function setupEventListeners() {
       });
   }
   
-  if (importAllBtn) importAllBtn.addEventListener('click', () => importAllFileInput.click());
+  if (importAllBtn) {
+    importAllBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      importAllFileInput.click();
+    });
+  }
   if (importAllFileInput) importAllFileInput.addEventListener('change', handleImportAll);
   if (exportAllBtn) exportAllBtn.addEventListener('click', exportAllChats);
   

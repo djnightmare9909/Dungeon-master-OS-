@@ -1,4 +1,4 @@
-a huge shout out to PSbigbig for all your help, be sure to go give him a star on the WFGY main repo https://github.com/onestardao/WFGY
+a huge shout out to PSbigbig for all your help, be sure to go give him a star on the WFGY main repo
 
 YouTube tutorial: https://youtu.be/2TAoK5txIts
 
