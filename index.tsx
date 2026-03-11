@@ -317,7 +317,7 @@ async function startNewChat() {
     }
     
     if (error.message && (error.message.includes('API Key') || error.message.includes('API key'))) {
-        errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
+        errorMessage = "⚠️ API Key Required: To use DM OS, you must have a Google AI Studio API key.\n\n1. Get your key from Google AI Studio (aistudio.google.com).\n2. Open the Logbook (top right), go to Settings, paste your key, and Save.";
         // Auto-open settings
         openModal(logbookModal);
         const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
@@ -371,7 +371,7 @@ function loadChat(id: string) {
       if (error instanceof Error) {
           errorMessage = `Error initializing AI: ${error.message}`;
           if (error.message.includes('API Key') || error.message.includes('API key')) {
-              errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
+              errorMessage = "⚠️ API Key Required: To use DM OS, you must have a Google AI Studio API key.\n\n1. Get your key from Google AI Studio (aistudio.google.com).\n2. Open the Logbook (top right), go to Settings, paste your key, and Save.";
               // Auto-open settings
               openModal(logbookModal);
               const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
@@ -782,7 +782,7 @@ async function handleFormSubmit(e: Event) {
 
     const geminiChat = getGeminiChat();
     if (!geminiChat) {
-        const errorMessage = 'The connection to the AI has been lost. This can happen if the API Key is missing or invalid. Please check your settings in the Logbook and start a new chat.';
+        const errorMessage = "⚠️ AI Connection Lost: To use DM OS, you must have a Google AI Studio API key.\n\n1. Get your key from Google AI Studio (aistudio.google.com).\n2. Open the Logbook (top right), go to Settings, paste your key, and Save.";
         appendMessage({ sender: 'error', text: errorMessage });
         setSending(false);
         openModal(logbookModal);

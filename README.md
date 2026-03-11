@@ -6,6 +6,13 @@ YouTube tutorial: https://youtu.be/2TAoK5txIts
 YouTube overview: https://youtu.be/f0dCEIK2l0Q
 
 
+# ⚠️ IMPORTANT: API KEY REQUIRED FOR INITIAL SETUP
+To use DM OS, you must have a Google AI Studio API key.
+1. **Obtain your key:** Go to [Google AI Studio](https://aistudio.google.com/app/apikey) and generate a free API key.
+2. **Configure the App:** Once the app loads, click the **Logbook** icon (top right), navigate to the **Settings** tab, paste your key into the API Key field, and click **Save**.
+3. **Start Playing:** After saving your key, you can start a new game or continue an existing one.
+
+
 DM OS: The Living World Engine
 
 An advanced, AI‑powered Dungeon Master for immersive, long‑form Dungeons & Dragons campaigns, powered by Google Gemini.
