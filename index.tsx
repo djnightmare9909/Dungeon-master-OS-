@@ -312,11 +312,11 @@ async function startNewChat() {
     let errorMessage = `Failed to start game. Error details: ${error.message || 'Unknown error'}`;
     
     // Handle Rate Limit (429) specific message
-    if (error.status === 429 || (error.message && error.message.includes('429'))) {
+    if (error.status === 429 || (error.message && error.message.includes('429')) || errorMessage.includes('429')) {
         errorMessage = "⚠️ System Overload (429): The 'Gemini 3.0 Pro' model is currently busy. Please go to Settings (in Logbook) and switch the AI Model to 'Gemini 2.5 Flash' for a smoother experience.";
     }
     
-    if (error.message && (error.message.includes('API Key') || error.message.includes('API key'))) {
+    if (errorMessage.includes('API Key') || errorMessage.includes('API key') || errorMessage.includes('403') || error.status === 403 || error.code === 403) {
         errorMessage = "⚠️ API Key Required: To use DM OS, you must have a Google AI Studio API key.\n\n1. Get your key from Google AI Studio (aistudio.google.com).\n2. Open the Logbook (top right), go to Settings, paste your key, and Save.";
         // Auto-open settings
         openModal(logbookModal);
@@ -370,7 +370,7 @@ function loadChat(id: string) {
       let errorMessage = 'Error initializing the AI. Please check your setup or start a new chat.';
       if (error instanceof Error) {
           errorMessage = `Error initializing AI: ${error.message}`;
-          if (error.message.includes('API Key') || error.message.includes('API key')) {
+          if (errorMessage.includes('API Key') || errorMessage.includes('API key') || errorMessage.includes('403') || (error as any).status === 403 || (error as any).code === 403) {
               errorMessage = "⚠️ API Key Required: To use DM OS, you must have a Google AI Studio API key.\n\n1. Get your key from Google AI Studio (aistudio.google.com).\n2. Open the Logbook (top right), go to Settings, paste your key, and Save.";
               // Auto-open settings
               openModal(logbookModal);
@@ -902,8 +902,8 @@ async function handleFormSubmit(e: Event) {
       let errorMessage = 'The DM seems to be pondering deeply ... and has gone quiet. Please try again.';
       if (error instanceof Error) {
           errorMessage = `AI Connection Error: ${error.message}`;
-          if (error.message.includes('API Key') || error.message.includes('API key')) {
-              errorMessage = 'Error: API Key is missing or invalid. Please check your settings in the Logbook.';
+          if (errorMessage.includes('API Key') || errorMessage.includes('API key') || errorMessage.includes('403') || (error as any).status === 403 || (error as any).code === 403) {
+              errorMessage = "⚠️ API Key Required: To use DM OS, you must have a Google AI Studio API key.\n\n1. Get your key from Google AI Studio (aistudio.google.com).\n2. Open the Logbook (top right), go to Settings, paste your key, and Save.";
               openModal(logbookModal);
               const settingsTabBtn = document.querySelector('[data-tab="settings"]') as HTMLElement;
               if (settingsTabBtn) settingsTabBtn.click();
