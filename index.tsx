@@ -83,6 +83,7 @@ import {
   enterToSendToggle,
   experimentalUploadToggle,
   modelSelect,
+  modelCustomInput,
   systemVersionSelect,
   apiKeyInput,
   saveApiKeyBtn,
@@ -1329,13 +1330,32 @@ function setupEventListeners() {
   }
   if (modelSelect) {
       modelSelect.addEventListener('change', () => {
-        getUISettings().activeModel = modelSelect.value;
+        if (modelSelect.value === 'custom') {
+          if (modelCustomInput) {
+            modelCustomInput.style.display = 'block';
+            modelCustomInput.focus();
+            getUISettings().activeModel = modelCustomInput.value;
+          }
+        } else {
+          if (modelCustomInput) modelCustomInput.style.display = 'none';
+          getUISettings().activeModel = modelSelect.value;
+        }
         dbSet('dm-os-ui-settings', getUISettings());
         const currentChat = getCurrentChat();
         if (currentChat) {
             loadChat(currentChat.id);
         }
       });
+  }
+  if (modelCustomInput) {
+    modelCustomInput.addEventListener('change', () => {
+      getUISettings().activeModel = modelCustomInput.value.trim();
+      dbSet('dm-os-ui-settings', getUISettings());
+      const currentChat = getCurrentChat();
+      if (currentChat) {
+          loadChat(currentChat.id);
+      }
+    });
   }
   if (systemVersionSelect) {
     systemVersionSelect.addEventListener('change', () => {
