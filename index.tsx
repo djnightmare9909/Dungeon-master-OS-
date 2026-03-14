@@ -649,8 +649,9 @@ async function handleFormSubmit(e: Event) {
 
     if (currentSession.creationPhase) {
       stopTTS();
-      const userMessage: Message = { sender: 'user', text: userInput };
-      appendMessage(userMessage);
+      const isPassword = currentSession.creationPhase === 'quick_start_password' || currentSession.creationPhase === 'guided_password';
+      const userMessage: Message = { sender: 'user', text: isPassword ? '********' : userInput, hidden: isPassword };
+      if (!isPassword) appendMessage(userMessage);
       currentSession.messages.push(userMessage);
       chatInput.value = '';
       chatInput.style.height = 'auto';
@@ -663,10 +664,7 @@ async function handleFormSubmit(e: Event) {
       }
 
       if (currentSession.creationPhase === 'guided') {
-        currentSession.adminPassword = userInput;
-        currentSession.creationPhase = 'character_creation';
-        saveChatHistoryToDB();
-        // Fall through to the generic setup message sending logic
+        // Just fall through to send the message to the AI
       }
 
       const modelMessageContainer = appendMessage({ sender: 'model', text: '' });
@@ -679,10 +677,20 @@ async function handleFormSubmit(e: Event) {
         const geminiChat = getGeminiChat();
         if (!geminiChat) throw new Error("Setup AI Error: chat is not initialized.");
         
-        // Use a different prompt to kick off character creation
-        const messageToSend = currentSession.creationPhase === 'character_creation' && currentSession.messages.filter(m => m.sender === 'user').length <= 2
-            ? "Let's create my character."
-            : userInput;
+        // Use a different prompt based on phase
+        let messageToSend = userInput;
+        if (currentSession.creationPhase === 'guided_password') {
+          currentSession.adminPassword = userInput;
+          currentSession.creationPhase = 'world_creation';
+          saveChatHistoryToDB();
+
+          const personaName = dmPersonas.find(p => p.id === currentSession.personaId)?.name || 'DM';
+          const tone = currentSession.settings?.tone || 'heroic';
+          const narration = currentSession.settings?.narration || 'descriptive';
+          messageToSend = `I've chosen the ${personaName} with a ${tone} tone and ${narration} narration. Now, let's create the world.`;
+        } else if (currentSession.creationPhase === 'character_creation' && currentSession.messages.filter(m => m.sender === 'user').length <= 2) {
+          messageToSend = "Let's create my character.";
+        }
 
         const result = await retryOperation(() => geminiChat.sendMessageStream({ message: messageToSend })) as any;
         let responseText = '';
@@ -695,6 +703,10 @@ async function handleFormSubmit(e: Event) {
           if (shouldScroll) {
             chatContainer.scrollTop = chatContainer.scrollHeight;
           }
+        }
+
+        if (responseText.includes('Generating character sheet...')) {
+          updateLogbookData('sheet');
         }
         
         if (responseText.includes('[CHARACTER_CREATION_COMPLETE]')) {
@@ -1126,29 +1138,12 @@ function setupEventListeners() {
           
           currentSession.settings = { tone: setupSettings.tone, narration: setupSettings.narration };
           currentSession.personaId = setupSettings.personaId;
-          currentSession.creationPhase = 'world_creation';
+          currentSession.creationPhase = 'guided_password';
 
-          const geminiChat = getGeminiChat();
-          if (!geminiChat) throw new Error("Chat not initialized for narrator selection.");
-
-          const modelMessageContainer = appendMessage({ sender: 'model', text: '' });
-          const modelMessageEl = modelMessageContainer.querySelector('.message') as HTMLElement;
-          modelMessageEl.classList.add('loading');
-          
-          const personaName = dmPersonas.find(p => p.id === setupSettings.personaId)?.name || 'DM';
-          const userMessageText = `I've chosen the ${personaName} with a ${setupSettings.tone} tone and ${setupSettings.narration} narration. Now, let's create the world.`;
-          const result = await retryOperation(() => geminiChat.sendMessageStream({ message: userMessageText })) as any;
-          
-          let responseText = '';
-          modelMessageEl.classList.remove('loading');
-          for await (const chunk of result) {
-            responseText += chunk.text || '';
-            modelMessageEl.innerHTML = responseText;
-          }
-
-          const userMessage: Message = { sender: 'user', text: userMessageText, hidden: true };
-          const modelMessage: Message = { sender: 'model', text: responseText };
-          currentSession.messages.push(userMessage, modelMessage);
+          const modelMessageText = "Excellent choices. Finally, please set a secure password for the OOC (Out of Character) protocol. This allows you to speak directly to the underlying AI if you need to make corrections or ask meta-questions.";
+          const modelMessage: Message = { sender: 'model', text: modelMessageText };
+          appendMessage(modelMessage);
+          currentSession.messages.push(modelMessage);
           saveChatHistoryToDB();
 
         } catch(error) {
