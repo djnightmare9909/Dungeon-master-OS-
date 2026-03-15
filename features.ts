@@ -42,16 +42,16 @@ import {
   updateLogbook,
   appendMessage
 } from './ui';
-import { ai, generateEmbedding } from './gemini';
+import { ai, generateEmbedding, getChroniclerPrompt } from './gemini';
 import { 
   calculateCosineSimilarity, 
   retryOperation,
   calculateSemanticTension,
   calculateScarPotential,
-  calculateTotalB,
-  updateVectorBBPF
+  updateVectorBBPF,
+  euclideanDistanceSquared
 } from './utils';
-import type { CharacterSheetData, Achievement, NPCState, SemanticNode, Scar, Message } from './types';
+import type { CharacterSheetData, Achievement, NPCState, SemanticNode, Scar, Message, ChatSession, ActiveEncounters, ProgressClock, Faction } from './types';
 
 // =================================================================================
 // TTS (Re-architected for stability)
@@ -641,7 +641,10 @@ export async function commitToSemanticMemory(text: string, importance: number = 
             content: text,
             embedding: embedding,
             timestamp: Date.now(),
-            importance: importance
+            importance: importance,
+            parentId: null,
+            childIds: [],
+            edges: {}
         };
         session.semanticLog.push(node);
         saveChatHistoryToDB();
@@ -944,70 +947,470 @@ export async function pruneAndSummarizeHistory() {
 
 /**
  * Runs the WFGY Semantic Audit on every turn.
- * Calculates ΔS and Ψ_scar to detect potential "Collapse-Rebirth" events.
+ * Calculates ΔS, Ψ_scar, B_total, tracks Λ-Observer state, and triggers BBCR if needed.
+ * @param userEmbedding Embedding vector of the user's message.
+ * @param dmEmbedding Embedding vector of the DM's response.
+ * @returns Promise<boolean> true if a collapse occurred.
  */
-export async function runWFGYAudit(userInput: string, dmOutput: string): Promise<boolean> {
-    const session = getCurrentChat();
-    if (!session) return false;
+export async function runWFGYAudit(
+  userEmbedding: number[],
+  dmEmbedding: number[]
+): Promise<boolean> {
+  const session = getCurrentChat();
+  if (!session) return false;
 
-    // Initialize vectors if missing
-    if (!session.currentVector) {
-        session.currentVector = Array(64).fill(0).map(() => (Math.random() - 0.5) * 0.2);
-        session.prevVector = [...session.currentVector];
+  // Initialize vectors if missing (latentStateEmbedding replaces currentVector)
+  if (!session.latentStateEmbedding) {
+    session.latentStateEmbedding = Array(768).fill(0).map(() => (Math.random() - 0.5) * 0.2);
+  }
+  // We'll keep scarLedger as before
+  if (!session.scarLedger) session.scarLedger = [];
+  if (!session.Bc) session.Bc = 0.85;
+  if (!session.lambdaState) session.lambdaState = 'Convergent';
+  if (!session.deltaSHistory) session.deltaSHistory = [];
+
+  const deltaS = calculateSemanticTension(userEmbedding, dmEmbedding);
+  const scarPot = calculateScarPotential(session.latentStateEmbedding, session.scarLedger);
+  const B_total = deltaS + scarPot * 0.1;
+
+  // Update deltaS history (keep last 10)
+  session.deltaSHistory.push(deltaS);
+  if (session.deltaSHistory.length > 10) session.deltaSHistory.shift();
+
+  // Λ-Observer logic
+  if (session.deltaSHistory.length >= 3) {
+    // Compute linear trend using simple average slope
+    const n = session.deltaSHistory.length;
+    let sumX = 0,
+      sumY = 0,
+      sumXY = 0,
+      sumX2 = 0;
+    for (let i = 0; i < n; i++) {
+      sumX += i;
+      sumY += session.deltaSHistory[i];
+      sumXY += i * session.deltaSHistory[i];
+      sumX2 += i * i;
+    }
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX) || 0;
+
+    if (slope > 0.05) {
+      session.lambdaState = 'Chaotic';
+    } else if (slope < -0.05) {
+      session.lambdaState = 'Convergent';
+    } else {
+      // Check variance to decide between Recursive and Divergent
+      const mean = sumY / n;
+      let variance = 0;
+      for (let i = 0; i < n; i++) {
+        variance += Math.pow(session.deltaSHistory[i] - mean, 2);
+      }
+      variance /= n;
+      if (variance < 0.01) {
+        session.lambdaState = 'Recursive';
+      } else if (slope > 0) {
+        session.lambdaState = 'Divergent';
+      } else {
+        session.lambdaState = 'Recursive';
+      }
+    }
+  }
+
+  // Collapse trigger
+  if (B_total > session.Bc || session.lambdaState === 'Chaotic') {
+    console.warn('WFGY COLLAPSE TRIGGERED!', { B_total, Bc: session.Bc, lambdaState: session.lambdaState });
+
+    // Log Scar in the Ledger
+    const scar: Scar = {
+      vector: [...dmEmbedding],
+      depth: 1.0 + 0.5 * (session.scarLedger.length || 0),
+      timestamp: Date.now(),
+      B_total: B_total,
+    };
+    session.scarLedger.push(scar);
+
+    // Append hidden system message with collapse info
+    const collapseMsg: Message = {
+      sender: 'system',
+      text: `[WFGY COLLAPSE]: Semantic Tension reached critical threshold (${B_total.toFixed(2)}). The world shudders as a Scar is formed in the latent space.`,
+      hidden: true,
+    };
+    session.messages.push(collapseMsg);
+
+    // Adjust Bc using online Bayesian moving average (simple exponential smoothing)
+    session.Bc = session.Bc * 0.8 + B_total * 0.2;
+
+    // "Rebirth" – move latent state away from the collapsed region
+    // Shift away from the new scar using the same repulsion logic
+    session.latentStateEmbedding = updateVectorBBPF(
+      session.latentStateEmbedding,
+      session.scarLedger,
+      0.5 // stronger alpha to force divergence
+    );
+
+    saveChatHistoryToDB();
+    return true;
+  }
+
+  // Normal update: move latent state according to BBPF (away from scars)
+  session.latentStateEmbedding = updateVectorBBPF(
+    session.latentStateEmbedding,
+    session.scarLedger,
+    0.3
+  );
+
+  saveChatHistoryToDB();
+  return false;
+}
+
+// =================================================================================
+// STATE CHANGE INTERCEPTOR & VALIDATOR
+// =================================================================================
+
+/**
+ * Extracts <EXECUTE_STATE_CHANGE> tags from raw model response, validates each
+ * requested state change against the current session state, applies valid changes,
+ * and returns the cleaned narrative text.
+ *
+ * If any change is invalid, the function records a scar, throws an error, and
+ * does NOT modify the session state.
+ *
+ * @param rawText The raw text output from the Gemini model.
+ * @param session The current chat session.
+ * @returns The narrative text with all <EXECUTE_STATE_CHANGE> tags removed.
+ * @throws Error if any requested state change fails validation.
+ */
+export function interceptAndValidateModelResponse(
+  rawText: string,
+  session: ChatSession
+): string {
+  // Regular expression to find all <EXECUTE_STATE_CHANGE> tags (non‑greedy)
+  const tagRegex = /<EXECUTE_STATE_CHANGE>(.*?)<\/EXECUTE_STATE_CHANGE>/gs;
+  const matches = [...rawText.matchAll(tagRegex)];
+
+  // If no tags, just return the raw text (no state changes)
+  if (matches.length === 0) {
+    return rawText;
+  }
+
+  try {
+    // Parse all JSON objects from the tags
+    const changes: any[] = [];
+    for (const match of matches) {
+      try {
+        const jsonStr = match[1].trim();
+        const parsed = JSON.parse(jsonStr);
+        // Allow both single object and array
+        if (Array.isArray(parsed)) {
+          changes.push(...parsed);
+        } else {
+          changes.push(parsed);
+        }
+      } catch (e) {
+        console.error('Failed to parse EXECUTE_STATE_CHANGE JSON:', e);
+        throw new Error('Invalid JSON in state change tag.');
+      }
     }
 
-    try {
-        // We use embeddings as proxies for the latent space position
-        const userEmbedding = await generateEmbedding(userInput);
-        const dmEmbedding = await generateEmbedding(dmOutput);
-        
-        const deltaS = calculateSemanticTension(userEmbedding, dmEmbedding);
-        const scarPot = calculateScarPotential(session.currentVector, session.scarLedger || []);
-        const B_total = calculateTotalB(deltaS, scarPot);
+    // Validate each change against current session state
+    for (const change of changes) {
+      const { targetId, stat, operator, value } = change;
+      if (!targetId || !stat || !operator || value === undefined) {
+        throw new Error(`Missing required field in state change: ${JSON.stringify(change)}`);
+      }
 
-        const Bc = session.Bc || 0.85;
-
-        console.log(`WFGY Audit [ΔS: ${deltaS.toFixed(3)}, Ψ: ${scarPot.toFixed(3)}, B: ${B_total.toFixed(3)}]`);
-
-        if (B_total > Bc || scarPot > 2.0) {
-            console.warn("WFGY COLLAPSE TRIGGERED!", { B_total, Bc, scarPot });
-            
-            // Log Scar in the Ledger
-            const scar: Scar = {
-                vector: [...session.currentVector],
-                depth: 1.0 + 0.5 * (session.scarLedger?.length || 0),
-                timestamp: Date.now(),
-                B_total: B_total
-            };
-            if (!session.scarLedger) session.scarLedger = [];
-            session.scarLedger.push(scar);
-
-            // Revert to prev vector + noise (Collapse-Rebirth)
-            session.currentVector = session.prevVector!.map(v => v + (Math.random() - 0.5) * 0.05);
-            
-            // Trigger World Event via Chronicler or Tone Shift
-            const collapseMsg: Message = {
-                sender: 'system',
-                text: `[WFGY COLLAPSE]: Semantic Tension reached critical threshold (${B_total.toFixed(2)}). The world shudders as a Scar is formed in the latent space.`,
-                hidden: true
-            };
-            session.messages.push(collapseMsg);
-            
-            // Adjust Bc using Bayesian-like update
-            session.Bc = (Bc * 0.8) + (B_total * 0.2);
-            
-            saveChatHistoryToDB();
-            return true; // Collapse occurred
+      // --- Validation logic ---
+      if (targetId === 'player') {
+        // Player character validation
+        if (!session.characterSheet || typeof session.characterSheet !== 'object') {
+          throw new Error('Cannot modify player: character sheet missing or invalid.');
         }
+        if (stat === 'hp') {
+          const currentHp = session.characterSheet.hitPoints?.current;
+          const maxHp = session.characterSheet.hitPoints?.max;
+          if (typeof currentHp !== 'number' || typeof maxHp !== 'number') {
+            throw new Error('Player HP data missing.');
+          }
+          let newHp = currentHp;
+          if (operator === '+') newHp = currentHp + value;
+          else if (operator === '-') newHp = currentHp - value;
+          else if (operator === '=') newHp = value;
+          else throw new Error(`Invalid operator for hp: ${operator}`);
+          if (newHp < 0 || newHp > maxHp) {
+            throw new Error(`HP change would result in out-of-bounds value: ${newHp}`);
+          }
+        } else if (stat === 'condition') {
+          // Conditions are arrays of strings
+          if (!Array.isArray(session.characterSheet.conditions)) {
+            // Initialize if missing
+            session.characterSheet.conditions = [];
+          }
+          if (operator === 'add') {
+            if (typeof value !== 'string') throw new Error('Condition must be a string');
+          } else if (operator === 'remove') {
+            if (typeof value !== 'string') throw new Error('Condition must be a string');
+          } else {
+            throw new Error(`Invalid operator for condition: ${operator}`);
+          }
+        } else {
+          throw new Error(`Unsupported player stat: ${stat}`);
+        }
+      } else if (targetId === 'inventory') {
+        // Inventory item quantity change
+        if (!session.inventory) {
+          throw new Error('Inventory data missing.');
+        }
+      } else {
+        // Assume targetId is an NPC name (from active encounters)
+        if (!session.activeEncounters) {
+          throw new Error('Active encounters missing.');
+        }
+        const encounter = session.activeEncounters.find(e => e.entityId === targetId);
+        if (!encounter) {
+          throw new Error(`Target NPC "${targetId}" not found in active encounters.`);
+        }
+        if (stat === 'hp') {
+          let newHp = encounter.currentHp;
+          if (operator === '+') newHp += value;
+          else if (operator === '-') newHp -= value;
+          else if (operator === '=') newHp = value;
+          else throw new Error(`Invalid operator for hp: ${operator}`);
+          if (newHp < 0 || newHp > encounter.maxHp) {
+            throw new Error(`HP change would result in out-of-bounds value: ${newHp}`);
+          }
+        } else if (stat === 'condition') {
+          if (operator === 'add') {
+            if (typeof value !== 'string') throw new Error('Condition must be a string');
+          } else if (operator === 'remove') {
+            if (typeof value !== 'string') throw new Error('Condition must be a string');
+          } else {
+            throw new Error(`Invalid operator for condition: ${operator}`);
+          }
+        } else {
+          throw new Error(`Unsupported NPC stat: ${stat}`);
+        }
+      }
+    }
 
-        // Update vectors using BBPF rule
-        session.prevVector = [...session.currentVector];
-        session.currentVector = updateVectorBBPF(session.currentVector, session.scarLedger || []);
+    // --- Apply changes (now validated) ---
+    for (const change of changes) {
+      const { targetId, stat, operator, value } = change;
+      if (targetId === 'player') {
+        if (stat === 'hp') {
+          const cs = session.characterSheet as CharacterSheetData;
+          if (operator === '+') cs.hitPoints.current += value;
+          else if (operator === '-') cs.hitPoints.current -= value;
+          else if (operator === '=') cs.hitPoints.current = value;
+        } else if (stat === 'condition') {
+          const cs = session.characterSheet as CharacterSheetData;
+          if (!cs.conditions) cs.conditions = [];
+          if (operator === 'add' && !cs.conditions.includes(value)) {
+            cs.conditions.push(value);
+          } else if (operator === 'remove') {
+            cs.conditions = cs.conditions.filter(c => c !== value);
+          }
+        }
+      } else if (targetId === 'inventory') {
+        console.log('Inventory change requested:', change);
+      } else {
+        // NPC
+        const encounter = session.activeEncounters!.find(e => e.entityId === targetId)!;
+        if (stat === 'hp') {
+          if (operator === '+') encounter.currentHp += value;
+          else if (operator === '-') encounter.currentHp -= value;
+          else if (operator === '=') encounter.currentHp = value;
+        } else if (stat === 'condition') {
+          if (operator === 'add' && !encounter.conditions.includes(value)) {
+            encounter.conditions.push(value);
+          } else if (operator === 'remove') {
+            encounter.conditions = encounter.conditions.filter(c => c !== value);
+          }
+        }
+      }
+    }
+
+    // Persist changes to IndexedDB
+    saveChatHistoryToDB();
+
+    // Remove all <EXECUTE_STATE_CHANGE> tags from the raw text
+    const cleanedText = rawText.replace(tagRegex, '').trim();
+
+    return cleanedText;
+  } catch (error: any) {
+    const reason = error.message || 'Unknown validation error';
+    recordValidationFailure(session, reason);
+
+    // Append a hidden system message to the prompt history to guide regeneration
+    if (!session.messages) session.messages = [];
+    session.messages.push({
+      sender: 'system',
+      text: `[WFGY COLLAPSE]: Your previous response was rejected due to an illegal state change: ${reason}. You MUST regenerate the response without narrating final numbers and ensuring all <EXECUTE_STATE_CHANGE> tags are mathematically valid according to the character sheet and active encounters. Do NOT repeat the illegal move.`,
+      hidden: true
+    });
+
+    throw error; // Re-throw to signal index.tsx to regenerate
+  }
+}
+
+/**
+ * Extracts <TOPOLOGY_GRAPH> tags from raw model response, parses the JSON,
+ * and updates the session's currentSpatialGraph.
+ */
+export function extractSpatialTopology(rawText: string, session: ChatSession): string {
+  const tagRegex = /<TOPOLOGY_GRAPH>(.*?)<\/TOPOLOGY_GRAPH>/gs;
+  const match = tagRegex.exec(rawText);
+
+  if (match) {
+    try {
+      const jsonStr = match[1].trim();
+      const parsed = JSON.parse(jsonStr);
+      if (Array.isArray(parsed)) {
+        session.currentSpatialGraph = parsed;
+        saveChatHistoryToDB();
+        console.log("Spatial Topology Extracted:", parsed);
+      }
+    } catch (e) {
+      console.error("Failed to parse TOPOLOGY_GRAPH JSON:", e);
+    }
+    // Clean the text by removing the tag
+    return rawText.replace(tagRegex, '').trim();
+  }
+
+  return rawText;
+}
+
+/**
+ * Runs the Chronicler's turn, incorporating MeRF reward calculation.
+ */
+export async function runChroniclerTurn(playerAction: string) {
+  const session = getCurrentChat();
+  if (!session) return;
+
+  const currentState = {
+    progressClocks: session.progressClocks || {},
+    factions: session.factions || {}
+  };
+
+  try {
+    const prompt = getChroniclerPrompt();
+    const inputData = JSON.stringify({ currentState, playerAction });
+
+    const response = await retryOperation(() => ai.models.generateContent({
+      model: getUISettings().activeModel,
+      contents: inputData,
+      config: {
+        systemInstruction: prompt,
+        responseMimeType: 'application/json'
+      }
+    })) as GenerateContentResponse;
+
+    const chroniclerOutput = JSON.parse(response.text || '{}');
+    const newState = chroniclerOutput.newState;
+
+    if (newState) {
+      // MeRF Reward Calculation (Heuristics)
+      const growth = estimateGrowth(newState, currentState);
+      const novelty = estimateNovelty(newState, currentState, session.messages);
+      const consistency = estimateConsistency(newState, currentState, session.messages);
+      const tension = await computeSemanticTension(playerAction, chroniclerOutput.eventLog);
+
+      const rIntrinsic = (growth + novelty + consistency) - tension;
+      console.log(`[CHRONICLER MeRF] R_intrinsic: ${rIntrinsic.toFixed(2)} (G:${growth}, N:${novelty}, C:${consistency}, T:${tension.toFixed(2)})`);
+
+      // Apply updates if reward is positive or at least not catastrophic
+      if (rIntrinsic > -0.5) {
+        if (newState.progressClocks) session.progressClocks = newState.progressClocks;
+        if (newState.factions) session.factions = newState.factions;
+        
+        // Log the event
+        if (chroniclerOutput.eventLog) {
+          session.messages.push({
+            sender: 'system',
+            text: `[CHRONICLER]: ${chroniclerOutput.eventLog}`,
+            hidden: true
+          });
+        }
         
         saveChatHistoryToDB();
-        return false;
-    } catch (e) {
-        console.warn("WFGY Audit failed (skipped):", e);
-        return false;
+      } else {
+        console.warn("Chronicler action rejected due to low MeRF reward.");
+      }
     }
+
+  } catch (error) {
+    console.error("Chronicler turn failed:", error);
+  }
+}
+
+// --- MeRF Heuristics ---
+
+function estimateGrowth(newState: any, oldState: any): number {
+  let score = 0;
+  // Growth: Clocks advancing towards completion
+  for (const id in newState.progressClocks) {
+    const oldClock = oldState.progressClocks[id];
+    const newClock = newState.progressClocks[id];
+    if (oldClock && newClock && newClock.current > oldClock.current) {
+      score += 0.2;
+    }
+  }
+  // Growth: Faction goals shifting
+  for (const id in newState.factions) {
+    const oldFaction = oldState.factions[id];
+    const newFaction = newState.factions[id];
+    if (oldFaction && newFaction && newFaction.goal !== oldFaction.goal) {
+      score += 0.3;
+    }
+  }
+  return Math.min(score, 1.0);
+}
+
+function estimateNovelty(newState: any, oldState: any, history: Message[]): number {
+  // Simple heuristic: Are there new keys in clocks or factions?
+  const oldClockKeys = Object.keys(oldState.progressClocks);
+  const newClockKeys = Object.keys(newState.progressClocks);
+  const addedClocks = newClockKeys.filter(k => !oldClockKeys.includes(k));
+  
+  return addedClocks.length > 0 ? 0.5 : 0.1;
+}
+
+function estimateConsistency(newState: any, oldState: any, history: Message[]): number {
+  // Heuristic: Did values jump too much?
+  let penalty = 0;
+  for (const id in newState.progressClocks) {
+    const oldClock = oldState.progressClocks[id];
+    const newClock = newState.progressClocks[id];
+    if (oldClock && newClock && (newClock.current - oldClock.current) > 2) {
+      penalty += 0.2;
+    }
+  }
+  return Math.max(1.0 - penalty, 0);
+}
+
+async function computeSemanticTension(action: string, event: string): Promise<number> {
+  try {
+    const actionEmb = await generateEmbedding(action);
+    const eventEmb = await generateEmbedding(event);
+    // Semantic Tension is high if the event is unrelated to the action
+    const similarity = calculateCosineSimilarity(actionEmb, eventEmb);
+    return 1.0 - similarity;
+  } catch (e) {
+    return 0.5;
+  }
+}
+
+/**
+ * If validation fails, record a scar in the ledger and throw an error to force regeneration.
+ * (Called from within interceptAndValidateModelResponse on failure.)
+ */
+export function recordValidationFailure(session: ChatSession, reason: string) {
+  if (!session.scarLedger) session.scarLedger = [];
+  const scar: Scar = {
+    vector: session.latentStateEmbedding || Array(768).fill(0),
+    depth: 1.0 + 0.5 * (session.scarLedger.length || 0),
+    timestamp: Date.now(),
+    B_total: 1.0, // placeholder
+  };
+  session.scarLedger.push(scar);
+  saveChatHistoryToDB();
+  console.error(`Validation failed, scar recorded: ${reason}`);
 }

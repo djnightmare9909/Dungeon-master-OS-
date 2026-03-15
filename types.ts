@@ -60,13 +60,14 @@ export interface CharacterSheetData {
   speed: string;
   skills: Skill[];
   featuresAndTraits: string[];
+  conditions?: string[];
   backstory?: string;
 }
 
 export interface NPCState {
-    name: string;
-    description: string;
-    relationship: string;
+  name: string;
+  description: string;
+  relationship: string;
 }
 
 export interface ProgressClock {
@@ -86,6 +87,10 @@ export interface SemanticNode {
   embedding: number[];
   timestamp: number;
   importance: number; // 0-1 score
+  parentId: string | null;
+  childIds: string[];
+  edges: Record<string, number>; // target node id -> association weight
+  clusterLabel?: string;
 }
 
 export interface Scar {
@@ -93,6 +98,15 @@ export interface Scar {
   depth: number;
   timestamp: number;
   B_total: number;
+}
+
+export interface ActiveEncounters {
+  entityId: string; // unique identifier (could be NPC name + timestamp)
+  currentHp: number;
+  maxHp: number;
+  conditions: string[]; // e.g., ["poisoned", "blinded"]
+  armorClass: number;
+  initiative: number;
 }
 
 export interface ChatSession {
@@ -103,7 +117,15 @@ export interface ChatSession {
   createdAt: number;
   adminPassword?: string;
   personaId?: string;
-  creationPhase?: 'guided' | 'character_creation' | 'narrator_selection' | 'guided_password' | 'world_creation' | 'quick_start_selection' | 'quick_start_password' | false;
+  creationPhase?:
+    | 'guided'
+    | 'character_creation'
+    | 'narrator_selection'
+    | 'guided_password'
+    | 'world_creation'
+    | 'quick_start_selection'
+    | 'quick_start_password'
+    | false;
   characterSheet?: CharacterSheetData | string;
   inventory?: string;
   characterImageUrl?: string;
@@ -122,6 +144,10 @@ export interface ChatSession {
   prevVector?: number[];
   Bc?: number;
   lambdaState?: 'Convergent' | 'Recursive' | 'Divergent' | 'Chaotic';
+  latentStateEmbedding?: number[]; // high‑dimensional embedding for the session's current latent state
+  activeEncounters?: ActiveEncounters[]; // list of active combat entities
+  deltaSHistory?: number[];
+  currentSpatialGraph?: Array<{ from: string; to: string; distance: number }>;
 }
 
 export interface DMPersona {

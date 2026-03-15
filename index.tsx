@@ -141,7 +141,10 @@ import {
   recallRelevantMemories,
   commitToSemanticMemory,
   pruneAndSummarizeHistory,
-  runWFGYAudit
+  runWFGYAudit,
+  interceptAndValidateModelResponse,
+  extractSpatialTopology,
+  runChroniclerTurn
 } from './features';
 import {
   ai,
@@ -151,6 +154,7 @@ import {
   getQuickStartCharacterPrompt,
   getChroniclerPrompt,
   resetAI,
+  generateEmbedding
 } from './gemini';
 import { retryOperation } from './utils';
 // Fix: import UISettings type
@@ -344,9 +348,9 @@ function loadChat(id: string) {
     setCurrentChatId(id);
 
     const geminiHistory = session.messages
-      .filter(m => m.sender !== 'error' && m.sender !== 'system')
+      .filter(m => m.sender !== 'error')
       .map(m => ({
-        role: m.sender as 'user' | 'model',
+        role: (m.sender === 'system' ? 'user' : m.sender) as 'user' | 'model',
         parts: [{ text: m.text }],
       }));
 
@@ -462,92 +466,6 @@ async function deleteChat() {
 }
 
 /**
- * Runs a background "world turn" with the Chronicler AI.
- * This function is fire-and-forget and should not block the UI.
- * @param session The current chat session to update.
- */
-async function runChroniclerTurn(session: ChatSession) {
-  const chronicler = getChroniclerChat();
-  // Note: We do NOT check isSending() here because this function is called 
-  // usually *while* the main DM response is finishing or just finished.
-  // If we block on isSending(), it might never run if the user types fast.
-  // Instead, we just run it. The AI instance is separate.
-  
-  if (!chronicler) return; 
-
-  try {
-    // 1. Get current state and last player action
-    // Filter out completed clocks to save tokens and context window
-    const activeClocks: Record<string, any> = {};
-    if (session.progressClocks) {
-        Object.entries(session.progressClocks).forEach(([key, clock]) => {
-            if (clock.current < clock.max) {
-                activeClocks[key] = clock;
-            }
-        });
-    }
-
-    const currentState = {
-      progressClocks: activeClocks,
-      factions: session.factions || {}
-    };
-    // Find the last *user* message
-    const lastUserMessage = [...session.messages].reverse().find(m => m.sender === 'user');
-    const playerAction = lastUserMessage ? lastUserMessage.text : "The player took a long rest.";
-
-    // 2. Build the prompt for the Chronicler
-    const chroniclerPrompt = `
-      Current State: ${JSON.stringify(currentState)}
-      Player Action: "${playerAction}"
-    `;
-
-    // 3. Talk to the Chronicler AI - With Retry
-    // We use a separate retry block here so if it fails, it just dies quietly
-    const result = await retryOperation(() => chronicler.sendMessage({ message: chroniclerPrompt })) as GenerateContentResponse;
-    const responseText = result.text;
-
-    // 4. Parse the JSON response
-    const parsedData = JSON.parse(responseText || '{}');
-
-    // 5. Save the new state to the current session object
-    // Merge new state into existing, respecting the filtered view.
-    // We iterate the response and update the master list.
-    if (parsedData.newState && parsedData.newState.progressClocks) {
-        if (!session.progressClocks) session.progressClocks = {};
-        Object.entries(parsedData.newState.progressClocks).forEach(([key, val]) => {
-             session.progressClocks![key] = val as any;
-        });
-    }
-    if (parsedData.newState && parsedData.newState.factions) {
-        if (!session.factions) session.factions = {};
-        Object.entries(parsedData.newState.factions).forEach(([key, val]) => {
-             session.factions![key] = val as any;
-        });
-    }
-
-    // 6. Save the event log as a HIDDEN system message for RAG context
-    const chroniclerEvent: Message = {
-      sender: 'system',
-      text: `[CHRONICLER EVENT]: ${parsedData.eventLog}`,
-      hidden: true // This won't be rendered, but will inform the main DM AI
-    };
-    session.messages.push(chroniclerEvent);
-    
-    // 7. Commit the event log to the Semantic Tree
-    await commitToSemanticMemory(parsedData.eventLog, 0.8); // High importance
-    
-    // 8. Persist the updated session to IndexedDB
-    saveChatHistoryToDB();
-
-  } catch (error) {
-    console.warn("Chronicler turn failed (background task):", error);
-    // Don't bother the user with a UI error, just log it.
-    // The game can continue without this background update.
-  } 
-}
-
-
-/**
  * A helper function to finalize the setup phase and transition to the main game.
  * @param session The current chat session.
  * @param title The title for the new adventure.
@@ -580,31 +498,38 @@ async function finalizeSetupAndStartGame(session: ChatSession, title: string, fi
     const instruction = persona.getInstruction(session.adminPassword || `dnd${Date.now()}`, version);
 
     const geminiHistory = session.messages
-      .filter(m => m.sender !== 'error' && m.sender !== 'system')
-      .map(m => ({ role: m.sender as 'user' | 'model', parts: [{ text: m.text }] }));
+      .filter(m => m.sender !== 'error')
+      .map(m => ({
+        role: (m.sender === 'system' ? 'user' : m.sender) as 'user' | 'model',
+        parts: [{ text: m.text }],
+      }));
 
     setGeminiChat(createNewChatInstance(geminiHistory, instruction));
     // Initialize the Chronicler AI for the main game. Explicitly use 'gemini-2.5-flash' for cost/speed.
     setChroniclerChat(createNewChatInstance([], getChroniclerPrompt(), 'gemini-2.5-flash'));
 
-    const kickoffResult = await retryOperation(() => getGeminiChat()!.sendMessageStream({ message: "The setup is complete. Begin the adventure by narrating the opening scene." })) as any;
+    if (!finalSetupMessage) {
+      const kickoffResult = await retryOperation(() => getGeminiChat()!.sendMessageStream({ message: "The setup is complete. Begin the adventure by narrating the opening scene." })) as any;
 
-    let openingSceneText = '';
-    gameLoadingMessage.classList.remove('loading');
-    gameLoadingMessage.innerHTML = '';
-    for await (const chunk of kickoffResult) {
-      openingSceneText += chunk.text || '';
-      gameLoadingMessage.innerHTML = openingSceneText;
-      if (shouldScroll) {
-        chatContainer.scrollTop = chatContainer.scrollHeight;
+      let openingSceneText = '';
+      gameLoadingMessage.classList.remove('loading');
+      gameLoadingMessage.innerHTML = '';
+      for await (const chunk of kickoffResult) {
+        openingSceneText += chunk.text || '';
+        gameLoadingMessage.innerHTML = openingSceneText;
+        if (shouldScroll) {
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
       }
-    }
-    gameLoadingContainer.remove();
+      gameLoadingContainer.remove();
 
-    const openingSceneMessage: Message = { sender: 'model', text: openingSceneText };
-    appendMessage(openingSceneMessage);
-    session.messages.push(openingSceneMessage);
-    saveChatHistoryToDB();
+      const openingSceneMessage: Message = { sender: 'model', text: openingSceneText };
+      appendMessage(openingSceneMessage);
+      session.messages.push(openingSceneMessage);
+      saveChatHistoryToDB();
+    } else {
+      gameLoadingContainer.remove();
+    }
   } catch (error) {
     console.error("Failed to start the main game:", error);
     gameLoadingContainer.remove();
@@ -821,8 +746,6 @@ async function handleFormSubmit(e: Event) {
       const context = getUserContext();
       
       // WFGY-Lite: Semantic Memory Retrieval
-      // Query the "Semantic Tree" for relevant past memories
-      // We wrap this in a try/catch just in case it fails, so it doesn't block the chat.
       let relevantMemories: string[] = [];
       try {
           relevantMemories = await recallRelevantMemories(userInput, 3);
@@ -847,17 +770,65 @@ async function handleFormSubmit(e: Event) {
           messageWithContext = `(System: Context Injection:\n${contextBlock}\n)\n\n${userInput}`;
       }
 
-      const result = await retryOperation(() => geminiChat.sendMessageStream({ message: messageWithContext })) as any;
       let responseText = '';
-      modelMessageEl.classList.remove('loading');
-      modelMessageEl.innerHTML = '';
+      let attempts = 0;
+      const maxAttempts = 3;
+      let validationPassed = false;
 
-      for await (const chunk of result) {
-        responseText += chunk.text || '';
-        let displayHtml = responseText.replace(/\[COMBAT_STATUS:.*?\]/g, '').trim();
-        modelMessageEl.innerHTML = displayHtml;
-        if (shouldScroll) {
-          chatContainer.scrollTop = chatContainer.scrollHeight;
+      while (attempts < maxAttempts && !validationPassed) {
+        try {
+          responseText = '';
+          modelMessageEl.classList.add('loading');
+          modelMessageEl.textContent = '...';
+          
+          // Re-initialize chat from history on each attempt to ensure it picks up [WFGY COLLAPSE] system messages
+          const personaId = currentSession.personaId || 'purist';
+          const persona = dmPersonas.find(p => p.id === personaId) || dmPersonas[0];
+          const version = currentSession.systemVersion || '3.0';
+          const instruction = persona.getInstruction(currentSession.adminPassword || '', version);
+          
+          const geminiHistory = currentSession.messages
+            .filter(m => m.sender !== 'error')
+            .map(m => ({
+              role: (m.sender === 'system' ? 'user' : m.sender) as 'user' | 'model',
+              parts: [{ text: m.text }],
+            }));
+          
+          const currentChat = createNewChatInstance(geminiHistory, instruction);
+          setGeminiChat(currentChat);
+
+          const result = await retryOperation(() => currentChat.sendMessageStream({ message: attempts === 0 ? messageWithContext : "Please regenerate your last response correctly." })) as any;
+          
+          modelMessageEl.classList.remove('loading');
+          modelMessageEl.innerHTML = '';
+
+          for await (const chunk of result) {
+            responseText += chunk.text || '';
+            let displayHtml = responseText.replace(/\[COMBAT_STATUS:.*?\]/g, '').replace(/<EXECUTE_STATE_CHANGE>.*?<\/EXECUTE_STATE_CHANGE>/gs, '').trim();
+            modelMessageEl.innerHTML = displayHtml;
+            if (shouldScroll) {
+              chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+          }
+
+          // Sudo-Architecture Firewall: Intercept and Validate
+          const cleanedTopology = extractSpatialTopology(responseText, currentSession);
+          const cleanedNarrative = interceptAndValidateModelResponse(cleanedTopology, currentSession);
+          responseText = cleanedNarrative; // Use cleaned narrative for final display
+          validationPassed = true;
+        } catch (error: any) {
+          attempts++;
+          console.warn(`Validation attempt ${attempts} failed:`, error.message);
+          if (attempts >= maxAttempts) {
+            responseText = "The simulation has become unstable. [WFGY CRITICAL COLLAPSE]";
+            modelMessageEl.innerHTML = responseText;
+            break;
+          }
+          // The interceptor already pushed a [WFGY COLLAPSE] message to session.history
+          // We need to make sure the geminiChat object's internal history is updated or we use a new one.
+          // Since geminiChat is stateful, we might need to re-initialize it from session.history if it doesn't pick up the changes.
+          // However, session.history is what we use to create the chat.
+          // Let's just try to send a "retry" message.
         }
       }
 
@@ -881,10 +852,15 @@ async function handleFormSubmit(e: Event) {
       saveChatHistoryToDB();
       
       // --- WFGY AUDIT TRIGGER ---
-      // This calculates Semantic Tension and Scar Potential to maintain the world's stability.
-      runWFGYAudit(userInput, finalMessage.text).catch(err => {
+      (async () => {
+        try {
+          const userEmb = await generateEmbedding(userInput);
+          const dmEmb = await generateEmbedding(finalMessage.text);
+          await runWFGYAudit(userEmb, dmEmb);
+        } catch (err) {
           console.error("WFGY Audit failed:", err);
-      });
+        }
+      })();
 
       // --- LIVING WORLD ENGINE TRIGGER ---
       // Now, check if we need to run a "World Turn" in the background
@@ -898,7 +874,7 @@ async function handleFormSubmit(e: Event) {
 
       if (isWorldTurn && getChroniclerChat()) {
         // This runs in the background and does not block the UI.
-        runChroniclerTurn(currentSession).catch(err => {
+        runChroniclerTurn(userInput).catch(err => {
             console.error("Caught an error from the background chronicler turn:", err);
         });
       }

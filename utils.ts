@@ -37,6 +37,7 @@ export function migrateAndValidateSession(session: any): ChatSession {
     session.creationPhase === 'guided' ||
     session.creationPhase === 'character_creation' ||
     session.creationPhase === 'narrator_selection' ||
+    session.creationPhase === 'guided_password' ||
     session.creationPhase === 'world_creation' ||
     session.creationPhase === 'quick_start_selection' ||
     session.creationPhase === 'quick_start_password'
@@ -113,6 +114,7 @@ export function migrateAndValidateSession(session: any): ChatSession {
   newSession.prevVector = Array.isArray(session.prevVector) ? session.prevVector : undefined;
   newSession.Bc = typeof session.Bc === 'number' ? session.Bc : 0.85;
   newSession.lambdaState = (['Convergent', 'Recursive', 'Divergent', 'Chaotic'].includes(session.lambdaState)) ? session.lambdaState : 'Convergent';
+  newSession.deltaSHistory = Array.isArray(session.deltaSHistory) ? session.deltaSHistory : [];
 
   return newSession as ChatSession;
 }
@@ -145,78 +147,88 @@ export function calculateCosineSimilarity(vecA: number[], vecB: number[]): numbe
  * ΔS = 1 - cos(I, G)
  */
 export function calculateSemanticTension(vecA: number[], vecB: number[]): number {
-    const similarity = calculateCosineSimilarity(vecA, vecB);
-    return 1 - similarity;
+  const similarity = calculateCosineSimilarity(vecA, vecB);
+  return 1 - similarity;
+}
+
+/**
+ * Euclidean distance squared between two vectors.
+ */
+export function euclideanDistanceSquared(a: number[], b: number[]): number {
+  if (a.length !== b.length) return Infinity;
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) {
+    const diff = a[i] - b[i];
+    sum += diff * diff;
+  }
+  return sum;
 }
 
 /**
  * WFGY Math: Scar Potential (Ψ_scar)
- * Ψ_scar(x) = Σ D_k / ||x - x_k||²
+ * Ψ_scar(x) = Σ D_k / (||x - x_k||² + ε)
+ * Capped at 100.0 to prevent Infinity.
  */
 export function calculateScarPotential(x: number[], scarLedger: Scar[]): number {
-    if (!scarLedger || scarLedger.length === 0) return 0;
-    let potential = 0;
-    const epsilon = 1e-6;
-    for (const scar of scarLedger) {
-        if (x.length !== scar.vector.length) continue;
-        let distSq = 0;
-        for (let i = 0; i < x.length; i++) {
-            distSq += Math.pow(x[i] - scar.vector[i], 2);
-        }
-        if (distSq < epsilon) return 100; // Cap at 100 instead of Infinity for stability
-        potential += scar.depth / distSq;
-    }
-    return potential;
+  if (!scarLedger || scarLedger.length === 0) return 0;
+  const epsilon = 1e-6;
+  let potential = 0;
+  for (const scar of scarLedger) {
+    const distSq = euclideanDistanceSquared(x, scar.vector);
+    potential += scar.depth / (distSq + epsilon);
+  }
+  return Math.min(potential, 100.0);
 }
 
 /**
- * WFGY Math: Total B (B_total)
- * B_total = ΔS + ∇Ψ_scar
+ * WFGY Math: BBPF Update Rule
+ * x_{t+1} = x_t - α ∇Ψ_scar(x)   (deterministic repulsion from nearest scar)
+ * Where ∇Ψ_scar(x) for the nearest scar = -2 * depth * (x - x_k) / (||x - x_k||²)²
  */
-export function calculateTotalB(deltaS: number, scarPot: number): number {
-    return deltaS + (scarPot * 0.1);
-}
+export function updateVectorBBPF(
+  x: number[],
+  scarLedger: Scar[],
+  alpha: number = 0.3
+): number[] {
+  if (!x || x.length === 0) return Array(768).fill(0).map(() => (Math.random() - 0.5) * 0.2);
+  if (scarLedger.length === 0) return x; // no scars, no change
 
-/**
- * WFGY Math: BBPF Update Rule (Simplified)
- * x_{t+1} = x_t - η ∇Φ(x) - α ∇Ψ_scar(x)
- */
-export function updateVectorBBPF(x: number[], scarLedger: Scar[], eta: number = 0.05, alpha: number = 0.3): number[] {
-    if (!x || x.length === 0) return Array(64).fill(0).map(() => (Math.random() - 0.5) * 0.2);
-    
-    const newX = [...x];
-    // Gradient of Φ (semantic tension) approximated by small random noise
-    const grad = x.map(() => (Math.random() - 0.5) * 0.01);
-    
-    let scarGrad = Array(x.length).fill(0);
-    if (scarLedger.length > 0) {
-        // Find nearest scar
-        let nearestScar = scarLedger[0];
-        let minDistSq = Infinity;
-        for (const scar of scarLedger) {
-            if (scar.vector.length !== x.length) continue;
-            let d2 = 0;
-            for (let i = 0; i < x.length; i++) d2 += Math.pow(x[i] - scar.vector[i], 2);
-            if (d2 < minDistSq) {
-                minDistSq = d2;
-                nearestScar = scar;
-            }
-        }
-        
-        if (minDistSq > 0) {
-            for (let i = 0; i < x.length; i++) {
-                scarGrad[i] = (x[i] - nearestScar.vector[i]) / minDistSq;
-            }
-        }
+  // Find nearest scar (by Euclidean distance)
+  let nearestScar: Scar | null = null;
+  let minDistSq = Infinity;
+  for (const scar of scarLedger) {
+    if (scar.vector.length !== x.length) continue;
+    const distSq = euclideanDistanceSquared(x, scar.vector);
+    if (distSq < minDistSq) {
+      minDistSq = distSq;
+      nearestScar = scar;
     }
+  }
 
-    for (let i = 0; i < x.length; i++) {
-        newX[i] = x[i] - (eta * grad[i]) - (alpha * scarGrad[i]);
-    }
+  if (!nearestScar) return x; // no compatible scar
 
-    // Normalize
-    const norm = Math.sqrt(newX.reduce((sum, v) => sum + v * v, 0)) || 1;
-    return newX.map(v => (v / norm) * 5.0);
+  const newX = [...x];
+  const epsilon = 1e-6;
+  const distSq = Math.max(minDistSq, epsilon); // avoid division by zero
+  const depth = nearestScar.depth;
+
+  // Compute gradient of Ψ for this scar: ∇Ψ = -2 * depth * (x - x_k) / (distSq)^2
+  // We want to move opposite to gradient (i.e., -α ∇Ψ) = +α * 2 * depth * (x - x_k) / distSq^2
+  const factor = (alpha * 2 * depth) / (distSq * distSq);
+  for (let i = 0; i < x.length; i++) {
+    const diff = x[i] - nearestScar.vector[i];
+    newX[i] = x[i] + factor * diff; // move away from scar
+  }
+
+  // Normalize to prevent explosion (optional, keep same norm as before)
+  const normOld = Math.sqrt(x.reduce((sum, v) => sum + v * v, 0)) || 1;
+  const normNew = Math.sqrt(newX.reduce((sum, v) => sum + v * v, 0)) || 1;
+  const scale = normOld / normNew;
+  for (let i = 0; i < x.length; i++) {
+    newX[i] *= scale;
+  }
+
+  return newX;
 }
 
 /**
