@@ -85,6 +85,7 @@ import {
   modelSelect,
   modelCustomInput,
   systemVersionSelect,
+  engineVariantSelect,
   apiKeyInput,
   saveApiKeyBtn,
   changeUiBtn,
@@ -144,7 +145,8 @@ import {
   runWFGYAudit,
   interceptAndValidateModelResponse,
   extractSpatialTopology,
-  runChroniclerTurn
+  runChroniclerTurn,
+  processIntents
 } from './features';
 import {
   ai,
@@ -804,7 +806,11 @@ async function handleFormSubmit(e: Event) {
 
           for await (const chunk of result) {
             responseText += chunk.text || '';
-            let displayHtml = responseText.replace(/\[COMBAT_STATUS:.*?\]/g, '').replace(/<EXECUTE_STATE_CHANGE>.*?<\/EXECUTE_STATE_CHANGE>/gs, '').trim();
+            let displayHtml = responseText
+              .replace(/\[COMBAT_STATUS:.*?\]/g, '')
+              .replace(/<EXECUTE_STATE_CHANGE>.*?<\/EXECUTE_STATE_CHANGE>/gs, '')
+              .replace(/\[INTENT:.*?\]/g, '')
+              .trim();
             modelMessageEl.innerHTML = displayHtml;
             if (shouldScroll) {
               chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -814,7 +820,10 @@ async function handleFormSubmit(e: Event) {
           // Sudo-Architecture Firewall: Intercept and Validate
           const cleanedTopology = extractSpatialTopology(responseText, currentSession);
           const cleanedNarrative = interceptAndValidateModelResponse(cleanedTopology, currentSession);
-          responseText = cleanedNarrative; // Use cleaned narrative for final display
+          
+          // Flash Engine: Process Intents
+          const finalNarrative = processIntents(cleanedNarrative);
+          responseText = finalNarrative; // Use final narrative for final display
           validationPassed = true;
         } catch (error: any) {
           attempts++;
@@ -1424,6 +1433,19 @@ function setupEventListeners() {
 
   if (fileUploadBtn) fileUploadBtn.addEventListener('click', () => fileUploadInput.click());
   if (fileUploadInput) fileUploadInput.addEventListener('change', handleFileUpload);
+
+  if (engineVariantSelect) {
+    engineVariantSelect.addEventListener('change', () => {
+      const newVariant = engineVariantSelect.value as 'pro' | 'flash';
+      getUISettings().engineVariant = newVariant;
+      dbSet('dm-os-ui-settings', getUISettings());
+      
+      const currentChat = getCurrentChat();
+      if (currentChat) {
+          loadChat(currentChat.id);
+      }
+    });
+  }
 }
 
 /**

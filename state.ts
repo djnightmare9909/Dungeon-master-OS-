@@ -39,6 +39,7 @@ let uiSettings: UISettings = {
   activeModel: 'gemini-2.5-flash',
   apiKey: '',
   systemVersion: '2.0',
+  engineVariant: 'pro',
 };
 
 // =================================================================================

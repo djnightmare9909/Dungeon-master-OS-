@@ -22,6 +22,7 @@ export interface UISettings {
   activeModel: string;
   apiKey: string;
   systemVersion: '2.0' | '3.0';
+  engineVariant: 'pro' | 'flash';
 }
 
 export interface AbilityScore {

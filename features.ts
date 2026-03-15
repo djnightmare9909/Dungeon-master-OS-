@@ -1341,7 +1341,91 @@ export async function runChroniclerTurn(playerAction: string) {
   }
 }
 
-// --- MeRF Heuristics ---
+/**
+ * Processes [INTENT: ...] tags for the Flash engine variant.
+ * Offloads mechanical logic to the client side.
+ */
+export function processIntents(text: string): string {
+  const intentRegex = /\[INTENT:\s*(\w+)\s*({.*?})?\]/g;
+  let match;
+  let processedText = text;
+
+  while ((match = intentRegex.exec(text)) !== null) {
+    const action = match[1];
+    const paramsStr = match[2];
+    let params = {};
+    if (paramsStr) {
+      try {
+        params = JSON.parse(paramsStr);
+      } catch (e) {
+        console.error("Failed to parse intent params:", paramsStr);
+      }
+    }
+    
+    executeIntent(action, params);
+    processedText = processedText.replace(match[0], '');
+  }
+  
+  return processedText;
+}
+
+function executeIntent(action: string, params: any) {
+  console.log(`[FLASH ENGINE] Executing Intent: ${action}`, params);
+  
+  const session = getCurrentChat();
+  if (!session) return;
+
+  switch (action) {
+    case 'ATTACK': {
+      const roll = Math.floor(Math.random() * 20) + 1;
+      const bonus = params.bonus || 0;
+      const total = roll + bonus;
+      appendMessage({ 
+        sender: 'system', 
+        text: `[FLASH MECHANICS]: Attack roll for ${params.target || 'target'}: ${roll} + ${bonus} = ${total}`,
+        hidden: false 
+      });
+      break;
+    }
+    case 'DAMAGE': {
+      appendMessage({ 
+        sender: 'system', 
+        text: `[FLASH MECHANICS]: ${params.target || 'target'} takes ${params.amount} ${params.type || ''} damage.`,
+        hidden: false 
+      });
+      break;
+    }
+    case 'CHECK': {
+      const roll = Math.floor(Math.random() * 20) + 1;
+      const dc = params.dc || 10;
+      const success = roll >= dc;
+      appendMessage({ 
+        sender: 'system', 
+        text: `[FLASH MECHANICS]: ${params.skill || 'Skill'} check (DC ${dc}): ${roll} -> ${success ? 'SUCCESS' : 'FAILURE'}`,
+        hidden: false 
+      });
+      break;
+    }
+    case 'HEAL': {
+      appendMessage({ 
+        sender: 'system', 
+        text: `[FLASH MECHANICS]: ${params.target || 'target'} is healed for ${params.amount} HP.`,
+        hidden: false 
+      });
+      break;
+    }
+    case 'CONDITION': {
+      appendMessage({ 
+        sender: 'system', 
+        text: `[FLASH MECHANICS]: ${params.target || 'target'} is now ${params.condition} for ${params.duration || '1 minute'}.`,
+        hidden: false 
+      });
+      break;
+    }
+    default:
+      console.warn(`Unknown intent action: ${action}`);
+  }
+}
 
 function estimateGrowth(newState: any, oldState: any): number {
   let score = 0;

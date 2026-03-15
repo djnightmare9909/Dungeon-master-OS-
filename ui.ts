@@ -84,6 +84,7 @@ export const experimentalUploadToggle = document.getElementById('setting-experim
 export const modelSelect = document.getElementById('setting-model') as HTMLSelectElement;
 export const modelCustomInput = document.getElementById('setting-model-custom') as HTMLInputElement;
 export const systemVersionSelect = document.getElementById('setting-system-version') as HTMLSelectElement;
+export const engineVariantSelect = document.getElementById('setting-engine-variant') as HTMLSelectElement;
 export const apiKeyInput = document.getElementById('setting-api-key') as HTMLInputElement;
 export const saveApiKeyBtn = document.getElementById('save-api-key-btn') as HTMLButtonElement;
 export const changeUiBtn = document.getElementById('change-ui-btn') as HTMLButtonElement;
@@ -150,6 +151,9 @@ export function applyUISettings() {
   }
   if (systemVersionSelect) {
     systemVersionSelect.value = uiSettings.systemVersion || '2.0';
+  }
+  if (engineVariantSelect) {
+    engineVariantSelect.value = uiSettings.engineVariant || 'pro';
   }
   if (apiKeyInput) {
       apiKeyInput.value = uiSettings.apiKey || '';
